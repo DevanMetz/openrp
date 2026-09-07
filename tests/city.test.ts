@@ -5,6 +5,7 @@ import {
   BUILDINGS,
   FLOOR_HEIGHT,
   INITIAL_DOORS,
+  MAP_BOUND,
   ROOMS,
   toWorld,
   type Building,
@@ -73,6 +74,27 @@ test('new businesses connect their front room, workshop and back office through 
     walk(-4, -4.6);
     walk(4, -4.6);
     walk(4, -8);
+  }
+});
+
+test('loose props remain on the ground throughout the expanded district and after restoring the world', () => {
+  let now = 100_000;
+  let game = new Game({ now: () => now });
+  const owner = game.join('Outer District Builder').player.id;
+  const edge = MAP_BOUND - 8;
+  for (const [x, z] of [[edge, 0], [-edge, 0], [0, edge], [0, -edge]])
+    game.createEntity('crate', owner, { x, y: 4, z });
+  for (let pass = 0; pass < 2; pass++) {
+    for (let step = 0; step < 90; step++) {
+      now += 34;
+      game.step();
+    }
+    assert.equal(game.entities.size, 4, 'props must not fall out of the expanded world');
+    for (const entity of game.entities.values()) {
+      assert.ok(entity.y > 0.55 && entity.y < 0.8, 'loose crates should rest on the ground');
+      assert.equal(entity.owner, owner);
+    }
+    if (!pass) game = new Game({ world: game.exportWorld(), now: () => now });
   }
 });
 

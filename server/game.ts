@@ -126,7 +126,7 @@ export class Game {
     this.physics.broadphase = new CANNON.SAPBroadphase(this.physics);
     this.physics.defaultContactMaterial.friction = 0.55;
     this.physics.defaultContactMaterial.restitution = 0.05;
-    this.addStatic({ x: 0, y: -0.5, z: 0, w: 160, h: 1, d: 160 });
+    this.addStatic({ x: 0, y: -0.5, z: 0, w: MAP_BOUND * 2 + 2, h: 1, d: MAP_BOUND * 2 + 2 });
     for (const b of BLOCKS) this.addStatic(b);
     for (const d of this.doors) this.doorBodies.set(d.id, this.addStatic(doorBox(d)));
     if (options.world) {
