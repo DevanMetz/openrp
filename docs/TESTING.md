@@ -14,6 +14,7 @@ Coverage includes:
 - Physics settling, freezing, ownership restrictions and fading collision restoration.
 - Weapon damage, world occlusion, ammunition, reload timing, death and respawn.
 - Wanted/arrest permissions, custody restrictions, release and lockpicking.
+- Resident actions through menus and chat: exact identity targeting, full names/IDs, role checks, clean reasons, shared cooldown, transfer conservation, wallet caps, range/occlusion and stale targets.
 - Credential privacy, wallet reconnect, local/global chat delivery and text filtering.
 - Real WebSocket clients sharing players, props, jobs and chat; retained belongings on disconnect.
 - Invalid JSON, origin restrictions, flooding, optional passwords and server status.
@@ -43,8 +44,11 @@ Coverage includes:
 9. Verify local/OOC/group chat and mayor laws. Names containing `<`, `>` or quotes must display as text.
 10. Buy a weapon and armor, spend ammunition, place/freeze/paint props, and lock a purchased door. Refresh, rejoin with the same browser identity, then gracefully stop/restart the server with the same `DATA_DIR`. Verify inventory, ammo, armor, cash, prop placement, paint, frozen state, shop stock and property keys remain. Check an offline owner's shop still pays the owner, and that offline shared keys can be revoked. Verify readable errors, graphics settings and no console exceptions. Normal removal, death rules and operator cleanup must still work.
 11. Voice: Settings → Enable microphone → allow the browser permission → return to play → hold V. Another nearby resident should hear directional audio that fades with distance and stops at 28 metres. Test V release, menus, chat, blur, tab visibility, death, mute/unmute in Tab, mute all, volume and microphone off. Permission denial or a missing device must leave text/gameplay working and show a useful retry message.
+12. Select a resident in Tab or aim at them and press C. Give cash and verify both wallets; repeat with a blocked view, distant/dead recipient and full wallet. As government, mark/clear wanted status, issue a warrant and grant a license with the appropriate job. Keep an amount or reason focused while the target renames, moves out of range or disconnects; drafts should survive updates, controls should match current permissions, and a replacement resident with the same name must not inherit the old menu's actions.
 
 Persistence browser QA, September 7, 2026: an isolated production server retained a Civil Protection character's pistol (11/36 rounds), 100 armor and owned frozen shelf after a page reload/rejoin and after replacing the server process from its checkpoint. The shelf remained in the same place, equipped weapon and ownership matched, and the browser reported no console errors. Automated tests separately cover graceful shutdown, purchased inventory, shop stock, property keys, legacy migration and corrupt saves.
+
+Resident-menu browser QA, September 7, 2026: an isolated production build transferred $125 (sender $1,375, recipient $1,625), marked a suspect wanted, issued a warrant and granted a license. Rapid submissions showed a cooldown notice and retained drafts. Names containing quotes and angle brackets displayed as text; a rename preserved the focused warrant reason. Movement disabled an out-of-range transfer without losing its amount, a job change removed government controls, and disconnect/replacement left the old menu unavailable. C targeting and resident mute worked. The resident form and player list fit at 1280×720 and 640×820 with no browser console warnings or errors.
 
 ### Reproducible browser voice lab
 

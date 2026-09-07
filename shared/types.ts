@@ -26,6 +26,7 @@ export type WeaponId =
   | 'medkit'
   | 'ram';
 export type PropKind = 'crate' | 'barrel' | 'pallet' | 'fence' | 'couch' | 'table' | 'shelf';
+export type ResidentAction = 'give' | 'wanted' | 'unwanted' | 'warrant' | 'license';
 export type EntityKind = PropKind | 'printer' | 'microwave' | 'shipment' | 'money' | 'food';
 export interface Input {
   seq: number;

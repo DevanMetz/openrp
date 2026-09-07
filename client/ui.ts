@@ -1,5 +1,16 @@
-import { GOVERNMENT, JOBS, MAX_PROPS, PROPS, SHOP, VERSION, WEAPONS } from '../shared/catalog.ts';
+import {
+  GIVE_RANGE,
+  GOVERNMENT,
+  JOBS,
+  MAX_PROPS,
+  MAX_TRANSFER,
+  PROPS,
+  SHOP,
+  VERSION,
+  WEAPONS,
+} from '../shared/catalog.ts';
 import { BUILDINGS, districtAt } from '../shared/map.ts';
+import { distance, eyes } from '../shared/movement.ts';
 import type { GameEvent, JobId, Player, Snapshot } from '../shared/types.ts';
 import type { VoiceStatus } from './voice.ts';
 
@@ -149,6 +160,21 @@ export class UI {
             ? `${Math.round(this.settings[key] * 100)}%`
             : String(this.settings[key]);
     });
+    this.el('menu-content').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement) || !form.dataset.residentAction) return;
+      const target = this.state?.players.find((p) => p.id === form.dataset.target);
+      if (!target || !this.player || this.player.deadUntil || this.player.arrestedUntil) {
+        this.notice('This resident action is no longer available.', 'error');
+        this.renderMenu();
+        return;
+      }
+      if (!form.reportValidity()) return;
+      const input = form.querySelector<HTMLInputElement>('input')!;
+      const action = form.dataset.residentAction;
+      this.onAction(action, target.id, action === 'give' ? Number(input.value) : input.value.trim());
+    });
   }
   el(id: string): HTMLElement {
     return document.getElementById(id)!;
@@ -178,14 +204,14 @@ export class UI {
     this.close(false);
     this.status(reason);
   }
-  open(menu: string): void {
-    if (this.menu === menu) {
+  open(menu: string, target?: AimTarget): void {
+    if (this.menu === menu && !target) {
       this.close();
       return;
     }
     this.closeChat(false);
     this.menu = menu;
-    if (menu === 'context') this.contextTarget = this.aim;
+    if (menu === 'context') this.contextTarget = target ?? this.aim;
     this.el('overlay').hidden = false;
     this.onMenu();
     this.renderMenu();
@@ -290,14 +316,57 @@ export class UI {
       )
       .join('');
     if (this.el('weapon-strip').innerHTML !== strip) this.el('weapon-strip').innerHTML = strip;
-    const menuKey = `${p.job}:${p.money}:${p.weapons.join(',')}:${state.players.map((v) => v.id + v.job).join(',')}:${state.vote?.id}:${state.vote?.yes}:${state.vote?.no}:${state.entities.length}:${JSON.stringify(state.doors)}:${state.laws.join('|')}`;
+    const residentMenu = this.menu === 'context' && this.contextTarget?.kind === 'player';
+    const resident = residentMenu ? state.players.find((v) => v.id === this.contextTarget?.id) : undefined;
+    const giveNearby = resident && distance(eyes(p), eyes(resident)) <= GIVE_RANGE;
+    const menuKey = JSON.stringify([
+      p.job,
+      p.money,
+      p.weapons,
+      giveNearby,
+      state.players.map((v) => [
+        v.id,
+        v.name,
+        v.job,
+        v.deadUntil,
+        v.arrestedUntil,
+        v.wantedUntil,
+        v.wantedReason,
+        v.warrantUntil,
+        v.license,
+      ]),
+      state.vote,
+      state.entities.length,
+      state.doors,
+      state.laws,
+      state.lockdown,
+    ]);
     if (
       this.menu &&
       this.lastMenuKey !== menuKey &&
-      !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '')
+      (residentMenu || !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? ''))
     ) {
       this.lastMenuKey = menuKey;
+      // Keep resident details and permissions live without discarding a typed amount or reason.
+      const focused = document.activeElement;
+      const fields = residentMenu
+        ? [...this.el('menu-content').querySelectorAll('input')].map((input) => ({
+            id: input.id,
+            value: input.value,
+            start: input.selectionStart,
+            end: input.selectionEnd,
+          }))
+        : [];
       this.renderMenu();
+      for (const field of fields) {
+        const input = document.getElementById(field.id) as HTMLInputElement | null;
+        if (!input) continue;
+        input.value = field.value;
+        if (focused?.id === field.id && !input.disabled) {
+          input.focus({ preventScroll: true });
+          if (field.start !== null && field.end !== null) input.setSelectionRange(field.start, field.end);
+        }
+      }
     }
     this.drawMap();
   }
@@ -370,7 +439,7 @@ export class UI {
           : '');
     }
     for (const button of this.root.querySelectorAll<HTMLButtonElement>(
-      '.scoreboard [data-action="voice-mute"]',
+      '#menu-content [data-action="voice-mute"]',
     )) {
       const id = button.dataset.target!;
       const name = this.state?.players.find((p) => p.id === id)?.name ?? 'resident';
@@ -452,7 +521,7 @@ export class UI {
     if (this.menu === 'laws' && s && p)
       html = `<div class="section-heading"><span class="eyebrow">MUNICIPAL NOTICEBOARD</span><h2>The law of the district.</h2><p>Mayor: ${escape(s.players.find((v) => v.job === 'mayor')?.name ?? 'Office vacant')}</p></div><div class="laws-list">${s.laws.map((law, i) => `<div><span>${String(i + 1).padStart(2, '0')}</span><p>${escape(law)}</p></div>`).join('')}</div><p class="muted">${s.lockdown ? 'A citywide lockdown is in effect.' : 'The district is open. No lockdown is in effect.'}</p>${p.job === 'mayor' ? '<div class="command-field"><input id="new-law" maxlength="120" placeholder="Write a new city law" aria-label="New city law"><button data-action="add-law">Add law</button></div><div class="tool-buttons"><button data-action="lockdown">Toggle lockdown</button><button data-action="reset-laws">Restore default laws</button></div>' : ''}${this.voteHtml()}`;
     if (this.menu === 'players' && s)
-      html = `<div class="section-heading"><span class="eyebrow">${escape(this.serverName)}</span><h2>The people make the city.</h2><p>${s.players.length} residents connected</p></div><div class="scoreboard"><div class="score-head"><span>RESIDENT</span><span>OCCUPATION</span><span>STATUS</span><span>VOICE</span></div>${s.players.map((v) => `<div class="score-row"><span><i style="background:${JOBS[v.job].color}"></i>${escape(v.name)}${v.id === p?.id ? ' <small>YOU</small>' : ''}</span><span style="color:${JOBS[v.job].color}">${JOBS[v.job].name}</span><span>${v.deadUntil ? 'Respawning' : v.arrestedUntil ? 'In custody' : v.wantedUntil ? 'Wanted' : 'In the district'}<small class="voice-speaking-label" data-voice-speaker="${v.id}"></small></span><span>${v.id === p?.id ? '<small>YOU</small>' : `<button class="voice-mute" data-action="voice-mute" data-target="${v.id}">Mute</button>`}</span></div>`).join('')}</div><p class="muted">Hold V for proximity voice after enabling your microphone in Settings. Mute controls only affect what you hear. Text chat: Y, /ooc for everyone, /g for your job group.</p>`;
+      html = `<div class="section-heading"><span class="eyebrow">${escape(this.serverName)}</span><h2>The people make the city.</h2><p>${s.players.length} residents connected · Select a name to interact.</p></div><div class="scoreboard"><div class="score-head"><span>RESIDENT</span><span>OCCUPATION</span><span>STATUS</span><span>VOICE</span></div>${s.players.map((v) => `<div class="score-row"><span><i style="background:${JOBS[v.job].color}"></i>${v.id === p?.id ? `${escape(v.name)} <small>YOU</small>` : `<button class="resident-link" data-action="resident" data-target="${v.id}" aria-label="View ${escape(v.name)}">${escape(v.name)} <span aria-hidden="true">↗</span></button>`}</span><span style="color:${JOBS[v.job].color}">${JOBS[v.job].name}</span><span>${v.deadUntil ? 'Respawning' : v.arrestedUntil ? 'In custody' : v.wantedUntil ? 'Wanted' : 'In the district'}<small class="voice-speaking-label" data-voice-speaker="${v.id}"></small></span><span>${v.id === p?.id ? '<small>YOU</small>' : `<button class="voice-mute" data-action="voice-mute" data-target="${v.id}">Mute</button>`}</span></div>`).join('')}</div><p class="muted">Hold V for proximity voice after enabling your microphone in Settings. Mute controls only affect what you hear. Text chat: Y, /ooc for everyone, /g for your job group.</p>`;
     if (this.menu === 'context') html = this.contextHtml();
     if (this.menu === 'help')
       html = `<div class="section-heading"><span class="eyebrow">THE FIELD GUIDE</span><h2>Welcome to the district.</h2><p>DarkRP is a social sandbox. The other players are the story.</p></div><div class="guide-start"><b>Your first five minutes</b><p>Choose a job in F4. Approach a door and press C to buy the property. Furnish your base with Q and the Physics Gun. A printer earns cash; a gun shop or kitchen earns customers. Use Y to introduce yourself.</p></div><div class="help-columns"><div><h3>On the streets</h3>${[
@@ -462,7 +531,7 @@ export class UI {
         ['SHIFT', 'Sprint'],
         ['CTRL', 'Crouch'],
         ['E', 'Use door, printer or shipment'],
-        ['C', 'Property & entity actions'],
+        ['C', 'Resident, property & entity actions'],
         ['1–9 / SCROLL', 'Select equipment'],
         ['LMB / RMB', 'Use / alternate use'],
         ['R', 'Reload / rotate held prop'],
@@ -492,6 +561,7 @@ export class UI {
       s = this.state;
     if (!t || !p || !s)
       return '<div class="section-heading"><h2>Look at something first.</h2><p>Stand near a door, player, or shop entity and press C.</p></div>';
+    if (t.kind === 'player') return this.residentHtml(t.id);
     let html = `<div class="section-heading"><span class="eyebrow">CONTEXT MENU</span><h2>${escape(t.title)}</h2><p>${escape(t.detail)}</p></div>`;
     if (t.kind === 'door') {
       const d = s.doors.find((v) => v.id === t.id)!;
@@ -517,12 +587,38 @@ export class UI {
       html += `<div class="context-actions"><button class="primary" data-action="interact" data-target="${e.id}">${e.kind === 'shipment' ? `Take weapon${e.owner === p.id ? '' : ` · ${money(e.price)}`}` : e.kind === 'microwave' ? `Buy meal · ${money(e.price)}` : e.kind === 'printer' ? 'Collect earnings / confiscate' : 'Use entity'}</button></div>`;
       if (e.owner === p.id && ['shipment', 'microwave'].includes(e.kind))
         html += `<div class="command-field"><input id="entity-price" type="number" min="1" max="50000" value="${e.price}" aria-label="Shop selling price"><button data-action="price" data-target="${e.id}">Set price</button></div>`;
-    } else
-      html +=
-        '<p>Use /give with this player in your crosshair to transfer cash. Government commands use the full name shown above.</p>';
+    }
     return html;
   }
+  residentHtml(id: string): string {
+    const p = this.player!,
+      target = this.state?.players.find((v) => v.id === id);
+    if (!target)
+      return '<div class="section-heading"><span class="eyebrow">RESIDENT</span><h2>This resident has disconnected.</h2><p>Select another resident from the player list.</p></div><button data-menu="players">Back to players</button>';
+    const unavailable = !!(p.deadUntil || p.arrestedUntil);
+    const nearby = distance(eyes(p), eyes(target)) <= GIVE_RANGE;
+    const canGive = nearby && !target.deadUntil && p.money > 0;
+    const max = Math.min(MAX_TRANSFER, p.money);
+    const reasonForm = (action: 'wanted' | 'warrant', label: string) =>
+      `<form class="resident-form" data-resident-action="${action}" data-target="${id}"><label class="field-label" for="resident-${action}">${action === 'wanted' ? 'WANTED' : 'SEARCH WARRANT'} REASON</label><div class="command-field"><input id="resident-${action}" maxlength="90" required pattern=".*\\S.*" placeholder="Describe the roleplay reason" autocomplete="off"><button type="submit">${label}</button></div></form>`;
+    return `<div class="section-heading"><span class="eyebrow">RESIDENT</span><h2>${escape(target.name)}</h2><p><span style="color:${JOBS[target.job].color}">${JOBS[target.job].name}</span> · ${target.deadUntil ? 'Respawning' : target.arrestedUntil ? 'In custody' : 'In the district'}</p></div>
+      <div class="resident-status" aria-live="polite">${target.wantedUntil ? `<p>Wanted · ${escape(target.wantedReason)}</p>` : ''}${target.warrantUntil ? '<p>Search warrant active</p>' : ''}<p>${target.license ? 'Gun license granted' : 'No gun license'}</p></div>
+      ${unavailable ? `<p class="muted">${p.deadUntil ? 'Wait until you respawn' : 'Wait until you leave custody'} to use resident actions.</p>` : ''}
+      <fieldset class="resident-actions" ${unavailable || target.id === p.id ? 'disabled' : ''}>
+        <section><h3>Give money</h3><p class="muted">${target.deadUntil ? 'This resident must respawn before receiving money.' : !nearby ? 'Move within 3.5 metres of this resident to give money.' : 'Stay close with a clear view of this resident.'} Your wallet: ${money(p.money)}.</p>
+          <form class="resident-form" data-resident-action="give" data-target="${id}"><label class="field-label" for="resident-amount">AMOUNT IN DOLLARS</label><div class="command-field"><input id="resident-amount" type="number" min="1" max="${max}" step="1" required placeholder="100" autocomplete="off" ${canGive ? '' : 'disabled'}><button class="primary" type="submit" ${canGive ? '' : 'disabled'}>Give money</button></div></form>
+        </section>
+        ${GOVERNMENT.includes(p.job) ? `<section><h3>Government actions</h3>${!GOVERNMENT.includes(target.job) ? reasonForm('wanted', target.wantedUntil ? 'Update wanted status' : 'Mark wanted') : '<p class="muted">Government staff cannot be marked wanted.</p>'}${target.wantedUntil ? `<button data-action="unwanted" data-target="${id}">Clear wanted status</button>` : ''}${['chief', 'mayor'].includes(p.job) ? reasonForm('warrant', target.warrantUntil ? 'Renew warrant' : 'Issue warrant') : ''}${p.job === 'mayor' ? `<button data-action="license" data-target="${id}" ${target.license ? 'disabled' : ''}>${target.license ? 'Gun license granted' : 'Grant gun license'}</button>` : ''}</section>` : ''}
+      </fieldset>
+      <div class="context-actions"><button data-menu="players">Back to players</button><button class="voice-mute" data-action="voice-mute" data-target="${id}">Mute</button><small data-voice-speaker="${id}"></small></div>`;
+  }
   clickAction(action: string, target: string, value?: string): void {
+    if (action === 'resident') {
+      const resident = this.state?.players.find((p) => p.id === target);
+      if (resident)
+        this.open('context', { kind: 'player', id: target, title: resident.name, detail: '', hint: '' });
+      return;
+    }
     if (action === 'resume') {
       this.close();
       return;

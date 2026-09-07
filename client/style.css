@@ -1304,6 +1304,47 @@ small {
 .scoreboard + .muted {
   margin-top: 1.5rem;
 }
+.resident-link {
+  display: inline;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.resident-link span {
+  color: var(--accent);
+}
+.resident-actions {
+  border: 0;
+  padding: 0;
+  margin: 1.5rem 0;
+  min-width: 0;
+}
+.resident-actions section + section {
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+  margin-top: 1.5rem;
+}
+.resident-status p {
+  margin: 0.4rem 0;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.resident-form {
+  margin: 1.2rem 0;
+}
+.resident-form .command-field {
+  margin: 0.5rem 0;
+  flex-wrap: wrap;
+}
+.resident-form input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
 .voice-hud {
   position: absolute;
   top: 6rem;

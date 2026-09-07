@@ -447,7 +447,7 @@ function aim(): AimTarget | undefined {
       id: p.id,
       title: p.name,
       detail: `${JOBS[p.job].name}${p.wantedUntil ? ` · WANTED: ${p.wantedReason}` : ''}`,
-      hint: 'V  Voice     Y  Text     /give amount  Give money',
+      hint: 'C  Resident actions     V  Voice     Y  Text',
     };
   }
   return target;

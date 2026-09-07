@@ -4,7 +4,7 @@
 
 Choose a job, buy a storefront, sell weapons or meals, hide money printers, build with physics props, become mayor, or patrol the city as Civil Protection. Everyone plays in the same server-owned world.
 
-OpenRP is a playable **0.3 alpha**, not a complete Source engine port. All map geometry, characters, equipment, textures, and game sound effects are original and generated locally. No Garry’s Mod installation, extracted Valve assets, external asset CDN, API keys, or paid services are required to run your own server.
+OpenRP is a playable **0.4 alpha**, not a complete Source engine port. All map geometry, characters, equipment, textures, and game sound effects are original and generated locally. No Garry’s Mod installation, extracted Valve assets, external asset CDN, API keys, or paid services are required to run your own server.
 
 ## Run it
 
@@ -72,26 +72,28 @@ New players start with $1,500 to make the initial sandbox easy to explore. Salar
 
 ## Controls
 
-| Key                              | Action                                                    |
-| -------------------------------- | --------------------------------------------------------- |
-| WASD / mouse                     | Move / look                                               |
-| Shift / Ctrl / Space             | Sprint / crouch / jump                                    |
-| E                                | Use a door, printer, shipment, microwave or cash pile     |
-| C                                | Context menu for the object under your crosshair          |
-| F4                               | Jobs, purchases, laws and voting                          |
-| Q                                | Props and Tool Gun modes                                  |
-| 1–9 / mouse wheel                | Select equipment                                          |
-| Left / right mouse               | Primary / alternate equipment action                      |
-| R                                | Reload; rotate a held physics prop                        |
-| Hold left mouse with Physics Gun | Grab your prop; release to drop                           |
-| Right mouse while grabbing       | Freeze prop                                               |
-| Mouse wheel while grabbing       | Adjust hold distance                                      |
-| F / Z                            | Activate your fading doors / undo your last prop          |
-| Y or Enter                       | Open chat                                                 |
-| Hold V                           | Proximity voice after enabling the microphone in Settings |
-| Tab / F1 / Escape                | Scoreboard / field guide / pause                          |
+| Key                              | Action                                                            |
+| -------------------------------- | ----------------------------------------------------------------- |
+| WASD / mouse                     | Move / look                                                       |
+| Shift / Ctrl / Space             | Sprint / crouch / jump                                            |
+| E                                | Use a door, printer, shipment, microwave or cash pile             |
+| C                                | Actions for the resident, property or object under your crosshair |
+| F4                               | Jobs, purchases, laws and voting                                  |
+| Q                                | Props and Tool Gun modes                                          |
+| 1–9 / mouse wheel                | Select equipment                                                  |
+| Left / right mouse               | Primary / alternate equipment action                              |
+| R                                | Reload; rotate a held physics prop                                |
+| Hold left mouse with Physics Gun | Grab your prop; release to drop                                   |
+| Right mouse while grabbing       | Freeze prop                                                       |
+| Mouse wheel while grabbing       | Adjust hold distance                                              |
+| F / Z                            | Activate your fading doors / undo your last prop                  |
+| Y or Enter                       | Open chat                                                         |
+| Hold V                           | Proximity voice after enabling the microphone in Settings         |
+| Tab / F1 / Escape                | Scoreboard / field guide / pause                                  |
 
 Some embedded browsers disallow Pointer Lock. OpenRP then uses **hold right mouse and drag to look**, with **Alt + left click** for alternate use. A normal desktop Chrome, Edge or Firefox window is recommended for captured first-person controls. Menus do not pause a multiplayer server.
+
+Select a resident's name in **Tab**, or look at them and press **C**, to give cash or use government actions. Transfers require a living recipient within 3.5 metres and a clear view, and accept whole dollars up to $50,000. A full recipient wallet rejects the transfer without deducting cash. Government menus show wanted status, warrants and gun licenses, with actions limited to your current job. Names and permissions update while the menu is open; typed amounts and reasons survive name or status updates. Menus use the selected resident's identity, so a different person reusing their name must be selected again.
 
 ### Proximity voice
 
@@ -127,6 +129,8 @@ The microphone starts off on every join. Opening menus or chat, losing focus, hi
 The mechanics aim to capture the recognizable DarkRP loop, but this is an independent implementation. Union District is an original map, not `rp_downtown` or `rp_evocity`. Character rigs and collisions are simplified; upper stories are scenery. The alpha does not include Source/BSP/Lua compatibility, Workshop addons, vehicles, ragdolls, welded constraints or wire systems. Operators have authenticated kick/ban commands; verified accounts and a full admin UI remain future work. Physics Gun manipulation is owner-only. Police need a wanted flag before using the arrest baton. Gun licenses and most written laws are social roleplay rules rather than a complete legal simulation.
 
 Names, wallets, inventory, ammunition, armor, position, props, shop stock, printer cash and property ownership persist together in `data/world.json`. Refreshing or restarting the server keeps your belongings; use the same browser identity and keep the server's data directory on persistent storage. Props retain their placement, rotation, paint and frozen state. Shops stay open while their owner is offline and sales credit the saved wallet. Jobs resume when a slot is available; a full job returns you as a Citizen with your inventory. Normal gameplay can still consume, destroy or remove items, and operator removals still clean up owned objects. Browser credentials are anonymous bearer tokens, not verified accounts; there is no cross-device account recovery. The server enforces bounds, prices, ownership, role restrictions and request limits, but this alpha has not been audited or load-tested for a large hostile public server.
+
+Full-world persistence starts with **0.4.0**. Earlier versions saved names, wallets and credentials only. Upgrading imports those saved profiles, but cannot recover inventory, props or property held only in an old server process after it stops. The official first 0.4.0 upgrade preserved saved wallets; no pre-upgrade world snapshot was available. Subsequent updates restore the full `world.json` checkpoint. See [persistence and upgrades](docs/HOSTING.md#persistence).
 
 ## Development
 
