@@ -152,3 +152,23 @@ test('evidence survives role changes, reconnect and validated world replacement;
   assert.throws(() => saveWorld(dir, world));
   assert.equal(loadWorld(dir)?.profiles.find((p) => p.id === b.id)?.character?.evidence?.length, 2);
 });
+
+test('switching equipment cancels a scanner seizure even if the officer switches back', () => {
+  const { game, a, b, advance } = fixture();
+  a.weapons.push('scanner');
+  a.weapon = 'scanner';
+  game.startConfiscation(a, b.id);
+  advance(1000);
+  game.handle(a.id, { type: 'action', action: 'equip', target: 'keys' });
+  advance(1000);
+  game.handle(a.id, { type: 'action', action: 'equip', target: 'scanner' });
+  advance(5000);
+  assert.equal(b.evidence?.length ?? 0, 0);
+  assert.ok(b.weapons.includes('pistol'));
+  assert.equal(b.pocket?.length, 1);
+  game.startConfiscation(a, b.id);
+  advance(1000);
+  game.handle(a.id, { type: 'action', action: 'equip', target: 'scanner' });
+  advance(4000);
+  assert.equal(b.evidence?.length, 2, 'reselecting the already equipped tool does not interrupt');
+});

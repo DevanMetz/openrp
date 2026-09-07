@@ -518,6 +518,11 @@ export class Game {
         break;
       case 'equip':
         if (p.weapons.includes(target as WeaponId)) {
+          if (p.weapon !== target && r.confiscation) {
+            r.confiscation = undefined;
+            this.notice(p.id, 'Weapon confiscation interrupted by equipment change.');
+            this.onEvent({ type: 'progress', label: 'Confiscation interrupted', end: this.now() }, p.id);
+          }
           this.release(p);
           p.weapon = target as WeaponId;
           p.reloadUntil = 0;
