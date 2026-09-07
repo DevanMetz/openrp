@@ -709,7 +709,18 @@ export class City {
     for (const x of [-6.4, 6.4]) this.box(x, 2.4, 69.2, 0.4, 4.8, 0.4, 'metal');
   }
   tree(x: number, z: number): void {
-    this.cylinder(x, 1.95, z, 0.105, 0.23, 3.3, 'bark');
+    const leanX = Math.sin(x * 0.7 + z) * 0.2;
+    const leanZ = Math.cos(z * 0.9 - x) * 0.15;
+    const trunk = new THREE.CylinderGeometry(0.018, 0.23, 3.8, 10, 8);
+    const vertices = trunk.attributes.position;
+    for (let i = 0; i < vertices.count; i++) {
+      const t = (vertices.getY(i) + 1.9) / 3.8;
+      const flare = 1 + (0.1 * (1 - t) ** 16) / (0.23 - 0.212 * t);
+      vertices.setX(i, vertices.getX(i) * flare + leanX * t * t);
+      vertices.setZ(i, vertices.getZ(i) * flare + leanZ * t * t);
+    }
+    trunk.computeVertexNormals();
+    this.add(trunk, this.material('bark'), new THREE.Vector3(x, 2.5, z));
     for (let branch = 0; branch < 7; branch++) {
       const angle = branch * 2.39996;
       const tip = new THREE.Vector3(
@@ -717,17 +728,21 @@ export class City {
         3.9 + (branch % 3) * 0.38,
         z + Math.sin(angle) * 1.25,
       );
-      const base = new THREE.Vector3(x, 2.45 + branch * 0.1, z);
+      const height = 2.45 + branch * 0.1;
+      const alongTrunk = (height - 0.6) / 3.8;
+      const base = new THREE.Vector3(x + leanX * alongTrunk ** 2, height, z + leanZ * alongTrunk ** 2);
       const direction = tip.clone().sub(base);
       const rotation = new THREE.Euler().setFromQuaternion(
         new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize()),
       );
-      this.add(
-        new THREE.CylinderGeometry(0.025, 0.083, direction.length(), 7),
-        this.material('bark'),
-        base.add(tip).multiplyScalar(0.5),
-        rotation,
-      );
+      const limb = new THREE.CylinderGeometry(0.012, 0.083, direction.length(), 7, 5);
+      const limbVertices = limb.attributes.position;
+      for (let i = 0; i < limbVertices.count; i++) {
+        const t = limbVertices.getY(i) / direction.length() + 0.5;
+        limbVertices.setX(i, limbVertices.getX(i) + Math.sin(t * Math.PI) * 0.09);
+      }
+      limb.computeVertexNormals();
+      this.add(limb, this.material('bark'), base.add(tip).multiplyScalar(0.5), rotation);
       for (let leaf = 0; leaf < 18; leaf++) {
         const a = rand() * Math.PI * 2,
           radius = Math.sqrt(rand()) * 0.8;

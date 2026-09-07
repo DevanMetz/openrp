@@ -1,5 +1,11 @@
 # Testing
 
+## Tree silhouette follow-up
+
+Union Square trunks now taper into the canopy with slight position-dependent lean and a continuous flared base. Branches use gently curved, tapered geometry and attach to the trunk's revised centerline. Canopy placement and the city random sequence are preserved. Static batching remains in use.
+
+Reviewed the actual City renderer at the previous bark camera. A separate base flare initially produced a seam; it was replaced with deformation of the trunk mesh and rechecked. The camera reported 62 calls/94,794 triangles versus 62/92,698 before this shape pass; this is a narrow scene comparison, not a frame-rate benchmark. Final build and production smoke passed. Local and undeployed; no collision or game-rule change.
+
 ## Dedicated bark visual pass
 
 Tree trunks and branches now use their own procedural bark texture and subtle bump relief, rather than furniture wood. The texture introduces broken longitudinal ridges and flecks without consuming city random values. Close-up review in the actual City renderer exposed excessive striping in the first version; reduced contrast and relief and interrupted ridges were then reviewed again. Tree silhouettes and geometry remain unchanged, including the visible flat trunk tip, which needs a later geometry pass.
