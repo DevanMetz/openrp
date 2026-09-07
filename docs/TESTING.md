@@ -1,5 +1,11 @@
 # Testing
 
+## Pendant exterior and shadow review
+
+At commit c8d35d1, Chrome compared high/low City quality from cafe-local (-12,1.4,2), facing the outside wall nearest the first table. No visible warm-light change appeared on that wall. A second view at local (-4.3,0.9,2), aimed at the table edge, showed a tabletop shadow on the floor without visible striping or a bright leak beneath the tabletop.
+
+This closes the specific exterior-wall and table-edge visual checks, not every potential occluder or camera angle. No renderer changes were needed. GPU cost and walking-camera transitions remain unmeasured; the fixtures' counters are not GPU benchmarks. Local and undeployed.
+
 ## Pendant distance fade
 
 High-quality pendant illumination now fades smoothly from full intensity at 12 metres to zero at 18 metres before the light is hidden, replacing the abrupt distance switch. Low graphics still disables the extra illumination.
