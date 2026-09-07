@@ -1,5 +1,11 @@
 # Testing
 
+## Cafe pendant illumination
+
+Added two warm downward spotlights under the pendant diffusers, with soft cone edges, four-metre range and 512px shadow maps. Lights are enabled only on high graphics within 18 metres of each fixture. Existing ambient illumination keeps low graphics usable.
+
+Chrome reviewed table illumination and furniture shadows, then switched City quality high → low → high and verified that the added lighting disappeared and returned. Fixture draw-call counters do not measure the additional shadow passes or GPU lighting cost; profiling remains outstanding. The short cones fit within the cafe seating area, but a separate exterior wall-leak review remains pending. Build and production HTTP smoke passed. Local and undeployed.
+
 ## Cafe pendant fixtures
 
 Replaced the cafe's plain ceiling strips with two table-centred pendant fixtures: ceiling mounts, suspension rods, tapered metal shades and warm emissive diffusers. Other business ceiling fixtures retain their current design. The diffusers provide a visible glow, not additional room illumination or dynamic shadows.

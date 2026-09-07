@@ -334,6 +334,7 @@ export class City {
   sun: THREE.DirectionalLight;
   private skyMaterial!: THREE.ShaderMaterial;
   private highDetail = true;
+  private interiorLights: THREE.SpotLight[] = [];
   constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     this.scene = scene;
     const environment = new RoomEnvironment();
@@ -827,6 +828,17 @@ export class City {
           this.material('pendant-diffuser'),
           new THREE.Vector3(diffuser.x, diffuser.y, diffuser.z),
         );
+        const lamp = new THREE.SpotLight('#ffe1b0', 9, 4, Math.PI / 4, 0.65, 2);
+        lamp.position.set(diffuser.x, diffuser.y - 0.025, diffuser.z);
+        lamp.target.position.set(diffuser.x, 0.1, diffuser.z);
+        lamp.castShadow = true;
+        lamp.shadow.mapSize.set(512, 512);
+        lamp.shadow.camera.near = 0.1;
+        lamp.shadow.camera.far = 4;
+        lamp.shadow.bias = -0.0003;
+        lamp.shadow.normalBias = 0.012;
+        this.interiorLights.push(lamp);
+        this.scene.add(lamp, lamp.target);
         local(x, 0.73, 2, 1.25, 0.12, 1.25, 'wood');
         local(x, 0.35, 2, 0.1, 0.7, 0.1, 'metal');
         local(x, 0.14, 2, 0.8, 0.07, 0.12, 'metal');
@@ -1342,6 +1354,12 @@ export class City {
     this.skyMaterial.uniforms.detail.value = this.highDetail ? 1 : 0;
   }
   update(time: number, dt: number, focus: Vec3): void {
+    for (const lamp of this.interiorLights) {
+      const dx = focus.x - lamp.position.x,
+        dy = focus.y - lamp.position.y,
+        dz = focus.z - lamp.position.z;
+      lamp.visible = this.highDetail && dx * dx + dy * dy + dz * dz < 18 * 18;
+    }
     this.skyMaterial.uniforms.time.value = time;
     // Keep detailed shadows around the viewer as they enter the outer neighborhoods.
     const x = Math.round(focus.x / 8) * 8,
