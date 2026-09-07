@@ -1,5 +1,11 @@
 # Testing
 
+## Atmosphere graphics settings
+
+The game graphics setting now reaches the City renderer. Low quality uses one cloud-noise layer and hides/skips moving fountain droplets; high quality restores three layers and droplets. Spillways and impact rings remain visible in both modes.
+
+The isolated City review switched high → low → high at 1100 × 760, reporting 75 → 74 → 75 draw calls. This fixture changes City effects only, not the game's separate shadow and pixel-ratio settings. Build and production HTTP smoke passed. No GPU speedup is claimed; high-resolution profiling remains outstanding. Local and undeployed.
+
 ## Sky atmosphere pass
 
 The existing sky sphere now shades soft procedural cloud cover with slow drift, a horizon fade and a broad sun glow aligned with the directional light. The shader includes tone mapping and output color conversion, correcting the old gradient's missing output conversion. It uses the existing sky mesh with no new textures or geometry.

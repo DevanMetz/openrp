@@ -260,6 +260,7 @@ export class City {
   private rippleTransform = new THREE.Object3D();
   sun: THREE.DirectionalLight;
   private skyMaterial!: THREE.ShaderMaterial;
+  private highDetail = true;
   constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     this.scene = scene;
     const environment = new RoomEnvironment();
@@ -977,12 +978,13 @@ export class City {
         bottom: { value: new THREE.Color('#c3c6b8') },
         cloud: { value: new THREE.Color('#e5e7dc') },
         time: { value: 0 },
+        detail: { value: 1 },
       },
       vertexShader: `varying vec3 direction;
         void main(){direction=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
       fragmentShader: `
         uniform vec3 top, bottom, cloud;
-        uniform float time;
+        uniform float time, detail;
         varying vec3 direction;
         float hash(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}
         float noise(vec3 p){
@@ -995,7 +997,8 @@ export class City {
         void main(){
           vec3 d=normalize(direction);
           vec3 p=d*5.0+vec3(time*0.002,0.0,time*0.001);
-          float field=noise(p)*0.58+noise(p*2.03)*0.28+noise(p*4.07)*0.14;
+          float field=noise(p);
+          if(detail>0.5) field=field*0.58+noise(p*2.03)*0.28+noise(p*4.07)*0.14;
           float cover=smoothstep(0.48,0.69,field)*smoothstep(0.03,0.28,d.y);
           vec3 color=mix(bottom,top,pow(max(d.y,0.0),0.65));
           float glow=pow(max(dot(d,normalize(vec3(-32.0,52.0,28.0))),0.0),48.0);
@@ -1074,6 +1077,10 @@ export class City {
       visual.angle = d.open ? -Math.PI * 0.48 : 0;
     }
   }
+  setQuality(quality: 'low' | 'high'): void {
+    this.highDetail = quality === 'high';
+    this.skyMaterial.uniforms.detail.value = this.highDetail ? 1 : 0;
+  }
   update(time: number, dt: number, focus: Vec3): void {
     this.skyMaterial.uniforms.time.value = time;
     // Keep detailed shadows around the viewer as they enter the outer neighborhoods.
@@ -1084,7 +1091,8 @@ export class City {
     for (const visual of this.doors.values())
       visual.pivot.rotation.y = THREE.MathUtils.damp(visual.pivot.rotation.y, visual.angle, 12, dt);
     const nearFountain = focus.x * focus.x + (focus.z - 9) ** 2 < 60 ** 2;
-    this.fountainDrops.visible = this.fountainRipples.visible = nearFountain;
+    this.fountainDrops.visible = nearFountain && this.highDetail;
+    this.fountainRipples.visible = nearFountain;
     if (!nearFountain) return;
     const pos = this.water.geometry.attributes.position;
     for (let i = 0; i < pos.count; i++)
@@ -1092,7 +1100,7 @@ export class City {
     pos.needsUpdate = true;
     this.water.geometry.computeVertexNormals();
     const drops = this.fountainDrops.geometry.attributes.position;
-    for (let i = 0; i < drops.count; i++) {
+    for (let i = 0; this.highDetail && i < drops.count; i++) {
       const angle = (Math.floor(i / 16) * Math.PI) / 4;
       const t = (time * 0.75 + (i % 16) / 16) % 1;
       const u = 1 - t;

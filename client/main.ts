@@ -154,6 +154,7 @@ ui.onSettings = () => {
   camera.fov = ui.settings.fov;
   camera.updateProjectionMatrix();
   renderer.shadowMap.enabled = ui.settings.quality === 'high';
+  city.setQuality(ui.settings.quality);
   renderer.setPixelRatio(Math.min(devicePixelRatio, ui.settings.quality === 'high' ? 1.6 : 1));
 };
 ui.onSettings();
