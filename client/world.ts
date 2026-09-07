@@ -227,6 +227,32 @@ function surfaceTexture(kind: string, color: string): THREE.CanvasTexture {
   map.anisotropy = 8;
   return map;
 }
+function roadPaintTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 256, 256);
+  // An independent seed keeps paint wear from changing city placement.
+  let paintSeed = 4421;
+  const random = () => {
+    paintSeed = (paintSeed * 1664525 + 1013904223) >>> 0;
+    return paintSeed / 4294967296;
+  };
+  // Chips expose the real road underneath; the shared cutout needs no blending.
+  for (let chip = 0; chip < 500; chip++)
+    ctx.clearRect(random() * 256, random() * 256, 0.5 + random() * 2, 0.5 + random() * 2);
+  for (let edge = 0; edge < 256; edge++) {
+    ctx.clearRect(edge, 0, 1, random() * 2);
+    ctx.clearRect(edge, 256 - random() * 2, 1, 2);
+    ctx.clearRect(0, edge, random() * 2, 1);
+    ctx.clearRect(256 - random() * 2, edge, 2, 1);
+  }
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 8;
+  return map;
+}
 function soilTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 256;
@@ -340,6 +366,23 @@ export class City {
         emissiveIntensity: 0.18,
       }),
     );
+    const paint = roadPaintTexture();
+    for (const [key, color] of [
+      ['road-line', '#b7ad88'],
+      ['crossing', '#b8b6a1'],
+    ])
+      this.materials.set(
+        key,
+        new THREE.MeshStandardMaterial({
+          map: paint,
+          color,
+          roughness: 0.96,
+          alphaTest: 0.5,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+          polygonOffsetUnits: -1,
+        }),
+      );
     this.materials.set('soil', new THREE.MeshStandardMaterial({ map: soilTexture(), roughness: 1 }));
     this.materials.set(
       'ground-cover',
@@ -496,6 +539,11 @@ export class City {
     this.scene.add(mesh);
     return mesh;
   }
+  roadMark(x: number, z: number, w: number, d: number, material: string): void {
+    const geometry = new THREE.PlaneGeometry(w, d);
+    geometry.rotateX(-Math.PI / 2);
+    this.add(geometry, this.material(material), new THREE.Vector3(x, -0.004, z));
+  }
   ground(): void {
     const size = MAP_BOUND * 2 + 2;
     const road = new THREE.PlaneGeometry(size, size, 48, 48);
@@ -519,11 +567,11 @@ export class City {
     this.box(0, -0.005, 8, 28, 0.025, 25, 'pavement');
     for (const x of [-67, 67]) {
       for (const side of [-1, 1]) this.box(x + side * 10, -0.005, 0, 2.2, 0.04, 214, 'pavement');
-      for (let z = -104; z <= 104; z += 7) this.box(x, 0.012, z, 0.14, 0.02, 3.2, '#b7ad88');
+      for (let z = -104; z <= 104; z += 7) this.roadMark(x, z, 0.14, 3.2, 'road-line');
     }
     for (const z of [-66, 66]) {
       for (const side of [-1, 1]) this.box(0, -0.005, z + side * 10, 214, 0.04, 2.2, 'pavement');
-      for (let x = -104; x <= 104; x += 7) this.box(x, 0.013, z, 3.2, 0.02, 0.14, '#b7ad88');
+      for (let x = -104; x <= 104; x += 7) this.roadMark(x, z, 3.2, 0.14, 'road-line');
     }
     for (const b of BUILDINGS) {
       const s = Math.abs(Math.sin(b.rotation)) > 0.5;
@@ -534,12 +582,10 @@ export class City {
     for (const x of [-13.7, 13.7]) this.box(x, 0.045, 8, 0.25, 0.14, 25, 'concrete');
     for (let z = -65; z < 69; z += 7) {
       if (z > -7 && z < 24) continue;
-      this.box(0, 0.015, z, 0.16, 0.025, 3.3, '#b7ad88');
+      this.roadMark(0, z, 0.16, 3.3, 'road-line');
     }
-    for (const z of [-3.5, 26])
-      for (let x = -6; x <= 6; x += 2) this.box(x, 0.026, z, 1.1, 0.02, 3.2, '#b8b6a1');
-    for (let x = -63; x <= 63; x += 7)
-      if (Math.abs(x) > 15) this.box(x, 0.017, -29, 3, 0.02, 0.13, '#b7ad88');
+    for (const z of [-3.5, 26]) for (let x = -6; x <= 6; x += 2) this.roadMark(x, z, 1.1, 3.2, 'crossing');
+    for (let x = -63; x <= 63; x += 7) if (Math.abs(x) > 15) this.roadMark(x, -29, 3, 0.13, 'road-line');
     for (const x of [-14.8, 15.2])
       for (let z = -23; z < 48; z += 20) {
         this.box(x, 0.025, z, 0.55, 0.035, 0.85, 'metal');

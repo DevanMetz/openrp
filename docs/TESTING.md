@@ -1,5 +1,11 @@
 # Testing
 
+## Road paint geometry and wear
+
+Crossings and dashed lane markings now use planes one millimetre above the asphalt instead of raised boxes. A shared original cutout texture adds fine paint loss and irregular edges; an independent deterministic seed preserves city placement. Polygon offset helps prevent depth conflict with the road.
+
+Chrome review at the crossing camera caught a regular diagonal chip pattern in the initial version. The revised irregular chips and softened edges were reviewed again. Calls stayed at 73 and triangles fell from 104,802 to 103,162. Final build and production HTTP smoke passed. Distant lane markings and moving-camera flicker remain unverified. Local and undeployed; no server collision changes.
+
 ## Road wear scale correction
 
 Removed the broad sinusoidal wear from the repeating asphalt tile after review exposed its repetition. Broad color variation now uses vertex colors on a 48 × 48 subdivided ground plane at the former ground surface height, retaining the existing map extent and fine texture. Server collision rules are unchanged.
