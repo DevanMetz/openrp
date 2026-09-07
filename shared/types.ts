@@ -61,6 +61,7 @@ export interface Player extends Motion {
   ammo: Partial<Record<WeaponId, number>>;
   reserve: Partial<Record<WeaponId, number>>;
   pocket?: PocketItem[];
+  evidence?: (PocketItem & { kind: 'weapon' })[];
   arrestedUntil: number;
   wantedUntil: number;
   wantedReason: string;

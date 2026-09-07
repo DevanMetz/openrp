@@ -89,3 +89,7 @@ Browser checks use the real browser. Automated tests additionally cover 80 concu
 Release validation: all 87 tests passed, typecheck/build and production HTTP smoke passed. Chrome verified the ceramic jar, E donation form, $25 debit ($1,520 to $1,495) and receipt naming the offline owner.
 
 Weapon inspection increment: npm run check passed all 90 tests, typecheck, build and production smoke. Tests cover permission, role-title spoofing, reach, obstruction, death/custody, shared cooldown, exact carried/pocketed ammunition and three-client report delivery. Chrome verified the resident button and timestamped report with a carried pistol (3/17) and pocketed SMG (12/40). Narrow report review and timed confiscation remain outstanding.
+
+Evidence implementation: all 95 tests passed with typecheck/build/production smoke. Tests cover five-second timing, cancellation on reach/obstruction/authority/license/wanted/custody/death/disconnect, duplicate firearm ammunition conservation, capacity rejection, partial return, unauthorized return, saved restoration and duplicate-ID rejection. Real WebSocket clients observe seizure and return with exact loaded/reserve ammunition. Browser review recorded separately below.
+
+Chrome verified five-second confiscation, evidence count 2, return receipt naming the resident, and immediate disabled count 0 after both firearms returned. The menu refresh fix was rebuilt and passed production smoke. Dedicated tool visuals, recipient evidence browsing and narrow layouts remain outstanding.

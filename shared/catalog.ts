@@ -1,7 +1,8 @@
 import type { EntityKind, JobId, WeaponId } from './types.ts';
 
 export const VERSION = '0.5.2';
-export const PROTOCOL = 6;
+export const PROTOCOL = 7;
+export const EVIDENCE_CAPACITY = 24;
 export const POCKET_CAPACITY = 8;
 export const CHAT_RANGES = { local: 28, whisper: 5, yell: 56 } as const;
 export const TICK_RATE = 30;

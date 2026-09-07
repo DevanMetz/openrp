@@ -455,3 +455,45 @@ test('weapon inspection reports are delivered to the inspecting client only', as
     await app.close();
   }
 });
+
+test('clients observe timed seizure and evidence return without duplicate firearm instances', async () => {
+  let now = 100000;
+  const game = new Game({ now: () => now });
+  const app = await startServer({ game, port: 0, host: '127.0.0.1', production: true, persist: false });
+  const a = new Client(`ws://127.0.0.1:${app.port}/ws`),
+    b = new Client(`ws://127.0.0.1:${app.port}/ws`);
+  try {
+    await Promise.all([a.open(), b.open()]);
+    const aj = await a.join('Evidence Officer'),
+      bj = await b.join('Evidence Resident');
+    const officer = game.players.get(aj.id)!,
+      target = game.players.get(bj.id)!;
+    Object.assign(officer, { job: 'police', x: 0, y: 0, z: 20 });
+    Object.assign(target, { x: 0, y: 0, z: 18, wantedUntil: 200000 });
+    target.weapons.push('pistol');
+    target.ammo.pistol = 4;
+    target.reserve.pistol = 13;
+    a.send({ type: 'action', action: 'confiscate-weapons', target: target.id });
+    await a.wait((m) => m.type === 'progress');
+    now += 5000;
+    const seized = await b.wait(
+      (m): m is Snapshot =>
+        m.type === 'state' && m.players.find((p) => p.id === target.id)?.evidence?.length === 1,
+    );
+    assert.equal(seized.players.find((p) => p.id === target.id)?.weapons.includes('pistol'), false);
+    now += 800;
+    a.send({ type: 'action', action: 'return-evidence', target: target.id });
+    const returned = await b.wait(
+      (m): m is Snapshot =>
+        m.type === 'state' && m.players.find((p) => p.id === target.id)?.pocket?.length === 1,
+    );
+    const p = returned.players.find((p) => p.id === target.id)!;
+    assert.equal(p.evidence?.length, 0);
+    assert.equal(p.pocket?.[0].loadedAmmo, 4);
+    assert.equal(p.pocket?.[0].reserveAmmo, 13);
+  } finally {
+    a.ws.terminate();
+    b.ws.terminate();
+    await app.close();
+  }
+});

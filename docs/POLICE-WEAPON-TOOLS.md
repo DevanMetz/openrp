@@ -20,3 +20,5 @@ Start with inspection and its resident-context button, permission/range/occlusio
 The current public snapshots include inventory fields for all residents. Private inspection results improve presentation but do not make inventories secret from modified clients. A separate replication/privacy change would be necessary before claiming that protection.
 
 Inspection implemented locally after 0.5.2, including server authority/reach checks, exact carried/pocketed reporting, resident notification and timestamped context report. All 90 tests and browser report review passed. Timed confiscation, evidence persistence and return are still unimplemented; the remaining rules above remain the next scope.
+
+Timed confiscation and bounded persistent evidence are now implemented locally. Returns fill free pocket slots, leaving overflow in evidence; current carried weapons are never overwritten. Original tool models, narrow layouts, recipient evidence browsing and integrating arrest seizure are still outstanding. Browser testing exposed and fixed stale evidence counts in the resident panel.

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Profile, SavedWorld } from './game.ts';
-import { JOBS, MAX_ENTITIES, POCKET_CAPACITY, PROPS, WEAPONS } from '../shared/catalog.ts';
+import { EVIDENCE_CAPACITY, JOBS, MAX_ENTITIES, POCKET_CAPACITY, PROPS, WEAPONS } from '../shared/catalog.ts';
 import { MAP_BOUND } from '../shared/map.ts';
 import { validAccount } from './accounts.ts';
 
@@ -56,6 +56,10 @@ function validCharacter(value: unknown): boolean {
         value.pocket.length <= POCKET_CAPACITY &&
         value.pocket.every(validPocketItem) &&
         unique(value.pocket.map((e) => e.id)))) &&
+    (value.evidence === undefined ||
+      (Array.isArray(value.evidence) &&
+        value.evidence.length <= EVIDENCE_CAPACITY &&
+        value.evidence.every((e) => validPocketItem(e) && e.kind === 'weapon'))) &&
     (value.jobBans === undefined ||
       (object(value.jobBans) &&
         Object.entries(value.jobBans).every(
@@ -98,6 +102,7 @@ function validCharacter(value: unknown): boolean {
         'votesAt',
         'jobBans',
         'pocket',
+        'evidence',
       ].includes(key),
     )
   );
@@ -232,7 +237,9 @@ function validateWorld(value: unknown): asserts value is SavedWorld {
   }
   const objectIds = [
     ...value.entities.map((e) => e.id),
-    ...value.profiles.flatMap((p) => (p.character?.pocket ?? []).map((e) => e.id)),
+    ...value.profiles.flatMap((p) =>
+      [...(p.character?.pocket ?? []), ...(p.character?.evidence ?? [])].map((e) => e.id),
+    ),
   ];
   if (!unique(objectIds) || !unique(value.doors.map((d) => d.id)))
     throw new Error('Duplicate object IDs in world save.');

@@ -15,6 +15,7 @@ import {
   SHOP,
   TICK_RATE,
   WEAPONS,
+  EVIDENCE_CAPACITY,
   entitySize,
 } from '../shared/catalog.ts';
 import { BLOCKS, INITIAL_DOORS, JAIL, MAP_BOUND, SPAWNS, doorBox } from '../shared/map.ts';
@@ -79,6 +80,7 @@ type Runtime = {
   inputSeq: number;
   grabDistance: number;
   tool: string;
+  confiscation?: { target: string; end: number };
   lockpick?: { door: string; end: number; start: Vec3 };
   votesAt: number;
   jobBans: Partial<Record<JobId, number>>;
@@ -252,6 +254,7 @@ export class Game {
     return { player, token: issued, returning: !!saved };
   }
   disconnect(id: string, cleanup = false): void {
+    this.cancelConfiscations(id);
     const p = this.players.get(id);
     if (!p) return;
     this.saveProfile(p);
@@ -484,6 +487,12 @@ export class Game {
       case 'demote':
         this.requestDemotion(p, target, cleanText(msg.value, 90));
         break;
+      case 'confiscate-weapons':
+        this.startConfiscation(p, target);
+        break;
+      case 'return-evidence':
+        this.returnEvidence(p, target);
+        break;
       case 'inspect-weapons':
         this.inspectWeapons(p, target);
         break;
@@ -586,6 +595,17 @@ export class Game {
     const colliders = [...BLOCKS, ...this.doors.filter((d) => !d.open).map(doorBox), ...this.solidEntities()];
     for (const p of this.players.values()) {
       const r = this.runtime.get(p.id)!;
+      if (r.confiscation) {
+        const target = this.players.get(r.confiscation.target);
+        if (!target || !this.canConfiscate(p, target)) {
+          r.confiscation = undefined;
+          this.notice(p.id, 'Weapon confiscation interrupted.');
+          this.onEvent({ type: 'progress', label: 'Confiscation interrupted', end: now }, p.id);
+        } else if (now >= r.confiscation.end) {
+          r.confiscation = undefined;
+          this.finishConfiscation(p, target);
+        }
+      }
       if (p.deadUntil) {
         if (now >= p.deadUntil) this.respawn(p);
         else continue;
@@ -849,6 +869,7 @@ export class Game {
     );
   }
   applyJob(p: Player, job: JobId): void {
+    this.cancelConfiscations(p.id);
     if (JOBS[job].max && [...this.players.values()].filter((v) => v.job === job).length >= JOBS[job].max)
       return;
     if (p.job === 'mayor') this.lockdown = false;
@@ -1600,6 +1621,141 @@ export class Game {
               CHAT_RANGES[channel === 'whisper' || channel === 'yell' ? channel : 'local']
         )
           this.onEvent(event, other.id);
+  }
+  cancelConfiscations(residentId: string): void {
+    for (const [officerId, runtime] of this.runtime) {
+      if (runtime.confiscation && (officerId === residentId || runtime.confiscation.target === residentId)) {
+        runtime.confiscation = undefined;
+        this.notice(officerId, 'Weapon confiscation interrupted.');
+        this.onEvent({ type: 'progress', label: 'Confiscation interrupted', end: this.now() }, officerId);
+      }
+    }
+  }
+  canSearchResident(p: Player, target: Player): boolean {
+    if (
+      this.players.get(p.id) !== p ||
+      this.players.get(target.id) !== target ||
+      p === target ||
+      !POLICE.includes(p.job) ||
+      p.deadUntil ||
+      p.arrestedUntil ||
+      target.deadUntil
+    )
+      return false;
+    const from = eyes(p),
+      to = eyes(target),
+      range = distance(from, to);
+    if (range <= 0.001 || range > 3) return false;
+    const hit = this.trace(
+      from,
+      { x: (to.x - from.x) / range, y: (to.y - from.y) / range, z: (to.z - from.z) / range },
+      range,
+      p.id,
+    );
+    return hit.kind === 'player' && hit.id === target.id;
+  }
+  canConfiscate(p: Player, target: Player): boolean {
+    return (
+      this.canSearchResident(p, target) &&
+      !GOVERNMENT.includes(target.job) &&
+      !target.arrestedUntil &&
+      target.wantedUntil > this.now() &&
+      !target.license
+    );
+  }
+  startConfiscation(p: Player, targetId: string): void {
+    const target = this.players.get(targetId),
+      r = this.runtime.get(p.id);
+    if (!r || r.confiscation) return;
+    if (!target || !this.canConfiscate(p, target)) {
+      this.notice(
+        p.id,
+        'Confiscation requires a nearby wanted, unlicensed civilian and a clear view.',
+        'error',
+      );
+      return;
+    }
+    if (this.now() - r.lastResidentAction < 700) return;
+    r.lastResidentAction = this.now();
+    r.confiscation = { target: target.id, end: this.now() + 5000 };
+    this.onEvent(
+      { type: 'progress', label: 'Confiscating firearms · stay near the resident', end: r.confiscation.end },
+      p.id,
+    );
+    this.notice(target.id, `${p.name} began a five-second firearm confiscation.`);
+  }
+  finishConfiscation(p: Player, target: Player): void {
+    if (!this.canConfiscate(p, target)) return;
+    const carried = target.weapons.filter((w) => WEAPONS[w].damage && !JOBS[target.job].loadout.includes(w));
+    const pocket = (target.pocket ?? []).filter(
+      (e): e is PocketItem & { kind: 'weapon' } => e.kind === 'weapon',
+    );
+    const count = carried.length + pocket.length,
+      evidence = target.evidence ?? [];
+    if (!count) {
+      this.notice(p.id, 'No personal firearms to confiscate.');
+      return;
+    }
+    if (evidence.length + count > EVIDENCE_CAPACITY) {
+      this.notice(p.id, 'Evidence storage is full. No firearms were removed.', 'error');
+      return;
+    }
+    const items = carried.map((item) => ({
+      id: randomUUID(),
+      kind: 'weapon' as const,
+      health: 100,
+      cash: 0,
+      stock: 0,
+      price: 1,
+      color: '#ffffff',
+      item,
+      loadedAmmo: target.ammo[item] ?? 0,
+      reserveAmmo: target.reserve[item] ?? 0,
+    }));
+    target.evidence = [...evidence, ...items, ...pocket];
+    target.weapons = target.weapons.filter((w) => !carried.includes(w));
+    for (const w of carried) {
+      delete target.ammo[w];
+      delete target.reserve[w];
+    }
+    if (carried.includes(target.weapon)) {
+      target.weapon = 'keys';
+      target.reloadUntil = 0;
+    }
+    target.pocket = (target.pocket ?? []).filter((e) => e.kind !== 'weapon');
+    this.notice(p.id, `Confiscated ${count} firearms. Evidence is retained for ${target.name}.`, 'success');
+    this.notice(target.id, `${p.name} confiscated ${count} firearms. Police can return your evidence.`);
+  }
+  returnEvidence(p: Player, targetId: string): void {
+    const target = this.players.get(targetId),
+      r = this.runtime.get(p.id);
+    if (!r || !target || !this.canSearchResident(p, target) || target.arrestedUntil) return;
+    if (this.now() - r.lastResidentAction < 700) return;
+    r.lastResidentAction = this.now();
+    const evidence = target.evidence ?? [],
+      pocket = target.pocket ?? [];
+    const count = Math.min(evidence.length, POCKET_CAPACITY - pocket.length);
+    if (!count) {
+      this.notice(
+        p.id,
+        evidence.length
+          ? 'The resident needs free pocket space. Evidence was retained.'
+          : 'No evidence to return.',
+      );
+      return;
+    }
+    target.pocket = [...pocket, ...evidence.slice(0, count)];
+    target.evidence = evidence.slice(count);
+    this.notice(
+      p.id,
+      `Returned ${count} firearms to ${target.name}'s pocket. ${target.evidence.length} remain in evidence.`,
+      'success',
+    );
+    this.notice(
+      target.id,
+      `${p.name} returned ${count} firearms to your pocket. Open F4 → Pocket to place them.`,
+      'success',
+    );
   }
   inspectWeapons(p: Player, targetId: string): void {
     const runtime = this.runtime.get(p.id),
