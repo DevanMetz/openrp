@@ -807,7 +807,7 @@ small {
 .hurt #damage {
   opacity: 1;
 }
-#notices {
+.hud-feed {
   position: fixed;
   right: 1.7rem;
   top: 5rem;
@@ -817,7 +817,18 @@ small {
   gap: 0.5rem;
   z-index: 50;
   pointer-events: none;
-  max-width: 360px;
+  max-width: min(360px, calc(100vw - 1.5rem));
+}
+#notices {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+#hud[hidden] ~ .hud-feed .contract-hud,
+#overlay:not([hidden]) ~ .hud-feed .contract-hud {
+  display: none;
 }
 .notice {
   background: #1b2c26ed;
@@ -1870,8 +1881,9 @@ small {
   .pause-links {
     flex-direction: column;
   }
-  #notices {
+  .hud-feed {
     right: 0.75rem;
+    top: 7.5rem;
     max-width: 280px;
   }
   .film-grain {
@@ -1960,9 +1972,7 @@ small {
 }
 
 .contract-hud {
-  position: absolute;
-  top: 9rem;
-  right: 1.5rem;
+  flex-shrink: 0;
   width: 16rem;
   max-width: calc(100vw - 3rem);
   display: grid;
@@ -1981,8 +1991,6 @@ small {
 }
 @media (max-width: 700px) {
   .contract-hud {
-    right: 0.8rem;
-    top: 7.5rem;
     width: 14rem;
     padding: 0.65rem 0.8rem;
     font-size: 0.8rem;

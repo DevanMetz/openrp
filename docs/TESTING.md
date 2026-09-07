@@ -1,5 +1,11 @@
 # Testing
 
+## Contract and notification layout follow-up
+
+The contract card and notices now occupy one vertical feed, with the card first. At 360 × 780, the feed starts below the voice control; a live connection notice was visibly separated from both controls. Opening a menu hides the card, and closing it restores the active assignment. Entry/disconnected screens also suppress the card. This supersedes the earlier narrow notification-overlap finding below. Large notice bursts and short-height viewports remain to be reviewed.
+
+The final build and production HTTP smoke passed. An earlier smoke attempt failed when Node fetch rejected a randomly allocated local port; the existing port-0 smoke harness passed on retry, and that intermittent harness issue remains unresolved. No server rules changed in this layout follow-up, and the full 109-test suite was not repeated after the prior HUD check. Changes remain local and undeployed.
+
 ## Automated
 
 Run `npm run check`. It runs strict TypeScript checks, Node's test runner through `tsx`, a production client build, and an HTTP smoke test of the built files. Tests use disposable worlds and storage; they do not modify a running player's wallet file.

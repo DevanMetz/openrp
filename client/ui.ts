@@ -113,7 +113,6 @@ export class UI {
         <footer class="entry-footer"><span>JOBS. PROPERTY. PHYSICS. POSSIBILITIES.</span><span>DESKTOP · KEYBOARD & MOUSE</span></footer>
       </section>
       <div id="hud" hidden>
-        <button id="contract-hud" class="contract-hud" data-menu="contracts" hidden aria-label="Open active contract"><span class="eyebrow">ACTIVE CONTRACT</span><strong id="contract-hud-target"></strong><span id="contract-hud-detail"></span><small>F4 → Contracts for details</small></button>
         <div class="hud-top"><div class="district-label"><span class="status-dot"></span><span id="district">Union Square</span><small>UNION DISTRICT</small></div><div class="server-chip"><span id="online">ONLINE</span><i></i><span id="ping">— ms</span></div></div>
         <div id="voice-hud" class="voice-hud"><button data-menu="settings" aria-label="Voice settings"><kbd>V</kbd><span id="voice-hint">Enable microphone</span><span class="voice-meter"><i id="voice-level"></i></span></button><div id="voice-speakers" hidden></div></div>
         <div id="lockdown" hidden>⚠ CITY LOCKDOWN <span>Return to your property. Follow Civil Protection instructions.</span></div>
@@ -129,8 +128,11 @@ export class UI {
         <div id="weapon-strip"></div><div id="chat" class="chat"><div id="chat-lines" aria-live="polite"></div><form id="chat-form" hidden><span id="chat-channel">LOCAL</span><input id="chat-input" maxlength="240" autocomplete="off" aria-label="Chat message" placeholder="Message nearby players, or /ooc for everyone"><kbd>↵</kbd></form></div>
         <div id="death" hidden></div><div id="damage" aria-hidden="true"></div>
       </div>
-      <div id="notices" aria-live="polite"></div>
-      <div id="overlay" class="overlay" hidden><section class="modal" role="dialog" aria-modal="true" aria-label="Game menu"><header class="modal-top"><div class="mini-brand">OPEN<span>RP</span></div><span id="modal-subtitle">UNION DISTRICT</span><button id="close-menu" class="close-button" aria-label="Close menu">✕ <kbd>ESC</kbd></button></header><div class="modal-body"><nav id="menu-nav"></nav><main id="menu-content"></main></div><footer class="modal-footer"><span id="menu-footer">Your city. Your rules.</span><span>OPENRP ${VERSION}</span></footer></section></div>`;
+      <div id="overlay" class="overlay" hidden><section class="modal" role="dialog" aria-modal="true" aria-label="Game menu"><header class="modal-top"><div class="mini-brand">OPEN<span>RP</span></div><span id="modal-subtitle">UNION DISTRICT</span><button id="close-menu" class="close-button" aria-label="Close menu">✕ <kbd>ESC</kbd></button></header><div class="modal-body"><nav id="menu-nav"></nav><main id="menu-content"></main></div><footer class="modal-footer"><span id="menu-footer">Your city. Your rules.</span><span>OPENRP ${VERSION}</span></footer></section></div>
+      <div class="hud-feed">
+        <button id="contract-hud" class="contract-hud" data-menu="contracts" hidden aria-label="Open active contract"><span class="eyebrow">ACTIVE CONTRACT</span><strong id="contract-hud-target"></strong><span id="contract-hud-detail"></span><small>F4 → Contracts for details</small></button>
+        <div id="notices" aria-live="polite"></div>
+      </div>`;
     this.root.addEventListener('click', (event) => {
       const button = (event.target as HTMLElement).closest<HTMLElement>(
         '[data-menu], [data-action], [data-job]',
