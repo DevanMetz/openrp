@@ -1,5 +1,13 @@
 # Testing
 
+## Pendant GPU diagnostic
+
+At commit 6093c80, a local Chrome WebGL2 timer-query fixture measured the fixed cafe camera at 1100 × 760, pixel ratio 1, with both pendant spotlights forced off/on and other renderer settings unchanged. Queries bracketed `renderer.render`, including shadow rendering. The scene had no players or spawned props and animation time was fixed. Disjoint GPU queries would abort the run.
+
+An initial 15-frame warmup/30-sample run reported off median/p95 0.169/0.187 ms and on 3.294/94.057 ms. A repeat with 90 warmup frames and 60 samples per mode reported off 0.182/0.879 ms and on 0.312/0.722 ms. The divergent first run is inconclusive; do not attribute its spikes to steady-state pendant cost. The warmed-up median difference was 0.130 ms in this static scene, not a full-game frame-rate guarantee. Existing shadow settings were retained.
+
+The earlier 120-sample attempt lost its final output when the tab closed; no result is claimed for it. The ignored `test-results/cafe-gpu-review.html` now saves each completed phase to localStorage, with `cafe-gpu-results.html` displaying saved values. Higher pixel ratios, moving residents/props and other GPUs remain unmeasured. No production deployment occurred.
+
 ## Pendant exterior and shadow review
 
 At commit c8d35d1, Chrome compared high/low City quality from cafe-local (-12,1.4,2), facing the outside wall nearest the first table. No visible warm-light change appeared on that wall. A second view at local (-4.3,0.9,2), aimed at the table edge, showed a tabletop shadow on the floor without visible striping or a bright leak beneath the tabletop.
