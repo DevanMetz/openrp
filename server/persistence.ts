@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import type { Profile, SavedWorld } from './game.ts';
 import { EVIDENCE_CAPACITY, JOBS, MAX_ENTITIES, POCKET_CAPACITY, PROPS, WEAPONS } from '../shared/catalog.ts';
 import { MAP_BOUND } from '../shared/map.ts';
+import { validContractState } from './contracts.ts';
 import { validAccount } from './accounts.ts';
 
 const object = (value: unknown): value is Record<string, unknown> =>
@@ -184,6 +185,8 @@ function validateWorld(value: unknown): asserts value is SavedWorld {
   )
     throw new Error('Invalid or unsupported world save.');
   const owners = new Set(value.profiles.map((p) => p.id));
+  if (value.contracts !== undefined && !validContractState(value.contracts, owners, value.savedAt as number))
+    throw new Error('Invalid saved contracts.');
   const kinds = [
     ...PROPS.map((p) => p.id),
     'printer',

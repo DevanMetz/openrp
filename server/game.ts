@@ -40,6 +40,8 @@ import type {
   WeaponId,
 } from '../shared/types.ts';
 
+import { ContractBook, type ContractState } from './contracts.ts';
+
 export interface Profile {
   id: string;
   name: string;
@@ -53,6 +55,7 @@ export type SavedCharacter = Omit<
   'id' | 'name' | 'money' | 'holding' | 'ping' | 'reloadUntil' | 'seq' | 'vy' | 'grounded'
 > & { lastJob: number; votesAt: number; jobBans?: Partial<Record<JobId, number>> };
 export interface SavedWorld {
+  contracts?: ContractState;
   version: 1;
   savedAt: number;
   profiles: Profile[];
@@ -121,6 +124,7 @@ export class Game {
   nextProduction: number;
   nextHunger: number;
   options: GameOptions;
+  contracts: ContractBook;
   constructor(options: Partial<GameOptions> = {}) {
     this.options = { startingMoney: 1500, salarySeconds: 60, jailSeconds: 60, ...options };
     this.now = options.now ?? Date.now;
@@ -129,6 +133,44 @@ export class Game {
     this.nextHunger = this.now() + 10_000;
     for (const p of structuredClone(options.world?.profiles ?? options.profiles ?? []))
       this.profiles.set(p.tokenHash, p);
+    this.contracts = new ContractBook(
+      (id) => {
+        const live = this.players.get(id),
+          profile = [...this.profiles.values()].find((p) => p.id === id);
+        const wallet = live ?? profile;
+        if (!wallet) return undefined;
+        return {
+          id,
+          get money() {
+            return wallet.money;
+          },
+          set money(value) {
+            wallet.money = value;
+          },
+          alive: !!live && !live.deadUntil,
+          available: !!live && !live.deadUntil && !live.arrestedUntil,
+          hitman: live?.job === 'hitman',
+        };
+      },
+      this.now,
+      (customer, hitman) => {
+        const a = this.players.get(customer),
+          b = this.players.get(hitman);
+        if (!a || !b) return false;
+        const from = eyes(a),
+          to = eyes(b),
+          range = distance(from, to);
+        if (range <= 0.001 || range > 3) return false;
+        const hit = this.trace(
+          from,
+          { x: (to.x - from.x) / range, y: (to.y - from.y) / range, z: (to.z - from.z) / range },
+          range,
+          a.id,
+        );
+        return hit.kind === 'player' && hit.id === b.id;
+      },
+    );
+    if (options.world?.contracts) this.contracts.restore(options.world.contracts);
     this.physics.broadphase = new CANNON.SAPBroadphase(this.physics);
     this.physics.defaultContactMaterial.friction = 0.55;
     this.physics.defaultContactMaterial.restitution = 0.05;
@@ -256,6 +298,7 @@ export class Game {
     return { player, token: issued, returning: !!saved };
   }
   disconnect(id: string, cleanup = false): void {
+    this.contracts.unavailable(id);
     this.cancelConfiscations(id);
     const p = this.players.get(id);
     if (!p) return;
@@ -323,6 +366,7 @@ export class Game {
       version: 1,
       savedAt: this.now(),
       profiles: this.exportProfiles(),
+      contracts: this.contracts.export(),
       doors: this.doors.map(({ id, name, owner, coowners, locked, open }) => ({
         id,
         name,
@@ -602,6 +646,7 @@ export class Game {
   }
   step(dt = 1 / TICK_RATE): void {
     const now = this.now();
+    this.contracts.tick();
     const colliders = [...BLOCKS, ...this.doors.filter((d) => !d.open).map(doorBox), ...this.solidEntities()];
     for (const p of this.players.values()) {
       const r = this.runtime.get(p.id)!;
@@ -879,6 +924,7 @@ export class Game {
     );
   }
   applyJob(p: Player, job: JobId): void {
+    this.contracts.unavailable(p.id);
     this.cancelConfiscations(p.id);
     if (JOBS[job].max && [...this.players.values()].filter((v) => v.job === job).length >= JOBS[job].max)
       return;
@@ -1508,6 +1554,7 @@ export class Game {
       attacker.wantedReason = 'Assault with a firearm';
     }
     if (p.health <= 0) {
+      this.contracts.death(p.id, attacker?.id);
       this.onActivity({ kind: 'death', playerId: p.id, name: p.name, attackerId: attacker?.id });
       this.release(p);
       this.runtime.get(p.id)!.lockpick = undefined;

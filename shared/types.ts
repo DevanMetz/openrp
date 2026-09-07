@@ -12,7 +12,8 @@ export type JobId =
   | 'mayor'
   | 'hobo'
   | 'cook'
-  | 'thief';
+  | 'thief'
+  | 'hitman';
 export type WeaponId =
   | 'keys'
   | 'physgun'

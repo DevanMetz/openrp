@@ -16,6 +16,10 @@ export interface HitContract {
   expires: number;
   status: 'offered' | 'active' | 'refund' | 'payout';
 }
+export interface ContractState {
+  entries: HitContract[];
+  cooldowns: [string, number][];
+}
 export const CONTRACT_LIMIT = 32;
 export const CONTRACT_MIN = 250;
 export const CONTRACT_MAX = 50_000;
@@ -30,6 +34,17 @@ export class ContractBook {
     readonly now: () => number,
     readonly nearby: (customer: string, hitman: string) => boolean,
   ) {}
+  export(): ContractState {
+    return structuredClone({ entries: [...this.contracts.values()], cooldowns: [...this.cooldowns] });
+  }
+  restore(state: ContractState): void {
+    this.contracts = new Map(structuredClone(state.entries).map((c) => [c.id, c]));
+    this.cooldowns = new Map(state.cooldowns);
+    // A replacement interrupts active work. Pending earned payouts remain payouts.
+    for (const c of this.contracts.values())
+      if (c.status === 'active' || c.status === 'offered') c.status = 'refund';
+    this.tick();
+  }
   request(customerId: string, hitmanId: string, targetId: string, price: unknown): HitContract {
     const customer = this.resident(customerId),
       hitman = this.resident(hitmanId),
@@ -122,7 +137,7 @@ export class ContractBook {
           hitman.available;
         if (paid) this.cooldowns.set(c.target, this.now() + CONTRACT_COOLDOWN);
         this.settle(c, paid ? 'payout' : 'refund');
-      } else if (c.hitman === targetId) this.settle(c, 'refund');
+      } else if (c.hitman === targetId || c.customer === targetId) this.settle(c, 'refund');
     }
   }
   unavailable(id: string): void {
@@ -137,9 +152,12 @@ export class ContractBook {
         continue;
       }
       const hitman = this.resident(c.hitman),
-        target = this.resident(c.target);
+        target = this.resident(c.target),
+        customer = this.resident(c.customer);
       if (
         c.expires <= this.now() ||
+        !customer?.alive ||
+        !customer.available ||
         !hitman?.hitman ||
         !hitman.alive ||
         !hitman.available ||
@@ -158,4 +176,71 @@ export class ContractBook {
     wallet.money += c.price;
     this.contracts.delete(c.id);
   }
+}
+
+export function validContractState(
+  value: unknown,
+  owners: Set<string>,
+  savedAt: number,
+): value is ContractState {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const state = value as Record<string, unknown>;
+  if (
+    Object.keys(state).some((k) => !['entries', 'cooldowns'].includes(k)) ||
+    !Array.isArray(state.entries) ||
+    state.entries.length > CONTRACT_LIMIT ||
+    !Array.isArray(state.cooldowns) ||
+    state.cooldowns.length > owners.size
+  )
+    return false;
+  const ids = new Set<string>(),
+    customers = new Set<string>(),
+    hitmen = new Set<string>(),
+    targets = new Set<string>();
+  for (const entry of state.entries) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+    const c = entry as HitContract;
+    if (
+      Object.keys(c).some(
+        (k) => !['id', 'customer', 'hitman', 'target', 'price', 'expires', 'status'].includes(k),
+      ) ||
+      typeof c.id !== 'string' ||
+      !c.id.length ||
+      c.id.length > 80 ||
+      ids.has(c.id) ||
+      ![c.customer, c.hitman, c.target].every((id) => typeof id === 'string' && owners.has(id)) ||
+      new Set([c.customer, c.hitman, c.target]).size !== 3 ||
+      !Number.isSafeInteger(c.price) ||
+      c.price < CONTRACT_MIN ||
+      c.price > CONTRACT_MAX ||
+      !Number.isSafeInteger(c.expires) ||
+      c.expires < 0 ||
+      c.expires > savedAt + 600_000 ||
+      !['offered', 'active', 'refund', 'payout'].includes(c.status) ||
+      customers.has(c.customer) ||
+      hitmen.has(c.hitman) ||
+      targets.has(c.target)
+    )
+      return false;
+    ids.add(c.id);
+    customers.add(c.customer);
+    hitmen.add(c.hitman);
+    targets.add(c.target);
+  }
+  const cooling = new Set<string>();
+  for (const row of state.cooldowns) {
+    if (
+      !Array.isArray(row) ||
+      row.length !== 2 ||
+      typeof row[0] !== 'string' ||
+      !owners.has(row[0]) ||
+      cooling.has(row[0]) ||
+      !Number.isSafeInteger(row[1]) ||
+      row[1] < 0 ||
+      row[1] > savedAt + CONTRACT_COOLDOWN
+    )
+      return false;
+    cooling.add(row[0]);
+  }
+  return true;
 }

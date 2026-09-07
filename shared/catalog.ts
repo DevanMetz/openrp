@@ -28,6 +28,15 @@ export const JOBS: Record<
     vote?: boolean;
   }
 > = {
+  hitman: {
+    name: 'Hitman',
+    color: '#897f98',
+    salary: 35,
+    max: 2,
+    category: 'Underworld',
+    description: 'Accept paid contracts from residents. Contract work does not exempt you from city law.',
+    loadout: [],
+  },
   citizen: {
     name: 'Citizen',
     color: '#85ad80',
