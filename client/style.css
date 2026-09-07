@@ -1942,3 +1942,9 @@ small {
 .evidence-section > .muted {
   margin-bottom: 1rem;
 }
+
+@media (max-width: 480px) {
+  .catalog-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
