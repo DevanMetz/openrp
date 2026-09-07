@@ -17,7 +17,7 @@ import type { JobId, Player } from '../shared/types.ts';
 
 const DAY = 86_400_000;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const CHANNELS = ['local', 'ooc', 'advert', 'me', 'group', 'system'];
+const CHANNELS = ['local', 'whisper', 'yell', 'ooc', 'advert', 'me', 'group', 'system'];
 const dateAt = (time: number) => new Date(time).toISOString().slice(0, 10);
 const safeText = (value: unknown, length: number) =>
   cleanText(value, length)

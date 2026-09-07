@@ -13,6 +13,7 @@ npm run analytics -- --days 30 --json
 npm run chatlogs -- --limit 100
 npm run chatlogs -- --player Alice --days 7
 npm run chatlogs -- --channel ooc --search printer --days 7
+npm run chatlogs -- --channel whisper --days 7
 npm run chatlogs -- --date 2026-09-07 --json
 node --import tsx scripts/observe.ts events --url https://openrp.dev --kind purchase --days 7
 ```

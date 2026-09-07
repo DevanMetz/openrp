@@ -1,6 +1,7 @@
 import * as CANNON from 'cannon-es';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import {
+  CHAT_RANGES,
   GOVERNMENT,
   GIVE_RANGE,
   INTERACT_RANGE,
@@ -1473,10 +1474,20 @@ export class Game {
     r.lastChat = this.now();
     const [command, ...words] = text.split(/\s+/);
     const args = words.join(' ');
-    let channel: 'local' | 'ooc' | 'advert' | 'me' | 'group' = 'local',
+    let channel: 'local' | 'whisper' | 'yell' | 'ooc' | 'advert' | 'me' | 'group' = 'local',
       message = text;
     if (command.startsWith('/')) {
       switch (command.toLowerCase()) {
+        case '/w':
+        case '/whisper':
+          channel = 'whisper';
+          message = args;
+          break;
+        case '/y':
+        case '/yell':
+          channel = 'yell';
+          message = args;
+          break;
         case '/ooc':
         case '//':
           channel = 'ooc';
@@ -1537,7 +1548,8 @@ export class Game {
               : ['boss', 'gangster', 'thief'].includes(p.job)
                 ? ['boss', 'gangster', 'thief'].includes(other.job)
                 : other.job === p.job
-            : distance(p, other) < 28
+            : distance(p, other) <
+              CHAT_RANGES[channel === 'whisper' || channel === 'yell' ? channel : 'local']
         )
           this.onEvent(event, other.id);
   }

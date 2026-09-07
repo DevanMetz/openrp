@@ -3,6 +3,7 @@ import type { EntityKind, JobId, WeaponId } from './types.ts';
 export const VERSION = '0.5.1';
 export const PROTOCOL = 6;
 export const POCKET_CAPACITY = 8;
+export const CHAT_RANGES = { local: 28, whisper: 5, yell: 56 } as const;
 export const TICK_RATE = 30;
 export const SNAPSHOT_RATE = 15;
 export const MAX_PROPS = 20;

@@ -1,4 +1,5 @@
 import {
+  CHAT_RANGES,
   GIVE_RANGE,
   GOVERNMENT,
   JOBS,
@@ -120,7 +121,7 @@ export class UI {
           <section class="weapon-hud"><div id="weapon-name">KEYS</div><div id="ammo"></div><small id="weapon-tip">LMB use · RMB lock</small></section>
         </div>
         <div class="minimap-wrap"><canvas id="minimap" width="300" height="240" aria-label="District minimap"></canvas><span>N ↑</span></div>
-        <div id="weapon-strip"></div><div id="chat" class="chat"><div id="chat-lines" aria-live="polite"></div><form id="chat-form" hidden><span>LOCAL</span><input id="chat-input" maxlength="240" autocomplete="off" aria-label="Chat message" placeholder="Message nearby players, or /ooc for everyone"><kbd>↵</kbd></form></div>
+        <div id="weapon-strip"></div><div id="chat" class="chat"><div id="chat-lines" aria-live="polite"></div><form id="chat-form" hidden><span id="chat-channel">LOCAL</span><input id="chat-input" maxlength="240" autocomplete="off" aria-label="Chat message" placeholder="Message nearby players, or /ooc for everyone"><kbd>↵</kbd></form></div>
         <div id="death" hidden></div><div id="damage" aria-hidden="true"></div>
       </div>
       <div id="notices" aria-live="polite"></div>
@@ -155,6 +156,7 @@ export class UI {
       if (name.length < 2) return;
       this.onConnect(name, this.input('server-password').value);
     });
+    this.input('chat-input').addEventListener('input', () => this.updateChatChannel());
     this.el('chat-form').addEventListener('submit', (event) => {
       event.preventDefault();
       const input = this.input('chat-input');
@@ -260,10 +262,30 @@ export class UI {
   openChat(): void {
     if (!this.playing || this.menu) return;
     this.chatOpen = true;
+    this.updateChatChannel();
     this.el('chat-form').hidden = false;
     this.el('chat').classList.add('active');
     this.onMenu();
     setTimeout(() => this.input('chat-input').focus(), 0);
+  }
+  updateChatChannel(): void {
+    const command = this.input('chat-input').value.trim().split(/\s+/)[0].toLowerCase();
+    const labels: Record<string, string> = {
+      '/w': `WHISPER · ${CHAT_RANGES.whisper}m`,
+      '/whisper': `WHISPER · ${CHAT_RANGES.whisper}m`,
+      '/y': `YELL · ${CHAT_RANGES.yell}m`,
+      '/yell': `YELL · ${CHAT_RANGES.yell}m`,
+      '/ooc': 'OOC',
+      '//': 'OOC',
+      '/g': 'GROUP',
+      '/ad': 'AD · $50',
+      '/advert': 'AD · $50',
+      '/me': `ACTION · ${CHAT_RANGES.local}m`,
+    };
+    this.text(
+      'chat-channel',
+      labels[command] ?? (command.startsWith('/') ? 'COMMAND' : `LOCAL · ${CHAT_RANGES.local}m`),
+    );
   }
   closeChat(resume = true): void {
     this.chatOpen = false;
@@ -284,7 +306,7 @@ export class UI {
     const line = document.createElement('div');
     line.className = `chat-line ${event.channel}`;
     const name = document.createElement('strong');
-    name.textContent = `${event.channel === 'ooc' ? '[OOC] ' : event.channel === 'advert' ? '[AD] ' : event.channel === 'group' ? '[GROUP] ' : event.channel === 'me' ? '* ' : ''}${event.name}${event.channel === 'me' ? ' ' : ': '}`;
+    name.textContent = `${event.channel === 'whisper' ? '[WHISPER] ' : event.channel === 'yell' ? '[YELL] ' : event.channel === 'ooc' ? '[OOC] ' : event.channel === 'advert' ? '[AD] ' : event.channel === 'group' ? '[GROUP] ' : event.channel === 'me' ? '* ' : ''}${event.name}${event.channel === 'me' ? ' ' : ': '}`;
     if (event.color && /^#[a-fA-F0-9]{6}$/.test(event.color)) name.style.color = event.color;
     line.append(name, document.createTextNode(event.text));
     this.el('chat-lines').append(line);
@@ -607,7 +629,7 @@ export class UI {
         .map(([key, desc]) => `<div class="control-row"><kbd>${key}</kbd><span>${desc}</span></div>`)
         .join(
           '',
-        )}<h3>Building</h3><p>Q opens props and tools. Hold LMB with the Physics Gun to grab your object, then RMB to freeze it. Scroll changes reach. R rotates. F activates fading doors. Z undoes your most recent prop.</p></div><div><h3>Talk & trade</h3><div class="commands"><code>/ooc message</code><p>Talk to the whole server.</p><code>/me action</code><p>Describe an action to nearby players.</p><code>/advert message</code><p>Advertise your business for $50.</p><code>/give 100</code><p>Give money to the player you’re looking at.</p><code>/dropweapon</code><p>Drop your equipped personal firearm with its ammunition. Job-issued equipment cannot be dropped. E picks up a dropped firearm.</p><code>/dropmoney 100</code><p>Drop cash for someone to collect.</p><code>/g message</code><p>Speak to your job group.</p><code>/rpname First Last</code><p>Change your roleplay name.</p></div><h3>Law & order</h3><div class="commands"><code>/demote Full Name reason</code><p>Start a public demotion vote. A majority of residents must agree. Passed votes remove the role for five minutes.</p><code>/wanted Full Name reason</code><p>Government: mark a suspect wanted, then use the arrest baton.</p><code>/unwanted Full Name</code><p>Clear a suspect’s wanted status.</p><code>/warrant Full Name reason</code><p>Mayor or Chief: authorize a search. Officers can then ram the owner’s door.</p><code>/unwarrant Full Name</code><p>Mayor or Chief: revoke a search warrant.</p><code>/license Full Name · /unlicense Full Name</code><p>Mayor: grant or revoke a civilian gun license.</p><code>/addlaw text · /removelaw 1</code><p>Mayor: edit city laws.</p><code>/lockdown · /unlockdown</code><p>Mayor: start or end a city curfew.</p></div></div></div><div class="guide-start"><b>Play with friends</b><p>Everyone connects to the same server address. On a LAN, share the host computer’s IP and port. A private browser window creates a separate test identity. This is an early browser implementation: maps, characters and sounds are original; Source engine assets and vehicles are not included. Proximity voice is optional and requires HTTPS (or localhost).</p></div>`;
+        )}<h3>Building</h3><p>Q opens props and tools. Hold LMB with the Physics Gun to grab your object, then RMB to freeze it. Scroll changes reach. R rotates. F activates fading doors. Z undoes your most recent prop.</p></div><div><h3>Talk & trade</h3><div class="commands"><code>/ooc message</code><p>Talk to the whole server.</p><code>/w message · /whisper message</code><p>Whisper to players within ${CHAT_RANGES.whisper} metres.</p><code>/y message · /yell message</code><p>Call out to players within ${CHAT_RANGES.yell} metres. Normal local chat reaches ${CHAT_RANGES.local} metres. Walls do not block text chat.</p><code>/me action</code><p>Describe an action to nearby players.</p><code>/advert message</code><p>Advertise your business for $50.</p><code>/give 100</code><p>Give money to the player you’re looking at.</p><code>/dropweapon</code><p>Drop your equipped personal firearm with its ammunition. Job-issued equipment cannot be dropped. E picks up a dropped firearm.</p><code>/dropmoney 100</code><p>Drop cash for someone to collect.</p><code>/g message</code><p>Speak to your job group.</p><code>/rpname First Last</code><p>Change your roleplay name.</p></div><h3>Law & order</h3><div class="commands"><code>/demote Full Name reason</code><p>Start a public demotion vote. A majority of residents must agree. Passed votes remove the role for five minutes.</p><code>/wanted Full Name reason</code><p>Government: mark a suspect wanted, then use the arrest baton.</p><code>/unwanted Full Name</code><p>Clear a suspect’s wanted status.</p><code>/warrant Full Name reason</code><p>Mayor or Chief: authorize a search. Officers can then ram the owner’s door.</p><code>/unwarrant Full Name</code><p>Mayor or Chief: revoke a search warrant.</p><code>/license Full Name · /unlicense Full Name</code><p>Mayor: grant or revoke a civilian gun license.</p><code>/addlaw text · /removelaw 1</code><p>Mayor: edit city laws.</p><code>/lockdown · /unlockdown</code><p>Mayor: start or end a city curfew.</p></div></div></div><div class="guide-start"><b>Play with friends</b><p>Everyone connects to the same server address. On a LAN, share the host computer’s IP and port. A private browser window creates a separate test identity. This is an early browser implementation: maps, characters and sounds are original; Source engine assets and vehicles are not included. Proximity voice is optional and requires HTTPS (or localhost).</p></div>`;
     if (this.menu === 'settings')
       html = `<div class="section-heading"><span class="eyebrow">MAKE IT YOURS</span><h2>Settings.</h2><p>Saved on this browser.</p></div><div class="settings-list"><label>Sound volume<output>${Math.round(this.settings.volume * 100)}%</output><input aria-label="Sound volume" data-setting="volume" type="range" min="0" max="1" step="0.05" value="${this.settings.volume}"></label><label>Voice volume<output>${Math.round(this.settings.voiceVolume * 100)}%</output><input aria-label="Voice volume" data-setting="voiceVolume" type="range" min="0" max="1" step="0.05" value="${this.settings.voiceVolume}"></label><label>Mouse sensitivity<output>${this.settings.sensitivity}</output><input aria-label="Mouse sensitivity" data-setting="sensitivity" type="range" min="0.2" max="2.5" step="0.1" value="${this.settings.sensitivity}"></label><label>Field of view<output>${this.settings.fov}</output><input aria-label="Field of view" data-setting="fov" type="range" min="65" max="105" step="1" value="${this.settings.fov}"></label><label>Graphics quality<select aria-label="Graphics quality" data-setting="quality"><option value="high" ${this.settings.quality === 'high' ? 'selected' : ''}>High · soft shadows</option><option value="low" ${this.settings.quality === 'low' ? 'selected' : ''}>Low · better performance</option></select></label></div><p class="muted">For smoother play on integrated graphics, choose Low. A mouse and keyboard are required.</p>${this.voiceControls()}`;
     this.el('menu-content').innerHTML = html;

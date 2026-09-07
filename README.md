@@ -113,6 +113,8 @@ The microphone starts off on every join. Opening menus or chat, losing focus, hi
 
 ```text
 /ooc Hello, everyone
+/w Keep this conversation close.
+/y Fresh meals at the café!
 /me checks the storefront
 /advert Fresh meals at the café
 /g Meet at the police station

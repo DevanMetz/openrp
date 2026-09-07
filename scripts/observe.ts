@@ -8,7 +8,7 @@ try {
 }
 const [action = 'analytics', ...args] = process.argv.slice(2);
 const help =
-  'Usage: observe.ts analytics|chat|events [--url https://openrp.dev] [--days 1|7|30] [--date YYYY-MM-DD] [--limit 50] [--player name-or-id] [--channel local|ooc|advert|me|group|system] [--search text] [--kind event] [--cursor value] [--json]';
+  'Usage: observe.ts analytics|chat|events [--url https://openrp.dev] [--days 1|7|30] [--date YYYY-MM-DD] [--limit 50] [--player name-or-id] [--channel local|whisper|yell|ooc|advert|me|group|system] [--search text] [--kind event] [--cursor value] [--json]';
 if (!['analytics', 'chat', 'events'].includes(action)) {
   console.error(help);
   process.exit(1);

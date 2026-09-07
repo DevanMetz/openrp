@@ -22,6 +22,46 @@ function fixture() {
     },
   };
 }
+test('whisper and yell enforce server distance boundaries, aliases and the shared chat cooldown', () => {
+  const { game, events, advance } = fixture();
+  const speaker = game.join('Speaker').player;
+  Object.assign(speaker, { x: 0, y: 0, z: 0 });
+  const listeners = [4.99, 5, 27.99, 28, 55.99, 56].map((x, i) => {
+    const p = game.join(`Listener ${i}`).player;
+    Object.assign(p, { x, y: 0, z: 0 });
+    return p;
+  });
+  for (const [prefix, channel, count] of [
+    ['/w', 'whisper', 1],
+    ['/WHISPER', 'whisper', 1],
+    ['/y', 'yell', 5],
+    ['/YELL', 'yell', 5],
+    ['', 'local', 3],
+  ] as const) {
+    events.length = 0;
+    advance(800);
+    game.chat(speaker, `${prefix} Hello <district>`);
+    const messages = events.filter(({ e }) => e.type === 'chat');
+    assert.deepEqual(
+      new Set(messages.map(({ to }) => to)),
+      new Set([speaker.id, ...listeners.slice(0, count).map((p) => p.id)]),
+    );
+    assert.ok(
+      messages.every(({ e }) => e.type === 'chat' && e.channel === channel && e.text === 'Hello <district>'),
+    );
+    game.chat(speaker, '/y cooldown bypass');
+    assert.equal(events.length, messages.length);
+  }
+  events.length = 0;
+  advance(800);
+  game.chat(speaker, '/whisper   ');
+  assert.equal(events.length, 0, 'empty channel commands are not delivered');
+  Object.assign(listeners[0], { x: 0, y: 5, z: 0 });
+  advance(800);
+  game.chat(speaker, '/w Upstairs');
+  assert.equal(events.filter(({ e }) => e.type === 'chat').length, 1, 'height contributes to range');
+});
+
 test('legal revocations enforce authority and preserve government role licenses', () => {
   const { game, advance } = fixture();
   const mayor = game.join('City Mayor').player;

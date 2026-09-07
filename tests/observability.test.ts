@@ -122,6 +122,8 @@ test('all accepted text channels are logged once before fan-out; rejected messag
   say('/advert shop open');
   say('/me waves');
   say('/g team plan');
+  say('/w quiet conversation');
+  say('/y calling down the street');
   say('/rpname New Alice');
   say('/ooc');
   say('/help');
@@ -129,16 +131,18 @@ test('all accepted text channels are logged once before fan-out; rejected messag
   a.money = 0;
   say('/advert cannot afford');
   const log = rows(await store.logs('chat'));
-  assert.equal(log.length, 5);
+  assert.equal(log.length, 7);
   assert.deepEqual(
     log.map((r) => r.channel),
-    ['group', 'me', 'advert', 'ooc', 'local'],
+    ['yell', 'whisper', 'group', 'me', 'advert', 'ooc', 'local'],
   );
   assert.ok(
     received.filter((text) => text === 'hello nearby').length > 1,
     'local message was delivered to multiple residents',
   );
-  assert.equal(totals(await store.analytics()).chatMessages, 5);
+  assert.equal(totals(await store.analytics()).chatMessages, 7);
+  assert.equal(rows(await store.logs('chat', { channel: 'whisper' })).length, 1);
+  assert.equal(rows(await store.logs('chat', { channel: 'yell' })).length, 1);
 });
 
 test('economy and job counters only include successful server actions, including player shop purchases', async (t) => {

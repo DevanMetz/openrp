@@ -138,7 +138,7 @@ export type GameEvent =
       type: 'chat';
       name: string;
       text: string;
-      channel: 'local' | 'ooc' | 'advert' | 'me' | 'system' | 'group';
+      channel: 'local' | 'whisper' | 'yell' | 'ooc' | 'advert' | 'me' | 'system' | 'group';
       color?: string;
     }
   | { type: 'notice'; text: string; tone?: 'info' | 'error' | 'success' }
