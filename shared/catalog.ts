@@ -44,7 +44,7 @@ export const JOBS: Record<
     max: 4,
     category: 'Government',
     description: 'Patrol the streets. Mark suspects wanted, arrest criminals, and execute search warrants.',
-    loadout: ['pistol', 'baton', 'unarrest', 'ram'],
+    loadout: ['pistol', 'baton', 'unarrest', 'ram', 'scanner'],
     vote: true,
   },
   gangster: {
@@ -90,7 +90,7 @@ export const JOBS: Record<
     max: 1,
     category: 'Government',
     description: 'Promote from Civil Protection. Coordinate officers and approve search warrants.',
-    loadout: ['pistol', 'baton', 'unarrest', 'ram'],
+    loadout: ['pistol', 'baton', 'unarrest', 'ram', 'scanner'],
   },
   mayor: {
     name: 'Mayor',
@@ -173,6 +173,15 @@ export const WEAPONS: Record<
     delay: 850,
     magazine: 6,
     reload: 2500,
+  },
+  scanner: {
+    name: 'Inspection Scanner',
+    short: 'SCAN',
+    damage: 0,
+    range: 3,
+    delay: 700,
+    magazine: 0,
+    reload: 0,
   },
   baton: { name: 'Arrest Baton', short: 'ARREST', damage: 0, range: 2.7, delay: 600, magazine: 0, reload: 0 },
   unarrest: {

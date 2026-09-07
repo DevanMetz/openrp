@@ -222,6 +222,8 @@ export class Game {
         this.notice(player.id, 'Your previous job is full. You returned as a Citizen with your inventory.');
       }
     }
+    if (POLICE.includes(player.job) && !player.arrestedUntil && !player.weapons.includes('scanner'))
+      player.weapons.push('scanner');
     this.players.set(player.id, player);
     this.runtime.set(player.id, {
       input: { ...idleInput(), yaw: player.yaw, pitch: player.pitch, crouch: player.crouch },
@@ -532,7 +534,10 @@ export class Game {
         this.primary(p, true);
         break;
       case 'reload':
-        this.reload(p);
+        if (p.weapon === 'scanner') {
+          const hit = this.trace(eyes(p), direction(p.yaw, p.pitch), 3, p.id);
+          if (hit.kind === 'player') this.returnEvidence(p, hit.id!);
+        } else this.reload(p);
         break;
       case 'door-buy':
       case 'door-sell':
@@ -1309,6 +1314,13 @@ export class Game {
     if (this.now() - r.lastShot < def.delay) return;
     r.lastShot = this.now();
     const hit = this.trace(eyes(p), direction(p.yaw, p.pitch), def.range, p.id);
+    if (p.weapon === 'scanner') {
+      if (hit.kind === 'player') {
+        if (secondary) this.startConfiscation(p, hit.id!);
+        else this.inspectWeapons(p, hit.id!);
+      }
+      return;
+    }
     if (p.weapon === 'keys') {
       if (hit.kind === 'door') {
         if (secondary) this.doorAction(p, 'door-lock', hit.id!, undefined);

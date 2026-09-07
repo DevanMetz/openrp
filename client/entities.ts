@@ -573,6 +573,17 @@ export function makeViewmodel(weapon: WeaponId, withHands = true): THREE.Group {
     box(group, 0, 0.096, -0.29, 0.016, 0.035, 0.025, '#a6aa8f', true);
     if (weapon === 'smg') box(group, 0, -0.19, -0.29, 0.06, 0.24, 0.1, '#3b453e');
     if (weapon === 'shotgun') box(group, 0, -0.03, -0.47, 0.13, 0.13, 0.25, '#8c7655');
+  } else if (weapon === 'scanner') {
+    hand(0, -0.16, 0.09);
+    box(group, 0, -0.12, 0.015, 0.1, 0.25, 0.13, '#303e3a');
+    box(group, 0, 0.075, -0.09, 0.24, 0.31, 0.16, '#687b70');
+    box(group, 0, 0.095, 0.001, 0.205, 0.22, 0.027, '#263c35');
+    panel(group, 'CP / SCAN', 0, 0.16, 0.018, 0.175, 0.055, '#a9c4a1', '#20362c');
+    panel(group, 'READY', 0, 0.07, 0.019, 0.165, 0.085, '#253f36', '#b9dcc1');
+    box(group, -0.065, -0.065, 0.004, 0.045, 0.025, 0.035, '#d2ad68');
+    box(group, 0.065, -0.065, 0.004, 0.045, 0.025, 0.035, '#465b51');
+    box(group, 0, 0.25, -0.09, 0.28, 0.05, 0.19, '#344b42');
+    for (let i = 0; i < 3; i++) box(group, -0.07 + i * 0.07, 0.281, -0.09, 0.032, 0.013, 0.1, '#b0b79a');
   } else if (weapon === 'medkit') {
     hand(0.14, -0.14, 0.04);
     hand(-0.2, -0.13, -0.03);

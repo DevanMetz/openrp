@@ -351,17 +351,19 @@ export class UI {
         ? 'RELOADING…'
         : p.holding
           ? 'RMB freeze · Scroll distance · R rotate'
-          : p.weapon === 'keys'
-            ? 'LMB use · RMB lock'
-            : p.weapon === 'physgun'
-              ? 'Hold LMB grab · RMB freeze'
-              : p.weapon === 'medkit'
-                ? 'LMB heal others · RMB heal self'
-                : p.weapon === 'toolgun'
-                  ? 'Choose a tool in Q · LMB apply'
-                  : WEAPONS[p.weapon].magazine
-                    ? 'LMB fire · R reload'
-                    : 'LMB use',
+          : p.weapon === 'scanner'
+            ? 'LMB inspect · RMB confiscate · R return'
+            : p.weapon === 'keys'
+              ? 'LMB use · RMB lock'
+              : p.weapon === 'physgun'
+                ? 'Hold LMB grab · RMB freeze'
+                : p.weapon === 'medkit'
+                  ? 'LMB heal others · RMB heal self'
+                  : p.weapon === 'toolgun'
+                    ? 'Choose a tool in Q · LMB apply'
+                    : WEAPONS[p.weapon].magazine
+                      ? 'LMB fire · R reload'
+                      : 'LMB use',
     );
     this.el('lockdown').hidden = !state.lockdown;
     this.el('status-flags').innerHTML =

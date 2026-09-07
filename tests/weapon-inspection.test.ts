@@ -87,3 +87,35 @@ test('inspection checks real role, distance, walls, life and custody, and shares
   game.handle(officer.id, { type: 'action', action: 'inspect-weapons', target: target.id });
   assert.equal(events.filter((v) => v.event.type === 'weapon-inspection').length, 1);
 });
+
+test('police scanner is issued on reconnect and routes aimed inspection without granting authority to civilians', () => {
+  const { game, officer, target, events } = fixture();
+  game.applyJob(officer, 'police');
+  assert.ok(officer.weapons.includes('scanner'));
+  officer.weapon = 'scanner';
+  officer.yaw = 0;
+  officer.pitch = 0;
+  game.primary(officer, false);
+  assert.ok(events.some((v) => v.event.type === 'weapon-inspection'));
+  const legacy = new Game({ now: game.now });
+  const joined = legacy.join('Returning Officer');
+  legacy.applyJob(joined.player, 'police');
+  joined.player.weapons = joined.player.weapons.filter((w) => w !== 'scanner');
+  joined.player.ammo.pistol = 2;
+  joined.player.reserve.pistol = 9;
+  legacy.disconnect(joined.player.id);
+  const restored = new Game({ world: legacy.exportWorld(), now: game.now });
+  const returning = restored.join('Ignored', joined.token).player;
+  assert.ok(returning.weapons.includes('scanner'));
+  assert.equal(returning.ammo.pistol, 2);
+  assert.equal(returning.reserve.pistol, 9);
+  officer.job = 'citizen';
+  game.runtime.get(officer.id)!.lastShot = -Infinity;
+  game.runtime.get(officer.id)!.lastResidentAction = -Infinity;
+  events.length = 0;
+  game.primary(officer, false);
+  assert.equal(
+    events.some((v) => v.event.type === 'weapon-inspection'),
+    false,
+  );
+});

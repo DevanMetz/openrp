@@ -24,7 +24,8 @@ export type WeaponId =
   | 'unarrest'
   | 'lockpick'
   | 'medkit'
-  | 'ram';
+  | 'ram'
+  | 'scanner';
 export type PropKind = 'crate' | 'barrel' | 'pallet' | 'fence' | 'couch' | 'table' | 'shelf';
 export type ResidentAction =
   'give' | 'wanted' | 'unwanted' | 'warrant' | 'unwarrant' | 'license' | 'unlicense';
