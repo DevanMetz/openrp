@@ -216,6 +216,7 @@ export class Game {
       const limit = JOBS[player.job].max;
       if (limit && [...this.players.values()].filter((p) => p.job === player.job).length >= limit) {
         player.job = 'citizen';
+        delete player.jobTitle;
         this.notice(player.id, 'Your previous job is full. You returned as a Citizen with your inventory.');
       }
     }
@@ -465,6 +466,9 @@ export class Game {
       return;
     }
     switch (msg.action) {
+      case 'job-title':
+        this.setJobTitle(p, msg.value);
+        break;
       case 'pocket-store':
         this.storePocket(p, target);
         break;
@@ -818,6 +822,7 @@ export class Game {
     if (player) this.applyJob(player, 'citizen');
     else {
       character.job = 'citizen';
+      delete character.jobTitle;
       character.weapons = ['keys', 'physgun', 'toolgun'];
       character.weapon = 'keys';
       character.ammo = {};
@@ -844,6 +849,7 @@ export class Game {
     this.release(p);
     const previousJob = p.job;
     p.job = job;
+    delete p.jobTitle;
     this.onActivity({ kind: 'job', playerId: p.id, name: p.name, previousJob, job });
     p.weapons = ['keys', 'physgun', 'toolgun', ...JOBS[job].loadout];
     p.weapon = 'keys';
@@ -1662,7 +1668,26 @@ export class Game {
       );
     }
   }
+  setJobTitle(p: Player, value: unknown): void {
+    if (p.deadUntil || p.arrestedUntil || typeof value !== 'string') return;
+    const title = cleanText(value, 240);
+    if (title && (title.length < 2 || title.length > 32)) {
+      this.notice(p.id, 'Use 2–32 characters for your job title, or leave it blank to reset.', 'error');
+      return;
+    }
+    if (title) p.jobTitle = title;
+    else delete p.jobTitle;
+    this.notice(
+      p.id,
+      `Job title: ${title || JOBS[p.job].name}. Your role and salary stay the same.`,
+      'success',
+    );
+  }
   command(p: Player, command: string, words: string[]): void {
+    if (command === '/job') {
+      this.setJobTitle(p, words.join(' '));
+      return;
+    }
     if (command === '/dropweapon') {
       this.dropWeapon(p);
       return;

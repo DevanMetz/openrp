@@ -520,7 +520,7 @@ function aim(): AimTarget | undefined {
       kind: 'player',
       id: p.id,
       title: p.name,
-      detail: `${JOBS[p.job].name}${p.wantedUntil ? ` · WANTED: ${p.wantedReason}` : ''}`,
+      detail: `${p.jobTitle ? `${p.jobTitle} · ` : ''}${JOBS[p.job].name}${p.wantedUntil ? ` · WANTED: ${p.wantedReason}` : ''}`,
       hint: 'C  Resident actions     V  Voice     Y  Text',
     };
   }

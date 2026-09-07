@@ -22,6 +22,28 @@ function directory(t: TestContext) {
   return dir;
 }
 
+test('custom job titles survive world replacement, reset on a full role and reject corrupt saves', (t) => {
+  const dir = directory(t);
+  const game = new Game({ now: () => 100_000 });
+  const owner = game.join('Title Owner');
+  game.applyJob(owner.player, 'mayor');
+  game.setJobTitle(owner.player, 'District Organizer');
+  saveWorld(dir, game.exportWorld());
+  const saved = loadWorld(dir)!;
+  const next = new Game({ world: saved, now: game.now });
+  const returning = next.join('Ignored', owner.token).player;
+  assert.equal(returning.jobTitle, 'District Organizer');
+  assert.equal(returning.job, 'mayor');
+  const full = new Game({ world: saved, now: game.now });
+  full.applyJob(full.join('New Mayor').player, 'mayor');
+  const fallback = full.join('Ignored', owner.token).player;
+  assert.equal(fallback.job, 'citizen');
+  assert.equal(fallback.jobTitle, undefined);
+  saved.profiles[0].character!.jobTitle = 'x'.repeat(33);
+  writeFileSync(join(dir, 'world.json'), JSON.stringify(saved));
+  assert.throws(() => loadWorld(dir));
+});
+
 test('offline demotion survives a saved world replacement, removes job stock and keeps property', (t) => {
   const dir = directory(t);
   let now = 100_000;
@@ -30,6 +52,7 @@ test('offline demotion survives a saved world replacement, removes job stock and
   const source = game.join('Requester').player;
   const witness = game.join('Witness').player;
   game.applyJob(owner.player, 'dealer');
+  game.setJobTitle(owner.player, 'Union Armory');
   const shipment = game.createEntity('shipment', owner.player.id, { x: 10, y: 1, z: 20 });
   const prop = game.createEntity('shelf', owner.player.id, { x: 15, y: 1, z: 20 });
   const door = game.doors.find((d) => d.id === 'cafe')!;
@@ -47,6 +70,7 @@ test('offline demotion survives a saved world replacement, removes job stock and
   const restored = new Game({ now: () => now, world: loadWorld(dir) });
   const p = restored.join('Shop Owner', owner.token).player;
   assert.equal(p.job, 'citizen');
+  assert.equal(p.jobTitle, undefined, 'offline demotion clears the previous roleplay title');
   assert.deepEqual(p.weapons, ['keys', 'physgun', 'toolgun']);
   assert.equal(Object.hasOwn(p, 'jobBans'), false, 'private runtime fields stay out of snapshots');
   now += 31_000;

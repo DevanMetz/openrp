@@ -119,6 +119,7 @@ The microphone starts off on every join. Opening menus or chat, losing focus, hi
 /advert Fresh meals at the café
 /g Meet at the police station
 /rpname Alex Citizen
+/job Union Cafe Owner
 /give 100
 /dropmoney 100
 /dropweapon
@@ -135,6 +136,8 @@ The microphone starts off on every join. Opening menus or chat, losing focus, hi
 /lockdown reason
 /unlockdown
 ```
+
+Use `/job Your title` or **F4 → Jobs → Your roleplay title** to name your business or specialty. Your underlying role, salary, equipment and permissions stay the same. Titles persist across reconnects and reset when your job changes; `/job` alone restores the default title.
 
 To hand over a personal firearm, equip it and use `/dropweapon` or **F4 → Shop → Drop firearm**. Anyone nearby can pick it up with **E**, retaining its loaded and reserve ammunition. Equipment supplied by your current job cannot be dropped.
 

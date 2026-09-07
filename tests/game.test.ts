@@ -62,6 +62,41 @@ test('whisper and yell enforce server distance boundaries, aliases and the share
   assert.equal(events.filter(({ e }) => e.type === 'chat').length, 1, 'height contributes to range');
 });
 
+test('custom job titles preserve role rules, reject invalid input and reset with job changes', () => {
+  const { game, act, advance } = fixture();
+  const p = game.join('Shopkeeper').player;
+  const other = game.join('Customer').player;
+  const original = { money: p.money, weapons: [...p.weapons], job: p.job };
+  act(p, 'job-title', undefined, 'Mayor');
+  assert.equal(p.jobTitle, 'Mayor');
+  assert.equal(p.job, original.job);
+  assert.deepEqual(p.weapons, original.weapons);
+  assert.equal(p.money, original.money);
+  game.command(p, '/license', [other.id]);
+  assert.equal(other.license, false, 'title does not grant mayor powers');
+  for (const invalid of ['x', 'a'.repeat(33), 123, true]) {
+    act(p, 'job-title', undefined, invalid);
+    assert.equal(p.jobTitle, 'Mayor');
+  }
+  p.arrestedUntil = game.now() + 1000;
+  act(p, 'job-title', undefined, 'Jailbreak');
+  assert.equal(p.jobTitle, 'Mayor');
+  p.arrestedUntil = 0;
+  p.deadUntil = game.now() + 1000;
+  act(p, 'job-title', undefined, 'Ghost');
+  assert.equal(p.jobTitle, 'Mayor');
+  p.deadUntil = 0;
+  advance(800);
+  game.chat(p, '/job  Café <Owner>\u202e');
+  assert.equal(p.jobTitle, 'Café <Owner>');
+  advance(800);
+  game.chat(p, '/job');
+  assert.equal(p.jobTitle, undefined);
+  act(p, 'job-title', undefined, 'Corner Shop');
+  game.applyJob(p, 'dealer');
+  assert.equal(p.jobTitle, undefined);
+});
+
 test('legal revocations enforce authority and preserve government role licenses', () => {
   const { game, advance } = fixture();
   const mayor = game.join('City Mayor').player;

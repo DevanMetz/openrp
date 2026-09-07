@@ -1147,6 +1147,28 @@ small {
   line-height: 1.6;
   margin-bottom: 1.25rem;
 }
+.job-title-editor {
+  border-top: 1px solid var(--line);
+  margin-top: 1.5rem;
+  padding-top: 1.2rem;
+}
+.job-title-editor p {
+  line-height: 1.6;
+  margin: 0.7rem 0 1rem;
+}
+.job-title-editor .command-field {
+  flex-wrap: wrap;
+}
+.job-title-editor input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+#hud-job {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .catalog-card p {
   font-size: 0.76rem;
   color: #9fae9a;

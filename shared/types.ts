@@ -47,6 +47,7 @@ export interface Player extends Motion {
   id: string;
   name: string;
   job: JobId;
+  jobTitle?: string;
   yaw: number;
   pitch: number;
   crouch: boolean;

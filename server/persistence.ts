@@ -50,6 +50,7 @@ function validCharacter(value: unknown): boolean {
       return false;
   }
   return (
+    (value.jobTitle === undefined || (text(value.jobTitle, 32) && value.jobTitle.trim().length >= 2)) &&
     (value.pocket === undefined ||
       (Array.isArray(value.pocket) &&
         value.pocket.length <= POCKET_CAPACITY &&
@@ -79,6 +80,7 @@ function validCharacter(value: unknown): boolean {
         'pitch',
         'crouch',
         'job',
+        'jobTitle',
         'weapons',
         'weapon',
         'ammo',

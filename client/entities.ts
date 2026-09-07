@@ -451,7 +451,7 @@ export function updateAvatar(a: Avatar, p: Player, dt: number, localPosition: TH
     a.equipment.position.y = p.crouch ? 0.76 : 1.13;
   }
   a.label.visible = !p.deadUntil && localPosition.distanceTo(dest) < 23;
-  const key = `${p.name}:${p.job}:${!!p.wantedUntil}:${!!p.arrestedUntil}`;
+  const key = `${p.name}:${p.job}:${p.jobTitle ?? ''}:${!!p.wantedUntil}:${!!p.arrestedUntil}`;
   if (a.labelKey !== key) {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
@@ -465,7 +465,18 @@ export function updateAvatar(a: Avatar, p: Player, dt: number, localPosition: TH
     ctx.fillText(p.name, 256, 38);
     ctx.font = '23px sans-serif';
     ctx.fillStyle = p.wantedUntil ? '#f3a081' : JOBS[p.job].color;
-    ctx.fillText(p.arrestedUntil ? 'IN CUSTODY' : p.wantedUntil ? 'WANTED' : JOBS[p.job].name, 256, 73);
+    ctx.fillText(
+      p.arrestedUntil
+        ? 'IN CUSTODY'
+        : p.wantedUntil
+          ? 'WANTED'
+          : p.jobTitle
+            ? `${p.jobTitle} · ${JOBS[p.job].name}`
+            : JOBS[p.job].name,
+      256,
+      73,
+      480,
+    );
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     a.label.material.map?.dispose();

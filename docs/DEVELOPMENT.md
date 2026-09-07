@@ -16,6 +16,8 @@ The active objective is comprehensive DarkRP feature coverage and the best pract
 
 ## Next work
 
+Local identity increment: custom roleplay titles through `/job` and F4 Jobs, displayed on the HUD, resident list, player context and overhead labels. Underlying job permissions, salaries and equipment are unchanged. Titles persist in character saves and reset with role changes, offline demotion and full-slot reconnect fallback. This increment is not yet deployed.
+
 Local roleplay chat increment: `/w` and `/whisper` reach 5 metres; `/y` and `/yell` reach 56 metres; ordinary local chat remains 28 metres. Server distance includes height and uses the existing shared cooldown. Channel labels appear in chat and while composing; accepted messages are logged once with searchable whisper/yell channels. Text range passes through walls. This is not yet deployed.
 
 Local increment after 0.5.1: eight-object pocket with C storage and F4 inventory/placement. Preserves ammunition, cash, health and paint; reserves stored prop quota; rejects foreign props, held/frozen/fading objects and businesses. Persistence validates bounds and unique IDs across pockets/world objects. Contents survive death, custody and job changes. Protocol 6 is required for the next release. This increment is not deployed yet.

@@ -35,6 +35,8 @@ Coverage includes:
 
 ## Browser checklist
 
+Custom-title QA, September 7, 2026: Chrome saved Union Cafe Owner through F4 Jobs, displayed it on the HUD, and showed both Union Cafe Owner and Citizen in the resident list. Salary remained $45. Tests cover invalid values, custody/death restrictions, chat reset, role changes, offline demotion, saved-world replacement and full-slot fallback; a Citizen titled Mayor cannot grant licenses. Full 83-test checks passed; narrow title-editor layout and overhead custom labels still need visual review.
+
 Narrow chat QA, September 7, 2026: Chrome rendered the actual game in a 360×780 iframe. The initial whisper composer wrapped its label beside a cramped field. The updated layout uses the available width, puts the channel/range above the input and keeps the Enter hint alongside it; the test message remained fully visible. Build, typecheck and production smoke passed. This is a CSS viewport check, not touch-input or mobile gameplay support.
 
 Chat range QA, September 7, 2026: Chrome showed WHISPER · 5m while composing `/w`, delivered the speaker's message with a [WHISPER] label, reset the composer to LOCAL · 28m, and showed YELL · 56m for `/y`. Server tests cover aliases, exact distance boundaries, height and shared cooldowns; observability tests cover one log record per message and filtering each new channel. The 81-test full check passed before the composer enhancement; the final composer build and production smoke were checked separately. Multiple live browser recipients and narrow-width composer layout remain unverified.
