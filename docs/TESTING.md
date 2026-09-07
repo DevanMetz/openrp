@@ -2,6 +2,8 @@
 
 ## Mayor broadcast — local implementation
 
+Follow-up: a three-client WebSocket test verifies exactly one broadcast at distant positions, rejection after losing the Mayor role, and no log entry for that rejection. A persisted observability fixture verifies broadcast channel/player/text filters. All 24 network and observability tests passed. In an isolated 360 × 780 browser session, the command hint and submitted message worked; review led to a dark broadcast card and additional clearance above the status panel. The revised chat-history layout was visually checked. Final build and production smoke passed. This supersedes the pending dedicated checks listed below; production deployment remains pending.
+
 `/broadcast message` produces a distinct server-wide chat event, input channel hint and field-guide entry. Authority uses the actual Mayor job, excludes death/custody, and shares existing chat rate/text limits. Accepted messages are logged once and the observability channel filter accepts `broadcast`.
 
 The new Game test covers title-based impersonation, custody/death, case-insensitive command handling, global-event delivery, empty input, truncation and shared cooldown. `npm run check` passed with 110 tests, production build and HTTP smoke. Dedicated multiplayer network delivery, broadcast log-query and browser presentation checks remain pending. This feature is local and undeployed.

@@ -727,6 +727,15 @@ small {
 .chat-line.advert {
   color: #f1d88f;
 }
+.chat-line.broadcast {
+  background: #18261ff2;
+  border-left: 3px solid var(--accent);
+  padding: 0.45rem 0.6rem;
+  font-size: 0.78rem;
+}
+.chat-line.broadcast strong {
+  display: block;
+}
 #chat-form {
   display: flex;
   align-items: center;
@@ -1836,7 +1845,7 @@ small {
   }
   .chat {
     left: 0.8rem;
-    bottom: 12rem;
+    bottom: 14rem;
     width: calc(100% - 1.6rem);
     font-size: 0.65rem;
   }

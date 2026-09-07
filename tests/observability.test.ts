@@ -49,6 +49,19 @@ const message = (text: string, extra = {}) => ({
   ...extra,
 });
 
+test('broadcast logs retain their channel and support combined query filters', async (t) => {
+  const { store } = await fixture(t, { now: () => Date.parse('2026-09-07T12:00:00Z') });
+  store.chat(message('Meet at City Hall', { job: 'mayor', channel: 'broadcast' }));
+  store.chat(message('Meet at City Hall', { channel: 'ooc' }));
+  const found = rows(await store.logs('chat', {
+    date: '2026-09-07', channel: 'broadcast', player: 'Alice', search: 'City Hall',
+  }));
+  assert.equal(found.length, 1);
+  assert.equal(found[0].channel, 'broadcast');
+  assert.equal(found[0].text, 'Meet at City Hall');
+  assert.equal(rows(await store.logs('chat', { channel: 'broadcast', search: 'absent' })).length, 0);
+});
+
 test('analytics splits connected time at UTC midnight, preserves identity counts and excludes open sessions from averages', async (t) => {
   let now = Date.parse('2026-09-06T23:59:50Z');
   const { store, dataDir } = await fixture(t, { now: () => now });

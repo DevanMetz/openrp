@@ -51,6 +51,44 @@ class Client {
   }
 }
 
+test('mayor broadcasts reach distant real clients once and revoked authority cannot broadcast', async () => {
+  let now = 100_000;
+  const game = new Game({ now: () => now });
+  const app = await startServer({ game, port: 0, host: '127.0.0.1', production: true, persist: false });
+  const clients = Array.from({ length: 3 }, () => new Client(`ws://127.0.0.1:${app.port}/ws`));
+  const logged: string[] = [];
+  const onChat = game.onChat;
+  game.onChat = (entry) => { logged.push(entry.text); onChat(entry); };
+  try {
+    await Promise.all(clients.map((c) => c.open()));
+    const identities = await Promise.all(clients.map((c, i) => c.join(`Broadcast Resident ${i}`)));
+    const mayor = game.players.get(identities[0].id)!;
+    game.applyJob(mayor, 'mayor');
+    Object.assign(mayor, { x: 0, y: 0, z: 0 });
+    Object.assign(game.players.get(identities[1].id)!, { x: 90, y: 0, z: 90 });
+    Object.assign(game.players.get(identities[2].id)!, { x: -90, y: 0, z: -90 });
+    const text = 'Town meeting at City Hall';
+    clients[0].send({ type: 'chat', text: `/broadcast ${text}` });
+    await Promise.all(clients.map((c) => c.wait((m) => m.type === 'chat' && m.channel === 'broadcast' && m.text === text)));
+    game.applyJob(mayor, 'citizen');
+    now += 800;
+    clients[0].send({ type: 'chat', text: '/broadcast revoked authority' });
+    await clients[0].wait((m) => m.type === 'notice' && m.text.includes('Only a living mayor'));
+    // A later accepted message establishes delivery order after the rejected attempt.
+    now += 800;
+    clients[0].send({ type: 'chat', text: '/ooc delivery barrier' });
+    await Promise.all(clients.map((c) => c.wait((m) => m.type === 'chat' && m.text === 'delivery barrier')));
+    for (const c of clients) {
+      const broadcasts = c.messages.filter((m) => m.type === 'chat' && m.channel === 'broadcast');
+      assert.equal(broadcasts.length, 1);
+    }
+    assert.deepEqual(logged, [text, 'delivery barrier']);
+  } finally {
+    clients.forEach((c) => c.ws.terminate());
+    await app.close();
+  }
+});
+
 test('real clients observe pocket storage and placement without duplicate world objects', async () => {
   let now = 100_000;
   const game = new Game({ now: () => now });
