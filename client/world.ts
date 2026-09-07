@@ -190,6 +190,43 @@ function surfaceTexture(kind: string, color: string): THREE.CanvasTexture {
   map.anisotropy = 8;
   return map;
 }
+function barkTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#665b45';
+  ctx.fillRect(0, 0, 256, 256);
+  // Periodic ridges wrap around the trunk without consuming the city's random sequence.
+  for (let ridge = -1; ridge < 33; ridge++) {
+    for (const [offset, width, color] of [
+      [0, 2, '#554d3d'],
+      [2.5, 1, '#776c55'],
+    ] as const) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.setLineDash([14 + (ridge % 4) * 3, 5 + (ridge % 3) * 2]);
+      ctx.lineDashOffset = ridge * 7;
+      ctx.beginPath();
+      for (let y = 0; y <= 256; y += 4) {
+        const x = ridge * 8 + offset + Math.sin((y * Math.PI) / 128 + ridge * 1.7) * 2;
+        if (y === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  }
+  for (let fleck = 0; fleck < 380; fleck++) {
+    const x = (fleck * 73) % 256,
+      y = (fleck * 47 + Math.floor(fleck / 7) * 13) % 256;
+    ctx.fillStyle = fleck % 3 ? '#867b6155' : '#292e2555';
+    ctx.fillRect(x, y, 1 + (fleck % 3), 2 + (fleck % 7));
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.anisotropy = 8;
+  return texture;
+}
 export class City {
   scene: THREE.Scene;
   materials = new Map<string, THREE.MeshStandardMaterial>();
@@ -241,6 +278,11 @@ export class City {
         emissive: '#957747',
         emissiveIntensity: 0.18,
       }),
+    );
+    const bark = barkTexture();
+    this.materials.set(
+      'bark',
+      new THREE.MeshStandardMaterial({ map: bark, bumpMap: bark, bumpScale: 0.008, roughness: 1 }),
     );
     const leaves = foliageTexture();
     for (const [key, color] of [
@@ -667,7 +709,7 @@ export class City {
     for (const x of [-6.4, 6.4]) this.box(x, 2.4, 69.2, 0.4, 4.8, 0.4, 'metal');
   }
   tree(x: number, z: number): void {
-    this.cylinder(x, 1.95, z, 0.105, 0.23, 3.3, 'wood');
+    this.cylinder(x, 1.95, z, 0.105, 0.23, 3.3, 'bark');
     for (let branch = 0; branch < 7; branch++) {
       const angle = branch * 2.39996;
       const tip = new THREE.Vector3(
@@ -682,7 +724,7 @@ export class City {
       );
       this.add(
         new THREE.CylinderGeometry(0.025, 0.083, direction.length(), 7),
-        this.material('wood'),
+        this.material('bark'),
         base.add(tip).multiplyScalar(0.5),
         rotation,
       );

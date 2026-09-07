@@ -1,5 +1,11 @@
 # Testing
 
+## Dedicated bark visual pass
+
+Tree trunks and branches now use their own procedural bark texture and subtle bump relief, rather than furniture wood. The texture introduces broken longitudinal ridges and flecks without consuming city random values. Close-up review in the actual City renderer exposed excessive striping in the first version; reduced contrast and relief and interrupted ridges were then reviewed again. Tree silhouettes and geometry remain unchanged, including the visible flat trunk tip, which needs a later geometry pass.
+
+Final build and production smoke passed. This is a material review at one Union Square camera, not a full lighting/performance audit. No external assets or server changes; local and undeployed.
+
 ## Bench and wood visual pass
 
 Added finer procedural grain and knots to the shared wood texture without consuming additional city random values. Union Square benches now have back supports, armrests, wider feet and seat fasteners using existing static geometry batching. Close-up review exposed the pre-existing seat/planter overlap; both benches moved 0.6 metres toward the square, leaving their frames clear of the planter.
