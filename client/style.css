@@ -740,6 +740,8 @@ small {
   color: var(--accent);
 }
 #chat-form input {
+  min-width: 0;
+  flex: 1;
   border: 0;
   padding: 0.4rem;
   background: transparent;
@@ -1802,8 +1804,18 @@ small {
   .chat {
     left: 0.8rem;
     bottom: 12rem;
-    width: 270px;
+    width: calc(100% - 1.6rem);
     font-size: 0.65rem;
+  }
+  #chat-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.2rem 0.5rem;
+  }
+  #chat-channel {
+    grid-column: 1 / -1;
+    white-space: nowrap;
+    letter-spacing: 0.05em;
   }
   .weapon-hud {
     min-width: 120px;

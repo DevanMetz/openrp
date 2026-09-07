@@ -35,6 +35,8 @@ Coverage includes:
 
 ## Browser checklist
 
+Narrow chat QA, September 7, 2026: Chrome rendered the actual game in a 360×780 iframe. The initial whisper composer wrapped its label beside a cramped field. The updated layout uses the available width, puts the channel/range above the input and keeps the Enter hint alongside it; the test message remained fully visible. Build, typecheck and production smoke passed. This is a CSS viewport check, not touch-input or mobile gameplay support.
+
 Chat range QA, September 7, 2026: Chrome showed WHISPER · 5m while composing `/w`, delivered the speaker's message with a [WHISPER] label, reset the composer to LOCAL · 28m, and showed YELL · 56m for `/y`. Server tests cover aliases, exact distance boundaries, height and shared cooldowns; observability tests cover one log record per message and filtering each new channel. The 81-test full check passed before the composer enhancement; the final composer build and production smoke were checked separately. Multiple live browser recipients and narrow-width composer layout remain unverified.
 
 Government menu QA, September 7, 2026: in a disposable three-resident Chrome session, Mayor used Revoke search warrant and Revoke gun license on a Medic. The panel removed the active warrant and switched to No gun license / Grant gun license. The same panel submitted a demotion reason; F4 showed the correct target, reason, 1 yes / 0 no, two required yes votes and vote-recorded state. Automated role-matrix coverage verifies revocation authority and protection of government-issued licenses. Full 80-test checks passed. Narrow-width ballots remain unverified.
