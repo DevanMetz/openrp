@@ -4,7 +4,7 @@
 
 `server/main.ts` owns HTTP, static files, WebSocket admission, rate limits and lifecycle. `Game` in `server/game.ts` owns players, transactions, jobs, entities, laws and Cannon physics. A client submits movement intent and named actions. It never submits authoritative position, cash, health, ownership, spawn coordinates or damage.
 
-The server steps at 30 Hz and sends a full snapshot at 15 Hz. This is deliberately simple for a small community server. It is not a measured 32-player bandwidth or performance claim. State size grows with entity/player count; interest management and delta snapshots are potential later work.
+The server targets 30 Hz simulation and 15 Hz updates. Initial joins and five-second resyncs receive a full snapshot; other frames carry changed fields and removal IDs. Encoding is shared across recipients. Slow consumers receive a fresh snapshot after backpressure. No fixed player slot cap is enforced. Spatial interest management remains future work; traffic still grows with the number of moving players and recipients.
 
 ```mermaid
 flowchart LR
@@ -49,4 +49,4 @@ The DOM layer in `client/ui.ts` renders HUD and game menus. Player-controlled te
 - Add tests around transactions, timers, permissions, visibility and reconnect behavior.
 - Preserve protocol compatibility intentionally, or increment the protocol number on both sides.
 
-Potential later work includes original richer art, multiple floors, player pushing/contacts, constraint tools, a map editor, moderation/authentication, spatial networking, voice, vehicles and persistent properties. None of those are represented as implemented systems in this release.
+Potential later work includes original richer art, multiple floors, player pushing/contacts, constraint tools, a map editor, verified accounts, spatial networking, voice, vehicles and persistent properties. None of those are represented as implemented systems in this release.

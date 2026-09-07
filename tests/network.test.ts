@@ -4,13 +4,20 @@ import { WebSocket } from 'ws';
 import { startServer } from '../server/main.ts';
 import { Game } from '../server/game.ts';
 import type { ClientMessage, ServerMessage, Snapshot } from '../shared/types.ts';
+import { applyDelta } from '../shared/replication.ts';
 
 class Client {
   ws: WebSocket;
   messages: ServerMessage[] = [];
+  state?: Snapshot;
   constructor(url: string, origin?: string) {
     this.ws = new WebSocket(url, origin ? { origin } : undefined);
-    this.ws.on('message', (raw) => this.messages.push(JSON.parse(raw.toString())));
+    this.ws.on('message', (raw) => {
+      let msg: ServerMessage = JSON.parse(raw.toString());
+      if (msg.type === 'delta' && this.state) msg = applyDelta(this.state, msg);
+      if (msg.type === 'state') this.state = msg;
+      this.messages.push(msg);
+    });
   }
   async open(): Promise<void> {
     if (this.ws.readyState === WebSocket.OPEN) return;

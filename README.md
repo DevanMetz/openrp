@@ -44,7 +44,7 @@ To test two identities yourself, use two different browsers or a private window.
 
 | System      | Implemented behavior                                                                                                                                                     |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Multiplayer | Real WebSockets, 30 Hz server simulation, 15 Hz snapshots, client movement prediction, interpolated players and props, 32 default slots                                  |
+| Multiplayer | Real WebSockets, 30 Hz server simulation, 15 Hz snapshots, client movement prediction, interpolated players and props, no player slot cap; compact delta updates         |
 | City        | Original Union District map: central square, café, gun store, clinic, apartments, warehouse, pawn shop, police station, holding cell and alleys; enterable ground floors |
 | Movement    | First-person mouse look, WASD, sprint, crouch, jump, gravity, shared world collision, browser mouse-capture fallback                                                     |
 | Jobs        | Citizen, Civil Protection, Gangster, Mob Boss, Gun Dealer, Medic, Police Chief, Mayor, Hobo, Cook, Thief; limits, loadouts, salaries and job cooldowns                   |

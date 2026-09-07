@@ -5,7 +5,6 @@ services:
       - '3000:3000'
     environment:
       SERVER_NAME: 'OpenRP | Union District'
-      MAX_PLAYERS: '32'
       STARTING_MONEY: '1500'
     volumes:
       - openrp-data:/app/data

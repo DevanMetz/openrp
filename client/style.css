@@ -1625,3 +1625,19 @@ small {
     animation: none !important;
   }
 }
+.entry-free {
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  color: #d9b67c;
+  margin: 1.1rem 0 0;
+}
+.entry-consent {
+  font-size: 0.65rem;
+  line-height: 1.6;
+  color: #9ba6a0;
+  margin: 0.8rem 0;
+}
+.entry-consent a {
+  color: #c6c8b6;
+  text-underline-offset: 3px;
+}

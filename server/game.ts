@@ -41,7 +41,6 @@ export interface GameOptions {
   startingMoney: number;
   salarySeconds: number;
   jailSeconds: number;
-  maxPlayers: number;
   profiles?: Profile[];
   now?: () => number;
 }
@@ -93,7 +92,7 @@ export class Game {
   nextHunger: number;
   options: GameOptions;
   constructor(options: Partial<GameOptions> = {}) {
-    this.options = { startingMoney: 1500, salarySeconds: 60, jailSeconds: 60, maxPlayers: 32, ...options };
+    this.options = { startingMoney: 1500, salarySeconds: 60, jailSeconds: 60, ...options };
     this.now = options.now ?? Date.now;
     this.nextSalary = this.now() + this.options.salarySeconds * 1000;
     this.nextProduction = this.now() + 30_000;
@@ -116,8 +115,6 @@ export class Game {
     return body;
   }
   join(name: unknown, token?: unknown): { player: Player; token: string } {
-    if (this.players.size >= this.options.maxPlayers)
-      throw new Error('The district is full. Please try again shortly.');
     const validToken = typeof token === 'string' && /^[a-f0-9]{64}$/.test(token) ? token : '';
     const saved = validToken ? this.profiles.get(hash(validToken)) : undefined;
     if (saved && this.players.has(saved.id))

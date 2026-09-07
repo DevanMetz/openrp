@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OpenRP — Rules & privacy</title>
+    <meta name="theme-color" content="#151a1b" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #151a1b;
+        color: #e9e8dc;
+        font:
+          17px/1.65 system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 780px;
+        padding: 64px 26px;
+        margin: auto;
+      }
+      a {
+        color: #d9b67c;
+      }
+      h1 {
+        font-size: clamp(36px, 8vw, 65px);
+        line-height: 1.05;
+        letter-spacing: -2px;
+      }
+      h2 {
+        margin-top: 48px;
+        font-size: 25px;
+      }
+      p,
+      li {
+        color: #bdc4c1;
+      }
+      b {
+        color: #e9e8dc;
+      }
+      .brand {
+        font-size: 20px;
+        letter-spacing: 3px;
+        text-decoration: none;
+        font-weight: 800;
+      }
+      .tag {
+        color: #d9b67c;
+        font-size: 12px;
+        letter-spacing: 2px;
+        margin-top: 40px;
+      }
+      .play {
+        display: inline-block;
+        padding: 13px 24px;
+        background: #d9b67c;
+        color: #151a1b;
+        text-decoration: none;
+        font-weight: 700;
+        margin-top: 24px;
+      }
+      li {
+        margin-bottom: 12px;
+      }
+      footer {
+        border-top: 1px solid #394140;
+        padding-top: 28px;
+        margin-top: 60px;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="brand" href="/">OPENRP.</a>
+      <div class="tag">PUBLIC ALPHA · DESKTOP BROWSER</div>
+      <h1>A city worth playing in.</h1>
+      <p>
+        OpenRP is a free, open-source multiplayer roleplay sandbox inspired by DarkRP. It is an independent
+        project, unaffiliated with Garry’s Mod or Facepunch. Bring a keyboard, a mouse, and a story.
+      </p>
+      <h2>Community rules</h2>
+      <ol>
+        <li>
+          <b>Give conflict a roleplay reason.</b> No random killing, spawn camping, or repeatedly targeting a
+          player to ruin their session.
+        </li>
+        <li>
+          <b>Build fairly.</b> Don’t block public roads, spawns, or other players’ exits. No trapping people
+          with props or using props to bypass fights.
+        </li>
+        <li>
+          <b>Respect the people behind the characters.</b> No harassment, hate speech, threats, doxxing, or
+          sexual content. Keep personal information out of chat and character names.
+        </li>
+        <li>
+          <b>Play without exploits.</b> No cheats, connection spam, impersonating operators, or creating
+          identities to manipulate money or elections.
+        </li>
+      </ol>
+      <p>
+        Operators can remove or ban identities that break these rules. City laws chosen by the mayor are part
+        of roleplay; they cannot override community rules.
+      </p>
+      <h2>What to expect in the alpha</h2>
+      <p>
+        Jobs, shops, property, physics building, printers, elections, combat and arrests work in a shared
+        city. There is no fixed player slot cap. Performance depends on server load. Vehicles, voice chat, and
+        Source-engine assets are not included.
+      </p>
+      <p>
+        Your wallet returns in the same browser. Jobs, inventory, props, and property reset when you leave or
+        the server restarts. Updates can briefly interrupt play. Clearing browser data loses your anonymous
+        identity; there is no account recovery yet.
+      </p>
+      <h2 id="privacy">Privacy</h2>
+      <p>
+        No email, password, or payment is needed. Your browser stores a randomly generated reconnect
+        credential, name and settings. The server stores your name, wallet, an internal ID and a hash of that
+        credential. Bans store an identity ID and operator reason. Chat is sent to players in its channel and
+        is not archived by the game.
+      </p>
+      <p>
+        Hosting and DNS providers (Railway and Cloudflare) process network requests and may keep operational
+        logs including IP addresses. The game uses source IPs temporarily to limit connection spam. There are
+        no advertising trackers or third-party game assets.
+      </p>
+      <p>
+        For a bug report or data request, use the
+        <a href="https://github.com/DevanMetz/openrp/issues" target="_blank" rel="noopener noreferrer"
+          >project’s issue tracker</a
+        >. Share your public roleplay name and approximate time, never your browser credential or sensitive
+        personal information. Use GitHub’s private vulnerability reporting for security issues when available.
+      </p>
+      <a class="play" href="/">Enter the district ↗</a>
+      <footer>
+        OpenRP · MIT licensed · <a href="https://github.com/DevanMetz/openrp">View the source</a>
+      </footer>
+    </main>
+  </body>
+</html>

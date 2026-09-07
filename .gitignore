@@ -7,3 +7,4 @@ test-results/
 playwright-report/
 .DS_Store
 .openai/
+media-exports/

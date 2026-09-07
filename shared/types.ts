@@ -1,3 +1,4 @@
+import type { Delta } from './replication.ts';
 export type Vec3 = { x: number; y: number; z: number };
 export type Quat = { x: number; y: number; z: number; w: number };
 export type JobId =
@@ -138,6 +139,7 @@ export type ClientMessage =
   | { type: 'ping'; time: number };
 export type ServerMessage =
   | Snapshot
+  | Delta
   | GameEvent
   | {
       type: 'welcome';
@@ -145,7 +147,6 @@ export type ServerMessage =
       token: string;
       name: string;
       serverName: string;
-      maxPlayers: number;
       protocol: number;
     }
   | { type: 'pong'; time: number };

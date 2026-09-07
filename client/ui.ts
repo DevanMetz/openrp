@@ -43,7 +43,6 @@ export class UI {
   chatOpen = false;
   settings: Settings;
   serverName = 'OpenRP | Union District';
-  maxPlayers = 32;
   lastMenuKey = '';
   onConnect: (name: string, password: string) => void = () => {};
   onAction: (action: string, target?: string, value?: string | number | boolean) => void = () => {};
@@ -69,15 +68,15 @@ export class UI {
       <div class="film-grain" aria-hidden="true"></div>
       <section id="entry" class="entry">
         <header class="entry-header"><div class="brandmark">R<span>●</span></div><div class="entry-edition">OPEN SOURCE<br><b>CITY ROLEPLAY</b></div><div class="version">ALPHA ${VERSION}</div></header>
-        <div class="entry-panel"><div class="eyebrow"><span class="status-dot"></span> UNION DISTRICT / MULTIPLAYER</div><h1>OPEN<span>RP</span><span class="title-period">.</span></h1><p class="entry-tagline">Another city. Your own story.</p>
+        <div class="entry-panel"><div class="eyebrow"><span class="status-dot"></span> UNION DISTRICT / MULTIPLAYER</div><h1>OPEN<span>RP</span><span class="title-period">.</span></h1><p class="entry-tagline">Another city. Your own story.</p><p class="entry-free">FREE TO PLAY · NO DOWNLOAD · PUBLIC ALPHA</p>
           <div class="entry-rule"></div><form id="join-form"><label class="field-label" for="player-name">YOUR ROLEPLAY NAME</label><input id="player-name" name="name" minlength="2" maxlength="24" required autocomplete="nickname" placeholder="Choose a name" value="${escape(localStorage.getItem('openrp-name') ?? '')}"><div id="password-row" hidden><label class="field-label" for="server-password">SERVER PASSWORD</label><input id="server-password" type="password" autocomplete="current-password"></div><button id="join-button" class="primary join-button" type="submit"><span>Enter the district</span><span>↗</span></button></form>
-          <p id="join-status" class="entry-status" role="status">Connecting to the district…</p><div class="entry-options"><button data-menu="help">How to play <span>↗</span></button><button data-menu="settings">Settings <span>⚙</span></button></div>
+          <p class="entry-consent">By joining, follow the <a href="/rules.html" target="_blank" rel="noopener">community rules</a>. <a href="/rules.html#privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://github.com/DevanMetz/openrp" target="_blank" rel="noopener">Source</a></p><p id="join-status" class="entry-status" role="status">Connecting to the district…</p><div class="entry-options"><button data-menu="help">How to play <span>↗</span></button><button data-menu="settings">Settings <span>⚙</span></button></div>
         </div>
         <div class="entry-location"><span class="location-line"></span><span>01 / UNION SQUARE<small>A city with room for you.</small></span></div>
         <footer class="entry-footer"><span>JOBS. PROPERTY. PHYSICS. POSSIBILITIES.</span><span>DESKTOP · KEYBOARD & MOUSE</span></footer>
       </section>
       <div id="hud" hidden>
-        <div class="hud-top"><div class="district-label"><span class="status-dot"></span><span id="district">Union Square</span><small>UNION DISTRICT</small></div><div class="server-chip"><span id="online">1 / 32</span><i></i><span id="ping">— ms</span></div></div>
+        <div class="hud-top"><div class="district-label"><span class="status-dot"></span><span id="district">Union Square</span><small>UNION DISTRICT</small></div><div class="server-chip"><span id="online">ONLINE</span><i></i><span id="ping">— ms</span></div></div>
         <div id="lockdown" hidden>⚠ CITY LOCKDOWN <span>Return to your property. Follow Civil Protection instructions.</span></div>
         <div id="vote-banner" hidden></div>
         <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div><div id="hitmarker" hidden>×</div>
@@ -219,7 +218,7 @@ export class UI {
     this.player = p;
     const job = JOBS[p.job];
     this.text('district', districtAt(p.x, p.z));
-    this.text('online', `${state.players.length} / ${this.maxPlayers} ONLINE`);
+    this.text('online', `${state.players.length} ONLINE`);
     this.text('ping', `${ping} ms`);
     this.text('hud-name', p.name);
     this.text('hud-job', job.name);
@@ -358,7 +357,7 @@ export class UI {
     if (this.menu === 'laws' && s && p)
       html = `<div class="section-heading"><span class="eyebrow">MUNICIPAL NOTICEBOARD</span><h2>The law of the district.</h2><p>Mayor: ${escape(s.players.find((v) => v.job === 'mayor')?.name ?? 'Office vacant')}</p></div><div class="laws-list">${s.laws.map((law, i) => `<div><span>${String(i + 1).padStart(2, '0')}</span><p>${escape(law)}</p></div>`).join('')}</div><p class="muted">${s.lockdown ? 'A citywide lockdown is in effect.' : 'The district is open. No lockdown is in effect.'}</p>${p.job === 'mayor' ? '<div class="command-field"><input id="new-law" maxlength="120" placeholder="Write a new city law" aria-label="New city law"><button data-action="add-law">Add law</button></div><div class="tool-buttons"><button data-action="lockdown">Toggle lockdown</button><button data-action="reset-laws">Restore default laws</button></div>' : ''}${this.voteHtml()}`;
     if (this.menu === 'players' && s)
-      html = `<div class="section-heading"><span class="eyebrow">${escape(this.serverName)}</span><h2>The people make the city.</h2><p>${s.players.length} / ${this.maxPlayers} residents connected</p></div><div class="scoreboard"><div class="score-head"><span>RESIDENT</span><span>OCCUPATION</span><span>STATUS</span></div>${s.players.map((v) => `<div class="score-row"><span><i style="background:${JOBS[v.job].color}"></i>${escape(v.name)}${v.id === p?.id ? ' <small>YOU</small>' : ''}</span><span style="color:${JOBS[v.job].color}">${JOBS[v.job].name}</span><span>${v.deadUntil ? 'Respawning' : v.arrestedUntil ? 'In custody' : v.wantedUntil ? 'Wanted' : 'In the district'}</span></div>`).join('')}</div><p class="muted">Chat nearby with Y. Use /ooc to reach everyone and /g to talk to your job group.</p>`;
+      html = `<div class="section-heading"><span class="eyebrow">${escape(this.serverName)}</span><h2>The people make the city.</h2><p>${s.players.length} residents connected</p></div><div class="scoreboard"><div class="score-head"><span>RESIDENT</span><span>OCCUPATION</span><span>STATUS</span></div>${s.players.map((v) => `<div class="score-row"><span><i style="background:${JOBS[v.job].color}"></i>${escape(v.name)}${v.id === p?.id ? ' <small>YOU</small>' : ''}</span><span style="color:${JOBS[v.job].color}">${JOBS[v.job].name}</span><span>${v.deadUntil ? 'Respawning' : v.arrestedUntil ? 'In custody' : v.wantedUntil ? 'Wanted' : 'In the district'}</span></div>`).join('')}</div><p class="muted">Chat nearby with Y. Use /ooc to reach everyone and /g to talk to your job group.</p>`;
     if (this.menu === 'context') html = this.contextHtml();
     if (this.menu === 'help')
       html = `<div class="section-heading"><span class="eyebrow">THE FIELD GUIDE</span><h2>Welcome to the district.</h2><p>DarkRP is a social sandbox. The other players are the story.</p></div><div class="guide-start"><b>Your first five minutes</b><p>Choose a job in F4. Approach a door and press C to buy the property. Furnish your base with Q and the Physics Gun. A printer earns cash; a gun shop or kitchen earns customers. Use Y to introduce yourself.</p></div><div class="help-columns"><div><h3>On the streets</h3>${[

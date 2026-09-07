@@ -6,8 +6,11 @@ import { WebSocketServer, WebSocket } from 'ws';
 import type { ViteDevServer } from 'vite';
 import { Game, cleanText } from './game.ts';
 import { loadProfiles, saveProfiles } from './persistence.ts';
+import { clientIP, JoinRate } from './network.ts';
+import { Moderation } from './moderation.ts';
 import { PROTOCOL, SNAPSHOT_RATE, TICK_RATE, VERSION } from '../shared/catalog.ts';
-import type { ClientMessage } from '../shared/types.ts';
+import type { ClientMessage, Snapshot } from '../shared/types.ts';
+import { makeDelta } from '../shared/replication.ts';
 
 try {
   process.loadEnvFile();
@@ -26,6 +29,7 @@ export interface ServerOptions {
   persist?: boolean;
   game?: Game;
   password?: string;
+  adminKey?: string;
 }
 export async function startServer(
   options: ServerOptions = {},
@@ -41,11 +45,11 @@ export async function startServer(
       startingMoney: numeric(process.env.STARTING_MONEY, 1500, 0, 1e7),
       salarySeconds: numeric(process.env.SALARY_SECONDS, 60, 5, 3600),
       jailSeconds: numeric(process.env.JAIL_SECONDS, 60, 5, 600),
-      maxPlayers: numeric(process.env.MAX_PLAYERS, 32, 1, 64),
       profiles: persist ? loadProfiles(dataDir) : [],
     });
   const name = cleanText(process.env.SERVER_NAME, 80) || 'OpenRP | Union District';
   const password = options.password ?? process.env.SERVER_PASSWORD ?? '';
+  const moderation = new Moderation(dataDir, persist, options.adminKey);
   const dist = resolve('dist');
   const mime: Record<string, string> = {
     '.html': 'text/html; charset=utf-8',
@@ -57,12 +61,26 @@ export async function startServer(
     '.json': 'application/json',
     '.woff2': 'font/woff2',
     '.ico': 'image/x-icon',
+    '.xml': 'application/xml',
+    '.txt': 'text/plain; charset=utf-8',
   };
   let vite: ViteDevServer | undefined;
   const server = createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'same-origin');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    if (req.url?.split('?')[0] === '/api/admin') {
+      await moderation.handle(req, res, game, (id, reason) => {
+        for (const [ws, session] of sessions)
+          if (session.id === id) {
+            send(ws, { type: 'notice', text: `Removed by an operator: ${reason}`, tone: 'error' });
+            game.disconnect(id);
+            session.id = undefined;
+            ws.close(1008, 'Removed by an operator');
+          }
+      });
+      return;
+    }
     if (req.url?.split('?')[0] === '/api/status') {
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Cache-Control', 'no-store');
@@ -73,7 +91,7 @@ export async function startServer(
           version: VERSION,
           protocol: PROTOCOL,
           players: game.players.size,
-          maxPlayers: game.options.maxPlayers,
+          maxPlayers: null,
           password: !!password,
         }),
       );
@@ -133,12 +151,14 @@ export async function startServer(
   const wss = new WebSocketServer({ noServer: true, maxPayload: 8192, perMessageDeflate: false });
   const sessions = new Map<
     WebSocket,
-    { id?: string; count: number; window: number; alive: boolean; ip: string }
+    { id?: string; count: number; window: number; alive: boolean; ip: string; needsFull: boolean }
   >();
   const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+  const joinRate = new JoinRate();
+  const proxy = process.env.TRUST_PROXY ?? 'none';
   server.on('upgrade', (req, socket, head) => {
     if (req.url?.split('?')[0] !== '/ws') {
       if (production) socket.destroy();
@@ -156,11 +176,8 @@ export async function startServer(
       socket.destroy();
       return;
     }
-    const ip = req.socket.remoteAddress ?? 'unknown';
-    if (
-      [...sessions.values()].filter((s) => s.ip === ip).length >= 8 ||
-      sessions.size >= game.options.maxPlayers + 8
-    ) {
+    const ip = clientIP(req, proxy);
+    if ([...sessions.values()].filter((s) => !s.id && s.ip === ip).length >= 8 || !joinRate.allow(ip)) {
       socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n');
       socket.destroy();
       return;
@@ -182,7 +199,8 @@ export async function startServer(
       count: 0,
       window: Date.now(),
       alive: true,
-      ip: req.socket.remoteAddress ?? 'unknown',
+      needsFull: true,
+      ip: clientIP(req, proxy),
     };
     sessions.set(ws, session);
     const joinTimeout = setTimeout(() => {
@@ -222,6 +240,10 @@ export async function startServer(
         }
         try {
           const joined = game.join(msg.name, msg.token);
+          if (moderation.banned(joined.player.id)) {
+            game.disconnect(joined.player.id);
+            throw new Error('This identity is banned from the server.');
+          }
           session.id = joined.player.id;
           clearTimeout(joinTimeout);
           send(ws, {
@@ -230,10 +252,8 @@ export async function startServer(
             token: joined.token,
             name: joined.player.name,
             serverName: name,
-            maxPlayers: game.options.maxPlayers,
             protocol: PROTOCOL,
           });
-          send(ws, game.snapshot());
         } catch (error) {
           send(ws, { type: 'notice', text: (error as Error).message, tone: 'error' });
           ws.close(1008, 'Join rejected');
@@ -254,11 +274,31 @@ export async function startServer(
     });
   });
   const tick = setInterval(() => game.step(), 1000 / TICK_RATE);
+  let previous: Snapshot | undefined;
+  let lastFull = 0;
   const broadcast = setInterval(() => {
-    const state = game.snapshot();
-    for (const [ws, session] of sessions) if (session.id) send(ws, state);
+    if (!game.players.size) return;
+    // Clone the mutable simulation, trim sub-millimeter noise, and share one encoded update.
+    const full = JSON.stringify(game.snapshot(), (_key, value) =>
+      typeof value === 'number' ? Math.round(value * 1000) / 1000 : value,
+    );
+    const current: Snapshot = JSON.parse(full);
+    const resync = !previous || current.time - lastFull >= 5000;
+    const update = resync ? full : JSON.stringify(makeDelta(previous!, current));
+    if (resync) lastFull = current.time;
+    for (const [ws, session] of sessions)
+      if (session.id && ws.readyState === WebSocket.OPEN) {
+        if (ws.bufferedAmount >= 1_000_000) {
+          session.needsFull = true;
+          continue;
+        }
+        ws.send(session.needsFull ? full : update);
+        session.needsFull = false;
+      }
+    previous = current;
   }, 1000 / SNAPSHOT_RATE);
   const heartbeat = setInterval(() => {
+    joinRate.prune();
     for (const [ws, s] of sessions) {
       if (!s.alive || ws.bufferedAmount > 2_000_000) {
         ws.terminate();
@@ -304,7 +344,7 @@ export async function startServer(
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const app = await startServer();
   console.log(
-    `\n  OpenRP · Union District\n  http://localhost:${app.port}\n  ${app.game.options.maxPlayers} slots · ${TICK_RATE} Hz server\n`,
+    `\n  OpenRP · Union District\n  http://localhost:${app.port}\n  No player slot cap · ${TICK_RATE} Hz server\n`,
   );
   for (const signal of ['SIGINT', 'SIGTERM'] as const)
     process.once(signal, () => {

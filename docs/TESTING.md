@@ -32,4 +32,4 @@ Coverage includes:
 9. Verify local/OOC/group chat and mayor laws. Names containing `<`, `>` or quotes must display as text.
 10. Disconnect/reconnect and reload the page. Check wallet continuity, cleanup, readable errors, graphics settings and no console exceptions.
 
-Browser checks are manual; the repository does not claim an automated browser test suite or a 32-player stress test. CI validates Node 22 and 24; graphical rendering depends on a WebGL2-capable browser and GPU.
+Browser checks use the real browser. Automated tests additionally cover 80 concurrent connections, delta reconstruction, trusted proxy headers and operator authorization. Run `npx tsx scripts/load.ts 100 15` for an isolated local synthetic movement load check; it never targets production. A local September 2026 run held 100 connections for 15 seconds, delivered 12.93 updates/client/second, used 10.49 MiB/s total outbound traffic and measured 21.45 ms p99 event-loop delay. This is a reproducible diagnostic, not a real-player or production capacity guarantee. CI validates Node 22 and 24; graphical rendering depends on a WebGL2-capable browser and GPU.

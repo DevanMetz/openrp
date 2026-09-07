@@ -1,55 +1,52 @@
 # Hosting OpenRP
 
-## One process, one port
+Run `npm ci`, `npm run build`, then `npm start`. The Node process serves the client and `/ws` on one port. `/health` is the deployment health check. `/api/status` reports the live population; `maxPlayers: null` means no slot cap. A static website host cannot run the simulation.
 
-`npm run dev` runs the Node HTTP/WebSocket host and Vite middleware together. `npm run build && npm start` serves the built client from `dist/` and runs the same game server. The game WebSocket endpoint is `/ws`; `/health` is a liveness endpoint; `/api/status` reports the actual player count and whether a password is required.
+## Railway
 
-Production needs Node, writable persistent storage, and a host/reverse proxy that supports WebSocket upgrades. A static-only deployment cannot simulate this game. The included Dockerfile builds the client in one stage and runs the server as an unprivileged user in another. The Compose volume stores wallets across container replacements. Docker configuration is provided; validate it on your own Docker host before an internet deployment.
+Connect the GitHub repository, attach a volume at `/app/data`, keep one replica and serverless sleeping disabled, and set the health-check path to `/health`. Enable **Wait for CI**. Dockerfile detection supplies build/start commands. The entrypoint gives the mounted directory to `node` and drops root privileges before starting the game. New Railway services use dashboard settings because first-time legacy config-as-code adoption closed in August 2026.
 
-## Configuration
+| Variable          | Default                 | Purpose                                                            |
+| ----------------- | ----------------------- | ------------------------------------------------------------------ |
+| `PORT`            | `3000`                  | HTTP and WebSocket port                                            |
+| `HOST`            | `0.0.0.0`               | Bind address                                                       |
+| `SERVER_NAME`     | `OpenRP Union District` | In-game name                                                       |
+| `DATA_DIR`        | `./data`                | Persistent directory; `/app/data` on Railway                       |
+| `STARTING_MONEY`  | `1500`                  | New identity wallet                                                |
+| `SALARY_SECONDS`  | `60`                    | Payday interval                                                    |
+| `JAIL_SECONDS`    | `60`                    | Sentence length                                                    |
+| `ALLOWED_ORIGINS` | same host               | Exact comma-separated browser origins                              |
+| `TRUST_PROXY`     | `none`                  | Use `railway` only behind Railway ingress to trust its `X-Real-IP` |
+| `SERVER_PASSWORD` | empty                   | Optional shared join password                                      |
 
-Copy `.env.example` to `.env`. The server reads it at startup. Environment variables provided by the host take precedence.
+There is no `MAX_PLAYERS` setting or fixed total admission limit. Job limits, 20 props/player, 240 world entities, and abuse protections still apply. Active residents do not count toward the eight pending, unjoined sockets/IP. Connection churn is limited to 120 attempts/IP/minute. Messages are limited to 8 KiB and 120/second per socket. Heartbeats remove dead sockets; slow consumers cannot accumulate unbounded buffers.
 
-| Variable          | Default                    | Meaning                                                      |
-| ----------------- | -------------------------- | ------------------------------------------------------------ |
-| `PORT`            | `3000`                     | HTTP and game WebSocket port                                 |
-| `HOST`            | `0.0.0.0`                  | Listen address; use `127.0.0.1` behind a local proxy         |
-| `SERVER_NAME`     | `OpenRP \| Union District` | Name shown in the game                                       |
-| `MAX_PLAYERS`     | `32`                       | Slot cap, clamped to 1–64; not a measured capacity guarantee |
-| `STARTING_MONEY`  | `1500`                     | Wallet for new identities                                    |
-| `SALARY_SECONDS`  | `60`                       | Payday interval                                              |
-| `JAIL_SECONDS`    | `60`                       | Sentence length                                              |
-| `DATA_DIR`        | `./data`                   | Persistent wallet directory                                  |
-| `ALLOWED_ORIGINS` | same host                  | Exact comma-separated browser origins                        |
-| `SERVER_PASSWORD` | empty                      | Optional shared join password                                |
+## Domain and TLS
 
-When hosting at `https://rp.example.com`, set `ALLOWED_ORIGINS=https://rp.example.com`. Preserve the original request host when reverse-proxying, or explicitly configure this origin list. Serve the page and WebSocket from the same public origin. Use TLS for internet play so browser bearer credentials and passwords are encrypted in transit.
+Add the custom domain with target port 3000 in Railway. Copy both its CNAME target and ownership-verification TXT record into Cloudflare. Cloudflare proxying is supported. In Railway mode the server accepts CF-Connecting-IP only when Railway reports a peer inside Cloudflare's published networks. Direct callers cannot spoof that header. Keep Cloudflare-to-origin TLS enabled; verify the origin certificate and HTTPS before opening play.
 
-Do not expose the development server as the production deployment. Build and use `npm start`. Configure automatic process restart through your hosting platform or the provided Compose service.
+Set `ALLOWED_ORIGINS=https://openrp.dev,https://www.openrp.dev` on the official host. Never publish the Vite development server.
 
-## Persistence and backups
+## Persistence
 
-`data/profiles.json` contains names, balances and SHA-256 hashes of anonymous reconnect credentials. Raw reconnect credentials live in the player's browser, never in snapshots or the server's saved JSON. Wallets flush every 10 seconds and during graceful shutdown using write-then-rename. Stop the server before restoring a backup. A corrupt wallet file fails startup instead of silently overwriting the data.
+Wallets, names and credential hashes are stored atomically in `profiles.json`, flushed every 10 seconds and on graceful shutdown. Corrupt files fail startup rather than replacing data. Raw reconnect credentials stay in the player's browser. Use Railway volume backups; stop the server before restoring one.
 
-Only run **one server process** per world/data directory. There is no distributed-state layer. Multiple server instances create separate worlds and must use separate data directories.
+The volume also stores identity bans and a generated operator key. Keep it private. Run **one game process per world/data directory**. Replicas would create separate worlds. Jobs, inventory, props and property reset on disconnect/restart.
 
-Doors, inventory, jobs and props are intentionally session-scoped in this alpha. Disconnecting cleans up owned entities and releases property. Changing away from Gun Dealer/Cook removes that job's shipments/microwaves. A disconnected owner's wallet remains saved.
+## Operator commands
 
-## Operational limits
+Run inside the container using Railway SSH or the dashboard Console:
 
-Clients are limited to 8 KiB messages, 120 messages per second, 8 simultaneous sockets per source IP, a 10-second join window, 20 building props per player and 240 entities per world. Heartbeats terminate stale connections. Slow consumers are disconnected before unlimited send buffers accumulate.
+```sh
+node --import tsx scripts/admin.ts list
+node --import tsx scripts/admin.ts kick RESIDENT_ID Repeated spawn camping
+node --import tsx scripts/admin.ts ban RESIDENT_ID Prop blocking
+node --import tsx scripts/admin.ts unban RESIDENT_ID
+node --import tsx scripts/admin.ts announce Update in five minutes. Wallets will be saved.
+```
 
-The per-IP cap uses the direct TCP peer. Behind a proxy, every player can appear under the same IP; raise or adapt that cap in `server/main.ts` with a trusted-proxy policy if needed. OpenRP deliberately does not trust arbitrary forwarded IP headers.
+The CLI reads the private mounted key and calls the authenticated endpoint on loopback. The key never enters the browser or repository. Bans persist immediately and apply to anonymous identities; fresh identities can evade them. Starting funds and elections are not Sybil-resistant. Moderate the public alpha and use the optional password if needed.
 
-There is no verified-account system, moderation console, ban list, DDoS protection, or administrative persistence editor. Operate the alpha as a small community or passworded server until those systems are added. A user can create a new anonymous identity by using a different browser; starting funds and job elections are not Sybil-resistant.
+## Verification and capacity
 
-## Quick smoke test
-
-1. Run `npm run check` and `npm start`.
-2. Visit `/health`, then the game in a regular and a private browser window.
-3. Join with two names. Confirm both appear in Tab.
-4. Spawn a shelf with Q. Confirm the other player sees it move and freeze.
-5. Use F4 to become a dealer, buy a shipment, and have the second player purchase a weapon with E.
-6. Disconnect and reconnect. Confirm the wallet survives and old props are cleaned up.
-
-The browser bundle uses local fonts and generated art/audio. After installing dependencies and building, it requires no third-party asset requests.
+Run `npm run check`, then test two browsers on the public hostname, job changes, props, chat, reconnects, and wallets across a restart. Run `npx tsx scripts/load.ts 100 15` for an isolated local synthetic movement check. No slot cap is a product behavior, not unlimited hardware or bandwidth. Watch CPU, memory, egress and gameplay latency as population grows. Current local measurements are in `TESTING.md`.

@@ -21,6 +21,7 @@ import { UI, type AimTarget } from './ui.ts';
 import { EYE_HEIGHT, JOBS, PROPS, PROTOCOL, TICK_RATE, WEAPONS, entitySize } from '../shared/catalog.ts';
 import { BLOCKS, doorBox } from '../shared/map.ts';
 import { direction, idleInput, movePlayer, rayBox } from '../shared/movement.ts';
+import { applyDelta } from '../shared/replication.ts';
 import type {
   Box,
   ClientMessage,
@@ -150,10 +151,9 @@ async function refreshStatus(): Promise<void> {
     if (!response.ok) throw new Error();
     const status = await response.json();
     ui.serverName = status.name;
-    ui.maxPlayers = status.maxPlayers;
     ui.el('password-row').hidden = !status.password;
     if (!ui.playing && socket?.readyState !== WebSocket.CONNECTING)
-      ui.status(`${status.players} / ${status.maxPlayers} residents online · Server ready`);
+      ui.status(`${status.players} residents online · Join the city`);
   } catch {
     if (!ui.playing) ui.status('Server unavailable. Check that the OpenRP server is running.');
   }
@@ -196,7 +196,6 @@ ui.onConnect = (name, password) => {
       localStorage.setItem('openrp-token', msg.token);
       localStorage.setItem('openrp-name', msg.name);
       ui.serverName = msg.serverName;
-      ui.maxPlayers = msg.maxPlayers;
       ui.connected();
       connectedAt = performance.now();
       yaw = pitch = 0;
@@ -204,6 +203,7 @@ ui.onConnect = (name, password) => {
       ui.open('pause');
       ui.notice('Connected. Click Return to the streets to start playing.');
     } else if (msg.type === 'state') receiveState(msg);
+    else if (msg.type === 'delta' && state) receiveState(applyDelta(state, msg));
     else if (msg.type === 'pong') ping = Math.round(Date.now() - msg.time);
     else if (msg.type === 'notice') {
       if (!myId) rejection = msg.text;
@@ -242,7 +242,7 @@ ui.onConnect = (name, password) => {
     ui.disconnected(
       rejection ||
         (event.code === 1008
-          ? 'Connection rejected. Check your identity, password, or server capacity.'
+          ? `Connection closed: ${event.reason || 'check your identity or server rules'}.`
           : 'Disconnected. Your wallet is saved. Enter the district to reconnect.'),
     );
     state = undefined;

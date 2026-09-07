@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OpenRP · Film studio</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #101718;
+        color: #e8e6d9;
+        font: 15px system-ui;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 280px;
+        min-height: 100vh;
+      }
+      #stage {
+        display: grid;
+        place-items: center;
+        min-width: 0;
+      }
+      canvas {
+        max-width: 100%;
+        max-height: 100vh;
+        width: auto;
+        height: auto;
+        aspect-ratio: 1;
+      }
+      aside {
+        padding: 28px 22px;
+        border-left: 1px solid #384440;
+      }
+      button {
+        display: block;
+        margin: 12px 0;
+        padding: 12px;
+        width: 100%;
+        border: 1px solid #69796e;
+        background: #22312c;
+        color: #e8e6d9;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:first-of-type {
+        background: #d7b57c;
+        color: #101718;
+        font-weight: 700;
+      }
+      p {
+        line-height: 1.5;
+        color: #abb9b0;
+      }
+      #status {
+        color: #d7b57c;
+      }
+      video {
+        max-width: 100%;
+      }
+      .shots {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .shots button {
+        margin: 0;
+        font-size: 12px;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      small {
+        color: #899d92;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="stage"></main>
+    <aside>
+      <h1>OPENRP / STUDIO</h1>
+      <p>
+        30-second in-engine alpha trailer. Original city, models, animation and score. Staged scenes; no
+        fabricated live player counts.
+      </p>
+      <button id="record">Record 30-second trailer</button><button id="preview">Preview trailer</button
+      ><button id="poster">Save share image</button>
+      <div class="shots">
+        <button data-shot="1">01 · City</button><button data-shot="5">02 · Mayor</button
+        ><button data-shot="9">03 · Shop</button><button data-shot="14">04 · Build</button
+        ><button data-shot="19">05 · Printer</button><button data-shot="23">06 · Chase</button
+        ><button data-shot="28">07 · Play</button>
+      </div>
+      <p id="status" role="status">Loading the city…</p>
+      <small>1080 × 1080 · 30 fps · captions baked in</small>
+    </aside>
+    <script type="module" src="/client/studio.ts"></script>
+  </body>
+</html>
