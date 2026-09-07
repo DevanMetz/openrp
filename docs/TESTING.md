@@ -1,5 +1,11 @@
 # Testing
 
+## Skyline side elevations and grounding
+
+Distant buildings now have inward-facing east/west window planes in addition to their existing north/south windows. Selected roofs have modest setbacks and caps, using deterministic index variation without changing building placement. An elevated eastern-edge review exposed absent ground under the distant scenery; a two-triangle background plane now grounds that scenery beneath the playable ground surface.
+
+Chrome verified side windows, roof setbacks and building bases meeting the background at camera (105,15,0), looking toward (188,22,0). The added ground changed this view from 17 calls/85,184 triangles to 18/85,186. Final build and production HTTP smoke passed. The background remains sparse and is decorative, not an expanded playable map. Local and undeployed.
+
 ## Combined visual-pass validation
 
 At commit 44d5663, `npm run check` passed all 118 tests, typecheck, production build and production HTTP smoke. This validates the accumulated local gameplay and renderer changes against the existing automated suite; it does not establish full DarkRP parity.

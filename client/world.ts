@@ -1092,6 +1092,9 @@ export class City {
     this.scene.add(this.fountainRipples);
   }
   skyline(): void {
+    const backgroundGround = new THREE.PlaneGeometry(520, 520);
+    backgroundGround.rotateX(-Math.PI / 2);
+    this.add(backgroundGround, this.material('#747c6e'), new THREE.Vector3(0, -0.04, 0));
     for (let i = 0; i < 33; i++) {
       const a = (i / 33) * Math.PI * 2,
         r = MAP_BOUND * 1.5 + rand() * 28,
@@ -1102,6 +1105,23 @@ export class City {
         d = 12 + rand() * 10;
       this.box(x, h / 2, z, w, h, d, i % 2 ? 'plaster' : 'industrial');
       this.box(x, h + 0.4, z, w + 0.5, 0.6, d + 0.5, 'concrete');
+      // Vary roof silhouettes without altering the skyline placement seed.
+      if (i % 3 !== 0) {
+        const cap = 2.1 + (i % 4) * 0.7;
+        this.box(x, h + 0.7 + cap / 2, z, w * 0.56, cap, d * 0.52, i % 2 ? 'plaster' : 'industrial');
+        this.box(x, h + 0.8 + cap, z, w * 0.6, 0.2, d * 0.56, 'concrete');
+      }
+      // East/west views previously exposed completely blank side elevations.
+      for (let y = 4; y < h - 1; y += 3.4)
+        for (let k = -d / 2 + 2; k < d / 2 - 1; k += 3.2) {
+          const side = x < 0 ? 1 : -1;
+          this.add(
+            new THREE.PlaneGeometry(1.2, 1.6),
+            this.material('#536064'),
+            new THREE.Vector3(x + side * (w / 2 + 0.025), y, z + k),
+            new THREE.Euler(0, (side * Math.PI) / 2, 0),
+          );
+        }
       for (let y = 4; y < h - 1; y += 3.4)
         for (let k = -w / 2 + 2; k < w / 2 - 1; k += 3.2)
           this.box(x + k, y, z + (z < 0 ? d / 2 + 0.02 : -d / 2 - 0.02), 1.2, 1.6, 0.05, '#536064');
