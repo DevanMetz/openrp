@@ -230,6 +230,7 @@ ui.onSignOut = async () => {
 };
 ui.onConnect = (name, password, account = false) => {
   if (socket?.readyState === WebSocket.CONNECTING || socket?.readyState === WebSocket.OPEN) return;
+  ui.clearSession();
   audio.init();
   void voice.prepare();
   audio.setVolume(ui.settings.volume);
@@ -256,6 +257,7 @@ ui.onConnect = (name, password, account = false) => {
     }),
   );
   ws.addEventListener('message', (event) => {
+    if (socket !== ws) return;
     let msg: ServerMessage;
     try {
       msg = JSON.parse(event.data);

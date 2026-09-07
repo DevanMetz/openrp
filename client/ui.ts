@@ -258,8 +258,27 @@ export class UI {
     document.body.classList.add('playing');
     this.close(false);
   }
+  clearSession(): void {
+    this.closeChat(false);
+    this.input('chat-input').value = '';
+    this.el('chat-lines').replaceChildren();
+    this.el('notices').replaceChildren();
+    this.el('menu-content').replaceChildren();
+    this.contracts = [];
+    this.weaponInspection = undefined;
+    this.contextTarget = undefined;
+    this.aim = undefined;
+    this.state = undefined;
+    this.player = undefined;
+    this.username = undefined;
+    this.lastMenuKey = '';
+    this.el('contract-hud').hidden = true;
+    this.text('contract-hud-target', '');
+    this.text('contract-hud-detail', '');
+  }
   disconnected(reason: string): void {
     this.playing = false;
+    this.clearSession();
     this.el('entry').hidden = false;
     this.el('hud').hidden = true;
     document.body.classList.remove('playing');

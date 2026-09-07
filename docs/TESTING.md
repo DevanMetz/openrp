@@ -1,5 +1,11 @@
 # Testing
 
+## Session UI cleanup — local follow-up
+
+Disconnect and the start of a new connection clear chat history/drafts, notices, menu content, contract entries/HUD text, weapon inspection, resident targets and cached player/snapshot/account UI state. Starting a connection also clears these when the previous socket is still closing. Message handlers ignore replaced sockets. The policy intentionally discards drafts on disconnect; menu navigation within a session still preserves them.
+
+Build and production smoke passed after extracting the shared cleanup; typecheck passed after additionally clearing hidden contract label text. Browser account-switch/reconnect regression checks remain pending. This does not delete server saves or moderation logs, and has not been deployed.
+
 ## Direct messages — local implementation
 
 Draft browser recheck: in an isolated 360 × 780 session, typed `Unfinished local message`, closed chat, opened Players → Morgan Vale → Message Morgan Vale. Chat reopened with the exact original text, LOCAL channel hint and preservation notice; selection did not send the draft. This resolves the pending browser recheck for the local-draft guard below. Cross-recipient PM drafts and disconnect/rejoin draft policy remain separate checks.
