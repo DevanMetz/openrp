@@ -139,7 +139,15 @@ test('government menus enforce each role and require clean, bounded reasons', ()
     assert.equal(!!b.warrantUntil, job === 'chief' || job === 'mayor');
     act('license');
     assert.equal(b.license, job === 'mayor');
+    b.warrantUntil = game.now() + 90_000;
+    act('unwarrant');
+    assert.equal(!!b.warrantUntil, job !== 'chief' && job !== 'mayor');
+    b.license = true;
+    act('unlicense');
+    assert.equal(b.license, job !== 'mayor');
     game.applyJob(b, 'police');
+    act('unlicense');
+    assert.equal(b.license, true, 'role-issued licenses cannot be revoked');
     b.wantedUntil = 0;
     act('wanted', 'Protected role');
     assert.equal(b.wantedUntil, 0);

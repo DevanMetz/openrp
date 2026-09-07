@@ -18,7 +18,7 @@ The active objective is comprehensive DarkRP feature coverage and the best pract
 
 Local increment after 0.5.1: eight-object pocket with C storage and F4 inventory/placement. Preserves ammunition, cash, health and paint; reserves stored prop quota; rejects foreign props, held/frozen/fading objects and businesses. Persistence validates bounds and unique IDs across pockets/world objects. Contents survive death, custody and job changes. Protocol 6 is required for the next release. This increment is not deployed yet.
 
-1. Finish browser coverage of context-menu demotion and ballots at narrow widths.
+1. Finish narrow-width ballot review. Resident-panel demotion submission is now verified in Chrome, including target, reason, recorded vote and majority threshold. Resident panels now include warrant and civilian license revocation.
 2. Continue character polish: equipment grip/aim poses, transitions, clothing surfaces and distance-based detail. The first detailed model pass is implemented; large-crowd GPU costs and weapon poses still need dedicated visual review.
 3. Continue foliage and window polish: wind motion, texture variation, distant leaf stability and GPU profiling. The initial branching foliage and window-surface pass is implemented; reflections are painted texture detail, not dynamic scene reflections.
 4. Continue physical trading polish: pocket storage and placement are implemented locally. Add object thumbnails and narrow-screen review, and assess configurable death/arrest dropping against the server's intended economy.
