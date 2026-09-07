@@ -1,5 +1,11 @@
 # Testing
 
+## Cafe pendant fixtures
+
+Replaced the cafe's plain ceiling strips with two table-centred pendant fixtures: ceiling mounts, suspension rods, tapered metal shades and warm emissive diffusers. Other business ceiling fixtures retain their current design. The diffusers provide a visible glow, not additional room illumination or dynamic shadows.
+
+Chrome reviewed one pendant and its table from the cafe interior, confirming connected mounting and shade/diffuser placement. Build and production HTTP smoke passed. Actual interior illumination remains a separate rendering improvement. Local and undeployed.
+
 ## Cafe furniture construction
 
 Cafe chairs now have four legs, side braces, back supports and three wooden back slats instead of a single central leg and solid back. Tables retain their tops and stems with added cross feet and underside mounting plates. Existing wood/metal materials and static batching are reused.

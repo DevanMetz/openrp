@@ -791,12 +791,42 @@ export class City {
         }
       }
     }
-    for (const x of [-4, 4]) {
-      local(x, 3.15, 0, 1.3, 0.09, 0.24, '#e4e2bc');
-    }
+    if (b.use !== 'cafe')
+      for (const x of [-4, 4]) {
+        local(x, 3.15, 0, 1.3, 0.09, 0.24, '#e4e2bc');
+      }
     signage(b.name.toUpperCase(), 0, 2.25, -b.d / 2 + 0.22, 5, 0.6, b.accent, 'bold 62px sans-serif');
     if (b.use === 'cafe') {
+      if (!this.materials.has('pendant-diffuser'))
+        this.materials.set(
+          'pendant-diffuser',
+          new THREE.MeshStandardMaterial({
+            color: '#efddb5',
+            emissive: '#e6b974',
+            emissiveIntensity: 0.6,
+            roughness: 0.8,
+          }),
+        );
       for (const x of [-6, 5]) {
+        const ceiling = toWorld(b, x, 3.16, 2);
+        this.add(
+          new THREE.CylinderGeometry(0.13, 0.13, 0.06, 12),
+          this.material('metal'),
+          new THREE.Vector3(ceiling.x, ceiling.y, ceiling.z),
+        );
+        local(x, 2.94, 2, 0.025, 0.42, 0.025, 'metal');
+        const shade = toWorld(b, x, 2.61, 2);
+        this.add(
+          new THREE.CylinderGeometry(0.08, 0.3, 0.25, 24, 1, true),
+          this.material('metal'),
+          new THREE.Vector3(shade.x, shade.y, shade.z),
+        );
+        const diffuser = toWorld(b, x, 2.488, 2);
+        this.add(
+          new THREE.CylinderGeometry(0.285, 0.285, 0.014, 24),
+          this.material('pendant-diffuser'),
+          new THREE.Vector3(diffuser.x, diffuser.y, diffuser.z),
+        );
         local(x, 0.73, 2, 1.25, 0.12, 1.25, 'wood');
         local(x, 0.35, 2, 0.1, 0.7, 0.1, 'metal');
         local(x, 0.14, 2, 0.8, 0.07, 0.12, 'metal');
