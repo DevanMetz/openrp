@@ -293,13 +293,15 @@ export class UI {
     setTimeout(() => this.input('chat-input').focus(), 0);
   }
   updateChatChannel(): void {
+    const directId = /^\/pm\s+(\S+)\s/i.exec(this.input('chat-input').value)?.[1];
+    const directRecipient = this.state?.players.find((p) => p.id === directId);
     const command = this.input('chat-input').value.trim().split(/\s+/)[0].toLowerCase();
     const labels: Record<string, string> = {
       '/w': `WHISPER · ${CHAT_RANGES.whisper}m`,
       '/whisper': `WHISPER · ${CHAT_RANGES.whisper}m`,
       '/y': `YELL · ${CHAT_RANGES.yell}m`,
       '/yell': `YELL · ${CHAT_RANGES.yell}m`,
-      '/pm': 'DIRECT MESSAGE · LOGGED',
+      '/pm': directRecipient ? `TO ${directRecipient.name} · LOGGED` : 'DIRECT MESSAGE · LOGGED',
       '/radio': 'TEXT RADIO · TUNED LISTENERS',
       '/broadcast': 'MAYOR BROADCAST · SERVER',
       '/ooc': 'OOC',
@@ -789,7 +791,7 @@ export class UI {
         ${GOVERNMENT.includes(p.job) ? `<section><h3>Government actions</h3>${!GOVERNMENT.includes(target.job) ? reasonForm('wanted', target.wantedUntil ? 'Update wanted status' : 'Mark wanted') : '<p class="muted">Government staff cannot be marked wanted.</p>'}${target.wantedUntil ? `<button data-action="unwanted" data-target="${id}">Clear wanted status</button>` : ''}${['chief', 'mayor'].includes(p.job) ? reasonForm('warrant', target.warrantUntil ? 'Renew warrant' : 'Issue warrant') + (target.warrantUntil ? `<button data-action="unwarrant" data-target="${id}">Revoke search warrant</button>` : '') : ''}${p.job === 'mayor' ? (GOVERNMENT.includes(target.job) ? '<p class="muted">Gun license supplied by government role.</p>' : `<button data-action="${target.license ? 'unlicense' : 'license'}" data-target="${id}">${target.license ? 'Revoke gun license' : 'Grant gun license'}</button>`) : ''}</section>` : ''}
         ${target.job !== 'citizen' ? `<section><h3>Request demotion</h3><p class="muted">Residents vote on whether this player should lose their job. Give a specific roleplay reason.</p><div class="command-field"><input id="demotion-reason" maxlength="90" placeholder="Reason for demotion" aria-label="Reason for demotion"><button data-action="demotion" data-target="${id}" ${this.state?.vote ? 'disabled' : ''}>Start vote</button></div>${this.state?.vote ? '<p class="muted">A public vote is already running.</p>' : ''}</section>` : ''}
       </fieldset>
-      <div class="context-actions"><button data-menu="players">Back to players</button><button class="voice-mute" data-action="voice-mute" data-target="${id}">Mute</button><small data-voice-speaker="${id}"></small></div>`;
+      <div class="context-actions">${target.id !== p.id ? `<button data-action="direct-message" data-target="${id}">Message ${escape(target.name)}</button>` : ''}<button data-menu="players">Back to players</button><button class="voice-mute" data-action="voice-mute" data-target="${id}">Mute</button><small data-voice-speaker="${id}"></small></div>`;
   }
   clickAction(action: string, target: string, value?: string): void {
     if (action === 'entry-login' || action === 'entry-register' || action === 'entry-guest') {
@@ -810,6 +812,17 @@ export class UI {
         undefined,
         action === 'job-title-reset' ? '' : this.input('job-title').value,
       );
+      return;
+    }
+    if (action === 'direct-message') {
+      const resident = this.state?.players.find((p) => p.id === target);
+      if (!resident || resident.id === this.player?.id) {
+        this.notice('This resident is no longer available.', 'error');
+        return;
+      }
+      this.close(false);
+      this.input('chat-input').value = `/pm ${resident.id} `;
+      this.openChat();
       return;
     }
     if (action === 'resident') {
