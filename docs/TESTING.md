@@ -1,5 +1,11 @@
 # Testing
 
+## Planter ground detail
+
+Replaced the two Union Square planters' plain green bed surfaces with an original procedural soil texture and sparse low grass tufts, excluding the tree bases. Soil generation uses its own deterministic seed; grass positions do not consume the city's random sequence. Ground-cover triangles share one statically batched material.
+
+Reviewed at the established tree close-up in the actual City renderer: 63 calls/95,202 triangles versus 62/94,794 before this pass. These camera-specific figures do not establish frame-rate performance. Build and production HTTP smoke passed. Local and undeployed; no collision or gameplay changes.
+
 ## Tree silhouette follow-up
 
 Union Square trunks now taper into the canopy with slight position-dependent lean and a continuous flared base. Branches use gently curved, tapered geometry and attach to the trunk's revised centerline. Canopy placement and the city random sequence are preserved. Static batching remains in use.

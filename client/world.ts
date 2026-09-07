@@ -190,6 +190,28 @@ function surfaceTexture(kind: string, color: string): THREE.CanvasTexture {
   map.anisotropy = 8;
   return map;
 }
+function soilTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#514b38';
+  ctx.fillRect(0, 0, 256, 256);
+  let soilSeed = 1907;
+  const random = () => {
+    soilSeed = (soilSeed * 1664525 + 1013904223) >>> 0;
+    return soilSeed / 4294967296;
+  };
+  for (let i = 0; i < 2400; i++) {
+    ctx.fillStyle = ['#292c23', '#75674b', '#3b3b2b', '#8a7857'][i % 4];
+    const size = 1 + random() * 3;
+    ctx.fillRect(random() * 256, random() * 256, size, size * 0.55);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.anisotropy = 8;
+  return texture;
+}
 function barkTexture(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 256;
@@ -278,6 +300,11 @@ export class City {
         emissive: '#957747',
         emissiveIntensity: 0.18,
       }),
+    );
+    this.materials.set('soil', new THREE.MeshStandardMaterial({ map: soilTexture(), roughness: 1 }));
+    this.materials.set(
+      'ground-cover',
+      new THREE.MeshStandardMaterial({ color: '#777950', roughness: 1, side: THREE.DoubleSide }),
     );
     const bark = barkTexture();
     this.materials.set(
@@ -645,7 +672,28 @@ export class City {
       }
     for (const x of [-10, 10]) {
       this.box(x, 0.3, 9, 2.3, 0.6, 7, 'concrete');
-      this.box(x, 0.61, 9, 2.05, 0.05, 6.7, '#484936');
+      this.box(x, 0.61, 9, 2.05, 0.05, 6.7, 'soil');
+      for (let tuft = 0; tuft < 54; tuft++) {
+        const dx = Math.sin(tuft * 19.37 + x) * 0.88;
+        const dz = 6 + ((tuft * 0.731) % 6);
+        if ([7, 11].some((treeZ) => dx * dx + (dz - treeZ) ** 2 < 0.2)) continue;
+        for (let blade = 0; blade < 4; blade++) {
+          const height = 0.09 + ((tuft + blade * 7) % 9) * 0.012;
+          const leaf = new THREE.BufferGeometry();
+          leaf.setAttribute(
+            'position',
+            new THREE.Float32BufferAttribute([-0.035, 0, 0, 0.035, 0, 0, 0.035, height, 0.045], 3),
+          );
+          leaf.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0.5, 1], 2));
+          leaf.computeVertexNormals();
+          this.add(
+            leaf,
+            this.material('ground-cover'),
+            new THREE.Vector3(x + dx, 0.64, dz),
+            new THREE.Euler(0, blade * 1.7 + tuft, 0),
+          );
+        }
+      }
       for (const z of [7, 11]) this.tree(x, z);
       const bx = x < 0 ? x + 2.4 : x - 2.4;
       for (let slat = 0; slat < 4; slat++) this.box(bx, 0.48, 8 + slat * 0.14, 2.1, 0.07, 0.1, 'wood');
