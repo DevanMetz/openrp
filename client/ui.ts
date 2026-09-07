@@ -821,7 +821,13 @@ export class UI {
         return;
       }
       this.close(false);
-      this.input('chat-input').value = `/pm ${resident.id} `;
+      const draft = this.input('chat-input');
+      if (draft.value.trim()) {
+        this.openChat();
+        this.notice('Your existing draft is still here. Send or clear it before choosing another recipient.');
+        return;
+      }
+      draft.value = `/pm ${resident.id} `;
       this.openChat();
       return;
     }
