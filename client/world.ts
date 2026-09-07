@@ -1358,7 +1358,9 @@ export class City {
       const dx = focus.x - lamp.position.x,
         dy = focus.y - lamp.position.y,
         dz = focus.z - lamp.position.z;
-      lamp.visible = this.highDetail && dx * dx + dy * dy + dz * dz < 18 * 18;
+      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      lamp.intensity = this.highDetail ? 9 * (1 - THREE.MathUtils.smoothstep(distance, 12, 18)) : 0;
+      lamp.visible = lamp.intensity > 0;
     }
     this.skyMaterial.uniforms.time.value = time;
     // Keep detailed shadows around the viewer as they enter the outer neighborhoods.

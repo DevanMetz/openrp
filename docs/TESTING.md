@@ -1,5 +1,11 @@
 # Testing
 
+## Pendant distance fade
+
+High-quality pendant illumination now fades smoothly from full intensity at 12 metres to zero at 18 metres before the light is hidden, replacing the abrupt distance switch. Low graphics still disables the extra illumination.
+
+The actual City renderer fixture used a fixed interior camera and synthetic focus distances relative to the first spotlight. Chrome verified intensities 9.00 at 10m, 4.50 at 15m and 0.00 at 18m. This checks the distance response, not a walking-camera or exterior light-leak review. Build and production HTTP smoke passed. Local and undeployed.
+
 ## Cafe pendant illumination
 
 Added two warm downward spotlights under the pendant diffusers, with soft cone edges, four-metre range and 512px shadow maps. Lights are enabled only on high graphics within 18 metres of each fixture. Existing ambient illumination keeps low graphics usable.
