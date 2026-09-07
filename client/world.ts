@@ -129,6 +129,34 @@ function surfaceTexture(kind: string, color: string): THREE.CanvasTexture {
         ctx.fillRect(col * 72 + (row % 2) * 36 + 2, row * 30 + 2, 69, 27);
       }
   }
+  if (kind === 'pavement') {
+    // Half-metre paving slabs: restrained variation and worn bevels, without
+    // consuming random values used to lay out the rest of the city.
+    for (let row = 0; row < 4; row++)
+      for (let col = 0; col < 4; col++) {
+        const x = col * 64,
+          y = row * 64;
+        ctx.fillStyle = `hsl(65,4%,${55 + ((row * 7 + col * 11) % 7)}%)`;
+        ctx.fillRect(x + 1, y + 1, 62, 62);
+        ctx.strokeStyle = '#c3c2ad75';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + 2, y + 62);
+        ctx.lineTo(x + 2, y + 2);
+        ctx.lineTo(x + 62, y + 2);
+        ctx.stroke();
+        ctx.strokeStyle = '#565f5360';
+        ctx.beginPath();
+        ctx.moveTo(x + 62, y + 2);
+        ctx.lineTo(x + 62, y + 62);
+        ctx.lineTo(x + 2, y + 62);
+        ctx.stroke();
+      }
+    for (let grain = 0; grain < 1800; grain++) {
+      ctx.fillStyle = grain % 3 ? '#ded9bf30' : '#414b3f30';
+      ctx.fillRect((grain * 73) % 256, (grain * 47 + Math.floor(grain / 7) * 13) % 256, 1, 1);
+    }
+  }
   if (kind === 'pavement' || kind === 'floor') {
     ctx.strokeStyle = '#636960';
     ctx.lineWidth = 2;

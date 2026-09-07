@@ -1,5 +1,11 @@
 # Testing
 
+## Paving material detail
+
+Outdoor paving now has restrained per-slab tint variation, painted bevel highlights/shadows and fine mineral grain. The procedural additions use deterministic coordinates and preserve the existing city random sequence. They reuse the existing texture, geometry and material.
+
+Reviewed in Chrome at the Union Square street camera, 1100 × 760: slab edges and variation remain visible under sunlight and tree shadows. The scene remains at 75 calls/100,262 triangles. Build and production HTTP smoke passed. This is a local material improvement, not a citywide performance audit; undeployed.
+
 ## Atmosphere graphics settings
 
 The game graphics setting now reaches the City renderer. Low quality uses one cloud-noise layer and hides/skips moving fountain droplets; high quality restores three layers and droplets. Spillways and impact rings remain visible in both modes.
