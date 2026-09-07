@@ -1,5 +1,11 @@
 # Testing
 
+## Clock tower landmark detail
+
+The tower now has four shared-material clock faces with quarter-hour numerals, minute ticks, metal rims and stone surrounds. Clock hands retain their existing decorative fixed time. Close-up review exposed the pyramid roof's diagonal alignment leaving tower corners uncovered; rotated the roof by 45 degrees and added an eave band to match the square walls.
+
+Chrome verified the detailed front face, adjacent side face and corrected roof alignment from (5,26,-65). Final build and production HTTP smoke passed. The opposite faces use the same rotated geometry but were not separately viewed. Local and undeployed; no game-rule changes.
+
 ## Skyline side elevations and grounding
 
 Distant buildings now have inward-facing east/west window planes in addition to their existing north/south windows. Selected roofs have modest setbacks and caps, using deterministic index variation without changing building placement. An elevated eastern-edge review exposed absent ground under the distant scenery; a two-triangle background plane now grounds that scenery beneath the playable ground surface.

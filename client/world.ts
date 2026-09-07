@@ -1129,17 +1129,40 @@ export class City {
     // A municipal clock tower frames the northern end of the square.
     this.box(0, 16, -83, 8, 32, 8, 'stone');
     this.box(0, 29.5, -83, 9.2, 0.6, 9.2, 'concrete');
-    this.cylinder(0, 34.7, -83, 0, 6.4, 6, '#4a605d', 4);
+    const towerRoof = new THREE.CylinderGeometry(0, 6.4, 6, 4);
+    towerRoof.rotateY(Math.PI / 4);
+    this.add(towerRoof, this.material('#4a605d'), new THREE.Vector3(0, 34.7, -83));
+    this.box(0, 31.72, -83, 9.1, 0.16, 9.1, 'concrete');
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 256;
     const ctx = canvas.getContext('2d')!;
     ctx.fillStyle = '#c4c3ac';
+    ctx.fillRect(0, 0, 256, 256);
     ctx.beginPath();
     ctx.arc(128, 128, 120, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#404c48';
     ctx.lineWidth = 10;
     ctx.stroke();
+    for (let minute = 0; minute < 60; minute++) {
+      const angle = (minute * Math.PI) / 30;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(128 + Math.sin(angle) * 105, 128 - Math.cos(angle) * 105);
+      ctx.lineTo(128 + Math.sin(angle) * 110, 128 - Math.cos(angle) * 110);
+      ctx.stroke();
+    }
+    ctx.font = 'bold 21px Georgia';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#404c48';
+    for (const [number, x, y] of [
+      ['12', 128, 48],
+      ['3', 208, 128],
+      ['6', 128, 208],
+      ['9', 48, 128],
+    ] as const)
+      ctx.fillText(number, x, y);
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * Math.PI * 2;
       ctx.beginPath();
@@ -1157,12 +1180,16 @@ export class City {
     ctx.stroke();
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
-    const clock = new THREE.Mesh(
-      new THREE.CircleGeometry(2.4, 48),
-      new THREE.MeshStandardMaterial({ map: tex }),
-    );
-    clock.position.set(0, 26, -78.96);
-    this.scene.add(clock);
+    tex.anisotropy = 8;
+    const clockMaterial = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.88 });
+    for (let face = 0; face < 4; face++) {
+      const angle = (face * Math.PI) / 2;
+      const rotation = new THREE.Euler(0, angle, 0);
+      const position = new THREE.Vector3(Math.sin(angle) * 4.08, 26, -83 + Math.cos(angle) * 4.08);
+      this.add(new THREE.CircleGeometry(2.4, 48), clockMaterial, position, rotation);
+      this.add(new THREE.TorusGeometry(2.43, 0.11, 8, 48), this.material('metal'), position, rotation);
+      this.add(new THREE.TorusGeometry(2.63, 0.14, 8, 48), this.material('concrete'), position, rotation);
+    }
     const skyGeometry = new THREE.SphereGeometry(350, 24, 16);
     const skyMaterial = (this.skyMaterial = new THREE.ShaderMaterial({
       side: THREE.BackSide,
