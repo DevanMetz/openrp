@@ -171,6 +171,9 @@ export class City {
   batches = new Map<THREE.Material, THREE.BufferGeometry[]>();
   doors = new Map<string, { pivot: THREE.Group; label: THREE.Mesh; textureKey: string; angle: number }>();
   water!: THREE.Mesh;
+  fountainDrops!: THREE.Points;
+  fountainRipples!: THREE.InstancedMesh;
+  private rippleTransform = new THREE.Object3D();
   sun: THREE.DirectionalLight;
   constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     this.scene = scene;
@@ -722,6 +725,57 @@ export class City {
     );
     stream.position.set(0, 2.93, 9);
     this.scene.add(stream);
+    // Eight spillways share one draw call; moving droplets provide flow along each arc.
+    const arcs: THREE.BufferGeometry[] = [];
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const point = (r: number, y: number) =>
+        new THREE.Vector3(Math.cos(angle) * r, y, 9 + Math.sin(angle) * r);
+      const curve = new THREE.QuadraticBezierCurve3(point(1.08, 1.47), point(1.62, 1.9), point(2.05, 0.5));
+      arcs.push(new THREE.TubeGeometry(curve, 20, 0.022, 5, false));
+    }
+    const arcGeometry = mergeGeometries(arcs)!;
+    arcs.forEach((geometry) => geometry.dispose());
+    this.scene.add(
+      new THREE.Mesh(
+        arcGeometry,
+        new THREE.MeshStandardMaterial({
+          color: '#b7d7d4',
+          transparent: true,
+          opacity: 0.48,
+          roughness: 0.18,
+          metalness: 0.15,
+          depthWrite: false,
+        }),
+      ),
+    );
+    const droplets = new THREE.BufferGeometry();
+    droplets.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(8 * 16 * 3), 3));
+    this.fountainDrops = new THREE.Points(
+      droplets,
+      new THREE.PointsMaterial({
+        color: '#dfefea',
+        size: 0.045,
+        transparent: true,
+        opacity: 0.65,
+        depthWrite: false,
+      }),
+    );
+    droplets.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 1.5, 9), 3);
+    this.scene.add(this.fountainDrops);
+    this.fountainRipples = new THREE.InstancedMesh(
+      new THREE.RingGeometry(0.85, 1, 32),
+      new THREE.MeshBasicMaterial({
+        color: '#bedbd0',
+        transparent: true,
+        opacity: 0.24,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+      16,
+    );
+    this.fountainRipples.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.515, 9), 3);
+    this.scene.add(this.fountainRipples);
   }
   skyline(): void {
     for (let i = 0; i < 33; i++) {
@@ -861,9 +915,33 @@ export class City {
     this.sun.target.position.set(x, 0, z);
     for (const visual of this.doors.values())
       visual.pivot.rotation.y = THREE.MathUtils.damp(visual.pivot.rotation.y, visual.angle, 12, dt);
+    const nearFountain = focus.x * focus.x + (focus.z - 9) ** 2 < 60 ** 2;
+    this.fountainDrops.visible = this.fountainRipples.visible = nearFountain;
+    if (!nearFountain) return;
     const pos = this.water.geometry.attributes.position;
     for (let i = 0; i < pos.count; i++)
       pos.setZ(i, Math.sin(pos.getX(i) * 5 + time * 2) * Math.cos(pos.getY(i) * 4 - time) * 0.018);
     pos.needsUpdate = true;
+    this.water.geometry.computeVertexNormals();
+    const drops = this.fountainDrops.geometry.attributes.position;
+    for (let i = 0; i < drops.count; i++) {
+      const angle = (Math.floor(i / 16) * Math.PI) / 4;
+      const t = (time * 0.75 + (i % 16) / 16) % 1;
+      const u = 1 - t;
+      const radius = u * u * 1.08 + 2 * u * t * 1.62 + t * t * 2.05;
+      const height = u * u * 1.47 + 2 * u * t * 1.9 + t * t * 0.5;
+      drops.setXYZ(i, Math.cos(angle) * radius, height, 9 + Math.sin(angle) * radius);
+    }
+    drops.needsUpdate = true;
+    for (let i = 0; i < 16; i++) {
+      const angle = (Math.floor(i / 2) * Math.PI) / 4;
+      const phase = (time * 0.7 + (i % 2) * 0.5) % 1;
+      this.rippleTransform.position.set(Math.cos(angle) * 2.05, 0.515, 9 + Math.sin(angle) * 2.05);
+      this.rippleTransform.rotation.x = -Math.PI / 2;
+      this.rippleTransform.scale.setScalar(0.03 + phase * 0.21);
+      this.rippleTransform.updateMatrix();
+      this.fountainRipples.setMatrixAt(i, this.rippleTransform.matrix);
+    }
+    this.fountainRipples.instanceMatrix.needsUpdate = true;
   }
 }

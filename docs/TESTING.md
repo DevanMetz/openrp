@@ -1,5 +1,13 @@
 # Testing
 
+## Fountain visual pass
+
+The Union Square fountain now has eight arcing spillways, 128 moving droplets, sixteen expanding impact rings and water normals updated with the surface waves. Spillways share merged geometry; droplets share one Points object and rings use instancing. Animation and droplet/ripple visibility stop beyond 60 metres. Explicit bounds preserve frustum culling for animated geometry.
+
+Reviewed with the actual City renderer in an isolated 1100 × 760 browser fixture from street level and above the basin. Spillway endpoints and ripple placement were visually inspected. The fixture reported 72 render calls/97,054 triangles at the street camera and 52/96,962 above the basin; these are scene-specific observations, not FPS or whole-city performance benchmarks. Build and production smoke passed. Original procedural geometry only; no external assets, server rules or collisions changed. This pass is local and undeployed.
+
+Session cleanup fixture follow-up: the actual UI class in a browser passed checks for clearing chat history/draft, closing chat, clearing contracts/inspection/resident/account caches and menu content, emptying/hiding contract labels, displaying entry after disconnect, and opening an empty next-session chat. This does not substitute for a complete account-switch network test.
+
 ## Session UI cleanup — local follow-up
 
 Disconnect and the start of a new connection clear chat history/drafts, notices, menu content, contract entries/HUD text, weapon inspection, resident targets and cached player/snapshot/account UI state. Starting a connection also clears these when the previous socket is still closing. Message handlers ignore replaced sockets. The policy intentionally discards drafts on disconnect; menu navigation within a session still preserves them.
