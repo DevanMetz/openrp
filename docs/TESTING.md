@@ -1,5 +1,11 @@
 # Testing
 
+## Direct messages — local implementation
+
+`/pm "Full Name" message` or `/pm player-id message` selects exactly one connected resident. Names without spaces may be unquoted; matching is case-insensitive and exact, with no prefix matching. Only sender and recipient receive the event. Self, missing, ambiguous and offline recipients are rejected; accepted messages share normal text limits/cooldown. Like other social text channels, PMs are allowed during death/custody. No offline queue exists.
+
+Logs store the recipient ID/name once per accepted message, and the readable CLI identifies the recipient. The field guide, input hint and public privacy text explicitly describe moderation logging. The new Game test verifies quoted names/IDs, recipient isolation, one log per message, cooldown, malformed/missing/self targets and offline rejection. `npm run check` passed with 116 tests, build and production smoke. Real-client PM isolation, persisted recipient metadata, CLI output and browser presentation still need dedicated checks. All changes are local and undeployed.
+
 ## Text radio — local implementation
 
 Browser follow-up: an isolated 360 × 780 session tuned to channel zero, sent a labeled radio message, switched off and received the expected rejection when attempting another transmission. Review exposed poor contrast over bright pavement; ordinary chat now has a translucent dark background and the narrow text size increased from 0.65rem to 0.75rem. The revised radio history and rejection notice were visually checked with clearance above the status panel. Build and production HTTP smoke passed. This supersedes the pending radio browser review below; long chat histories and other viewport sizes remain broader layout work. No production state was used.

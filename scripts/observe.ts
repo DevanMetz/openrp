@@ -8,7 +8,7 @@ try {
 }
 const [action = 'analytics', ...args] = process.argv.slice(2);
 const help =
-  'Usage: observe.ts analytics|chat|events [--url https://openrp.dev] [--days 1|7|30] [--date YYYY-MM-DD] [--limit 50] [--player name-or-id] [--channel local|whisper|yell|ooc|advert|broadcast|radio|me|group|system] [--search text] [--kind event] [--cursor value] [--json]';
+  'Usage: observe.ts analytics|chat|events [--url https://openrp.dev] [--days 1|7|30] [--date YYYY-MM-DD] [--limit 50] [--player name-or-id] [--channel local|whisper|yell|ooc|advert|broadcast|radio|pm|me|group|system] [--search text] [--kind event] [--cursor value] [--json]';
 if (!['analytics', 'chat', 'events'].includes(action)) {
   console.error(help);
   process.exit(1);
@@ -120,7 +120,7 @@ else if (action === 'analytics') {
   for (const row of report.rows) {
     if (action === 'chat')
       console.log(
-        `${row.at} [${row.channel}${row.channel === 'radio' && Number.isInteger(row.radioChannel) && row.radioChannel >= 0 && row.radioChannel <= 100 ? ` ${row.radioChannel}` : ''}] ${JSON.stringify(row.name)} (${row.playerId ?? 'system'}): ${JSON.stringify(row.text)}`,
+        `${row.at} [${row.channel}${row.channel === 'radio' && Number.isInteger(row.radioChannel) && row.radioChannel >= 0 && row.radioChannel <= 100 ? ` ${row.radioChannel}` : ''}] ${JSON.stringify(row.name)}${row.channel === 'pm' ? ` → ${JSON.stringify(row.recipientName ?? row.recipientId ?? 'unknown')}` : ''} (${row.playerId ?? 'system'}): ${JSON.stringify(row.text)}`,
       );
     else console.log(JSON.stringify(row));
   }

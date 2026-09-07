@@ -1699,6 +1699,29 @@ export class Game {
           channel = 'ooc';
           message = args;
           break;
+        case '/pm': {
+          const parsed = /^(?:"([^"]+)"|(\S+))\s+(.+)$/.exec(args);
+          if (!parsed) {
+            this.notice(p.id, 'Use /pm "Full Name" message, or /pm player-id message. Direct messages are logged.', 'error');
+            return;
+          }
+          const address = parsed[1] ?? parsed[2];
+          const matches = [...this.players.values()].filter((other) =>
+            other.id === address || other.name.toLowerCase() === address.toLowerCase());
+          if (matches.length !== 1 || matches[0] === p) {
+            this.notice(p.id, 'Choose one other connected resident by exact name or player ID.', 'error');
+            return;
+          }
+          const recipient = matches[0];
+          const message = parsed[3];
+          this.onChat({ playerId: p.id, name: p.name, job: p.job, channel: 'pm', text: message,
+            recipientId: recipient.id, recipientName: recipient.name });
+          const event: GameEvent = { type: 'chat', channel: 'pm', name: p.name, text: message,
+            recipientName: recipient.name, color: JOBS[p.job].color };
+          this.onEvent(event, p.id);
+          this.onEvent(event, recipient.id);
+          return;
+        }
         case '/channel': {
           if (!args) {
             this.notice(p.id, r.radioChannel === null ? 'Text radio is off.' : `Text radio channel ${r.radioChannel}. Anyone tuned to this channel can hear; messages are logged.`);
