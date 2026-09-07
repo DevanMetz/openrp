@@ -430,14 +430,16 @@ export function updateAvatar(a: Avatar, p: Player, dt: number, localPosition: TH
   const stride = Math.sin(a.phase) * 0.65 * Math.min(a.speed / 3, 1) * (p.crouch ? 0.22 : 1);
   a.leftLeg.rotation.x = (p.crouch ? 1.15 : 0) + stride;
   a.rightLeg.rotation.x = (p.crouch ? 1.15 : 0) - stride;
-  a.leftArm.rotation.x = p.weapon === 'keys' ? -stride * 0.65 : 0.95;
-  a.rightArm.rotation.x = p.weapon === 'keys' ? stride * 0.65 : 1.15;
+  a.leftArm.rotation.x =
+    p.weapon === 'scanner' ? -stride * 0.45 : p.weapon === 'keys' ? -stride * 0.65 : 0.95;
+  a.rightArm.rotation.x =
+    p.weapon === 'scanner' ? 0.65 + p.pitch * 0.45 : p.weapon === 'keys' ? stride * 0.65 : 1.15;
   a.leftShin.rotation.x = p.crouch ? -2.05 : -Math.max(0, stride) * 0.65;
   a.rightShin.rotation.x = p.crouch ? -2.05 : -Math.max(0, -stride) * 0.65;
   a.leftFoot.rotation.x = -a.leftLeg.rotation.x - a.leftShin.rotation.x;
   a.rightFoot.rotation.x = -a.rightLeg.rotation.x - a.rightShin.rotation.x;
-  a.leftForearm.rotation.x = p.weapon === 'keys' ? 0.12 : 0.48;
-  a.rightForearm.rotation.x = p.weapon === 'keys' ? 0.12 : 0.35;
+  a.leftForearm.rotation.x = p.weapon === 'scanner' ? 0.12 : p.weapon === 'keys' ? 0.12 : 0.48;
+  a.rightForearm.rotation.x = p.weapon === 'scanner' ? 0.85 : p.weapon === 'keys' ? 0.12 : 0.35;
   a.torso.position.y = p.crouch ? 0.46 : 0.835;
   a.torso.rotation.x = p.crouch ? -0.65 : 0;
   a.leftLeg.position.y = a.rightLeg.position.y = a.torso.position.y;
@@ -451,12 +453,20 @@ export function updateAvatar(a: Avatar, p: Player, dt: number, localPosition: TH
     a.equipment.position.set(0.2, 1.13, -0.28);
     a.equipment.scale.setScalar(0.7);
     a.equipment.visible = p.weapon !== 'keys';
-    a.root.add(a.equipment);
+    (p.weapon === 'scanner' ? a.rightForearm : a.root).add(a.equipment);
     a.weapon = p.weapon;
   }
   if (a.equipment) {
-    a.equipment.rotation.x = p.pitch;
-    a.equipment.position.y = p.crouch ? 0.76 : 1.13;
+    if (p.weapon === 'scanner') {
+      // Keep the grip at the animated palm while holding the display upright.
+      a.equipment.rotation.x =
+        p.pitch * 0.3 - a.torso.rotation.x - a.rightArm.rotation.x - a.rightForearm.rotation.x;
+      const grip = new THREE.Vector3(0, -0.12, 0.015).multiplyScalar(0.7).applyEuler(a.equipment.rotation);
+      a.equipment.position.set(-grip.x, -0.3 - grip.y, -0.01 - grip.z);
+    } else {
+      a.equipment.rotation.x = p.pitch;
+      a.equipment.position.y = p.crouch ? 0.76 : 1.13;
+    }
   }
   a.label.visible = !p.deadUntil && localPosition.distanceTo(dest) < 23;
   const key = `${p.name}:${p.job}:${p.jobTitle ?? ''}:${!!p.wantedUntil}:${!!p.arrestedUntil}`;
