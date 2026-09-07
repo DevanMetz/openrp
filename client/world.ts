@@ -799,10 +799,19 @@ export class City {
       for (const x of [-6, 5]) {
         local(x, 0.73, 2, 1.25, 0.12, 1.25, 'wood');
         local(x, 0.35, 2, 0.1, 0.7, 0.1, 'metal');
+        local(x, 0.14, 2, 0.8, 0.07, 0.12, 'metal');
+        local(x, 0.14, 2, 0.12, 0.07, 0.8, 'metal');
+        local(x, 0.64, 2, 0.55, 0.08, 0.55, 'metal');
         for (const z of [0.7, 3.3]) {
           local(x, 0.43, z, 0.6, 0.12, 0.55, 'wood');
-          local(x, 0.2, z, 0.08, 0.4, 0.1, 'metal');
-          local(x, 0.78, z + (z < 2 ? -0.22 : 0.22), 0.6, 0.6, 0.07, 'wood');
+          const back = z < 2 ? -1 : 1;
+          for (const dx of [-0.23, 0.23]) {
+            for (const dz of [-0.2, 0.2]) local(x + dx, 0.21, z + dz, 0.045, 0.42, 0.045, 'metal');
+            local(x + dx, 0.24, z, 0.035, 0.035, 0.42, 'metal');
+            local(x + dx, 0.75, z + back * 0.23, 0.04, 0.59, 0.04, 'metal');
+          }
+          for (let slat = 0; slat < 3; slat++)
+            local(x, 0.67 + slat * 0.15, z + back * 0.24, 0.6, 0.105, 0.065, 'wood');
         }
       }
       signage(

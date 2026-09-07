@@ -1,5 +1,11 @@
 # Testing
 
+## Cafe furniture construction
+
+Cafe chairs now have four legs, side braces, back supports and three wooden back slats instead of a single central leg and solid back. Tables retain their tops and stems with added cross feet and underside mounting plates. Existing wood/metal materials and static batching are reused.
+
+Chrome reviewed the furniture from inside the actual cafe. The first table feet sat beneath the existing floor; their corrected height was reviewed again and the full cross base is visible. Final build and production HTTP smoke passed. These remain decorative furnishings; seating interaction and interior lighting improvements are outside this increment. Local and undeployed.
+
 ## Clock tower landmark detail
 
 The tower now has four shared-material clock faces with quarter-hour numerals, minute ticks, metal rims and stone surrounds. Clock hands retain their existing decorative fixed time. Close-up review exposed the pyramid roof's diagonal alignment leaving tower corners uncovered; rotated the roof by 45 degrees and added an eave band to match the square walls.
