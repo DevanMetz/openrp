@@ -2,6 +2,8 @@
 
 ## Text radio — local implementation
 
+Integration follow-up: three real WebSocket clients verify distant matching-channel delivery, exclusion of another channel, and immediate receive opt-out after `/channel off`; ordered OOC barriers make the negative delivery assertions meaningful. Persisted observability fixtures retain channel 0 and 100 after reopening storage and omit radio metadata from ordinary chat. All 26 network/observability tests passed. The CLI now displays radio frequencies, with an additional live CLI assertion for `[radio 0]`; all 12 observability tests passed after that change, as did typecheck. Browser radio controls/presentation remain pending. This increment does not change production game state or deploy the feature.
+
 `/channel 0–100` selects a session-only text radio channel; `/channel off` disables sending and listening, and `/channel` reports tuning. Joining defaults to channel 1. `/radio message` reaches matching listeners independent of distance, with a channel-number label. The field guide explains open-channel access, logging and separation from proximity voice. Logs retain the radio channel number. Like existing group/local chat, text radio remains usable during death/custody; this is an explicit policy rather than a police-equipment permission.
 
 The Game test covers default listeners, distant matching recipients, channel isolation, off, invalid tuning, channel zero, shared cooldown, empty messages and reconnect reset. `npm run check` passed with 113 tests, typecheck, build and production HTTP smoke. Dedicated real-client delivery, persisted log metadata and browser review remain pending; the feature is not deployed.

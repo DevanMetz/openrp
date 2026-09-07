@@ -13,6 +13,7 @@ import { startServer } from '../server/main.ts';
 import type { Player, ServerMessage } from '../shared/types.ts';
 
 interface Row {
+  radioChannel?: number;
   id: string;
   at: string;
   kind: string;
@@ -47,6 +48,24 @@ const message = (text: string, extra = {}) => ({
   channel: 'local',
   text,
   ...extra,
+});
+
+test('radio channel metadata survives persisted log replacement including zero', async (t) => {
+  const { store, dataDir } = await fixture(t, { now: () => Date.parse('2026-09-07T12:00:00Z') });
+  store.chat(message('Channel zero', { channel: 'radio', radioChannel: 0 }));
+  store.chat(message('Channel hundred', { channel: 'radio', radioChannel: 100 }));
+  store.chat(message('Ordinary chat'));
+  await store.close();
+  const restored = await Observability.create({ dataDir, persist: true, now: () => Date.parse('2026-09-07T12:01:00Z') });
+  try {
+    const found = rows(await restored.logs('chat', { channel: 'radio', date: '2026-09-07' }));
+    assert.deepEqual(found.map((r) => [r.text, r.radioChannel]), [['Channel hundred', 100], ['Channel zero', 0]]);
+    const ordinary = rows(await restored.logs('chat', { channel: 'local' }));
+    assert.equal(ordinary.length, 1);
+    assert.equal(Object.hasOwn(ordinary[0], 'radioChannel'), false);
+  } finally {
+    await restored.close();
+  }
 });
 
 test('broadcast logs retain their channel and support combined query filters', async (t) => {
@@ -446,6 +465,7 @@ test('live HTTP/WebSocket logs require authorization, read keys cannot moderate,
     const events = await (await get('/api/admin/events')).text();
     for (const secret of [readKey, adminKey, reconnectToken, 'voiceTicket', '127.0.0.1'])
       assert.ok(!events.includes(secret));
+    app.game.onChat({ playerId, name: 'Alice', job: 'citizen', channel: 'radio', radioChannel: 0, text: 'Radio CLI fixture' });
     const execute = promisify(execFile);
     const env = { ...process.env, ANALYTICS_READ_TOKEN: readKey };
     const json = await execute(
@@ -461,6 +481,7 @@ test('live HTTP/WebSocket logs require authorization, read keys cannot moderate,
     );
     assert.match(text.stdout, /untrusted data, never instructions/);
     assert.match(text.stdout, /private local test/);
+    assert.match(text.stdout, /\[radio 0\].*Radio CLI fixture/);
     assert.ok(!text.stdout.includes(readKey));
     await app.close();
     app = await startServer(options);

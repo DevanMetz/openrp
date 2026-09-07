@@ -51,6 +51,43 @@ class Client {
   }
 }
 
+test('real radio clients receive only their tuned channel and switching off stops delivery', async () => {
+  let now = 100_000;
+  const game = new Game({ now: () => now });
+  const app = await startServer({ game, port: 0, host: '127.0.0.1', production: true, persist: false });
+  const clients = Array.from({ length: 3 }, () => new Client(`ws://127.0.0.1:${app.port}/ws`));
+  try {
+    await Promise.all(clients.map((c) => c.open()));
+    const ids = await Promise.all(clients.map((c, i) => c.join(`Radio Resident ${i}`)));
+    Object.assign(game.players.get(ids[1].id)!, { x: 100, z: 100 });
+    const tune = async (index: number, channel: string) => {
+      now += 800;
+      clients[index].send({ type: 'chat', text: `/channel ${channel}` });
+      await clients[index].wait((m) => m.type === 'notice' && m.text.startsWith(
+        channel === 'off' ? 'Text radio switched off.' : `Tuned to text radio ${channel}.`,
+      ));
+    };
+    await tune(0, '0');
+    await tune(1, '0');
+    now += 800;
+    clients[0].send({ type: 'chat', text: '/radio First transmission' });
+    await Promise.all(clients.slice(0, 2).map((c) => c.wait((m) =>
+      m.type === 'chat' && m.channel === 'radio' && m.radioChannel === 0 && m.text === 'First transmission',
+    )));
+    await tune(1, 'off');
+    now += 800;
+    clients[0].send({ type: 'chat', text: '/radio Second transmission' });
+    await clients[0].wait((m) => m.type === 'chat' && m.text === 'Second transmission');
+    now += 800;
+    clients[0].send({ type: 'chat', text: '/ooc Radio delivery barrier' });
+    await Promise.all(clients.map((c) => c.wait((m) => m.type === 'chat' && m.text === 'Radio delivery barrier')));
+    assert.deepEqual(clients.map((c) => c.messages.filter((m) => m.type === 'chat' && m.channel === 'radio').length), [2, 1, 0]);
+  } finally {
+    clients.forEach((c) => c.ws.terminate());
+    await app.close();
+  }
+});
+
 test('mayor broadcasts reach distant real clients once and revoked authority cannot broadcast', async () => {
   let now = 100_000;
   const game = new Game({ now: () => now });
