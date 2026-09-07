@@ -4,7 +4,7 @@
 
 Choose a job, buy a storefront, sell weapons or meals, hide money printers, build with physics props, become mayor, or patrol the city as Civil Protection. Everyone plays in the same server-owned world.
 
-OpenRP is a playable **0.3 alpha**, not a complete Source engine port. All map geometry, characters, equipment, textures, and game sound effects are original and generated locally. No Garry’s Mod installation, extracted Valve assets, external asset CDN, API keys, or paid services are required to run your own server.
+OpenRP is a playable **0.5 alpha**, not a complete Source engine port. All map geometry, characters, equipment, textures, and game sound effects are original and generated locally. No Garry’s Mod installation, extracted Valve assets, external asset CDN, API keys, or paid services are required to run your own server.
 
 ## Run it
 
@@ -17,7 +17,7 @@ npm ci
 npm run dev
 ```
 
-Open **http://localhost:3000**. Enter a roleplay name, then select **Return to the streets**. The server and Vite run together on one port.
+Open **http://localhost:3000**. Create an account with a username and password, or choose **Guest** and enter a roleplay name. Then select **Return to the streets**. The server and Vite run together on one port.
 
 For a production build:
 
@@ -38,27 +38,35 @@ On your LAN, friends open `http://YOUR-COMPUTER-LAN-IP:3000`. The server binds t
 
 For internet play, run the Node server on a host that supports long-lived WebSockets and put HTTPS in front of it. Forward `/ws` and `/voice` upgrades to the same server as the page. Voice needs HTTPS or localhost; a plain HTTP LAN address can play the game but cannot access the microphone. Static hosts such as GitHub Pages alone cannot run the multiplayer server. See [hosting and configuration](docs/HOSTING.md).
 
-To test two identities yourself, use two different browsers or a private window. A browser saves its wallet credential and prevents simultaneous use of the same identity.
+To test two identities yourself, use two different browsers or a private window. Guest and account sessions keep separate browser credentials. Signing into an account on another browser moves that character to the new session.
 
 ## What works
 
-| System      | Implemented behavior                                                                                                                                                              |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Multiplayer | Real WebSockets, 30 Hz server simulation, 15 Hz snapshots, client movement prediction, interpolated players and props, no player slot cap; compact delta updates                  |
-| City        | Original Union District map: central square, café, gun store, clinic, apartments, warehouse, pawn shop, police station, holding cell and alleys; enterable ground floors          |
-| Movement    | First-person mouse look, WASD, sprint, crouch, jump, gravity, shared world collision, browser mouse-capture fallback                                                              |
-| Jobs        | Citizen, Civil Protection, Gangster, Mob Boss, Gun Dealer, Medic, Police Chief, Mayor, Hobo, Cook, Thief; limits, loadouts, salaries and job cooldowns                            |
-| Elections   | Public elections and reasoned demotion votes; fixed electorate, majority required, one vote per identity; five-minute demotion bans persist                                       |
-| Property    | Buy and sell doors, lock/unlock/open, rename your property, share and revoke keys, up to three properties per player                                                              |
-| Building    | Seven prop types, server-side Cannon rigid-body physics, Physics Gun grab/rotate/distance/freeze, Tool Gun freeze/remove/paint/fading doors, undo and cleanup                     |
-| Economy     | Salaries, saved wallets, money printers, cash drops, direct cash transfers, food, hunger and armor                                                                                |
-| Businesses  | Job-restricted weapon shipments and microwaves, adjustable sale prices, stock, purchases that pay the owner, recurring meal production                                            |
-| Equipment   | Keys, Physics Gun, Tool Gun, pistol, SMG, shotgun, arrest/unarrest batons, lockpick, medical kit and battering ram                                                                |
-| Combat      | Server raycasts, line-of-sight checks, shotgun spread, ammo, timed reloads, armor, damage, death, cash loss and respawn                                                           |
-| Law         | Wanted status, arrests and timed jail, release, search warrants, door ramming, printer confiscation, gun licenses, mayor laws and lockdowns                                       |
-| Social      | Nearby chat, global OOC, advertisements, roleplay actions, job/group chat, names and scoreboard                                                                                   |
-| Voice       | Hold V to talk within 28 metres; positional stereo audio, distance fade, explicit microphone consent, individual mute, mute all, independent volume and server-enforced proximity |
-| Interface   | F4 jobs/shop/laws, Q build menu, C context actions, F1 guide, minimap, role-colored HUD, equipment selection, settings and procedural audio                                       |
+| System      | Implemented behavior                                                                                                                                                                  |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Multiplayer | Real WebSockets, 30 Hz server simulation, 15 Hz snapshots, client movement prediction, interpolated players and props, no player slot cap; compact delta updates                      |
+| City        | Expanded Union District: 17 buildings, four neighborhoods around the original square, 24 three-room apartments on three walkable floors, and four new businesses with connected rooms |
+| Movement    | First-person mouse look, WASD, sprint, crouch, jump, gravity, shared world collision, browser mouse-capture fallback                                                                  |
+| Jobs        | Citizen, Civil Protection, Gangster, Mob Boss, Gun Dealer, Medic, Police Chief, Mayor, Hobo, Cook, Thief; limits, loadouts, salaries and job cooldowns                                |
+| Elections   | Public elections and reasoned demotion votes; fixed electorate, majority required, one vote per identity; five-minute demotion bans persist                                           |
+| Property    | Buy and sell doors, lock/unlock/open, rename your property, share and revoke keys, up to three properties per player                                                                  |
+| Building    | Seven prop types, server-side Cannon rigid-body physics, Physics Gun grab/rotate/distance/freeze, Tool Gun freeze/remove/paint/fading doors, undo and cleanup                         |
+| Economy     | Salaries, saved wallets, money printers, cash drops, direct cash transfers, food, hunger and armor                                                                                    |
+| Businesses  | Job-restricted weapon shipments and microwaves, adjustable sale prices, stock, purchases that pay the owner, recurring meal production                                                |
+| Equipment   | Keys, Physics Gun, Tool Gun, pistol, SMG, shotgun, arrest/unarrest batons, lockpick, medical kit and battering ram                                                                    |
+| Combat      | Server raycasts, line-of-sight checks, shotgun spread, ammo, timed reloads, armor, damage, death, cash loss and respawn                                                               |
+| Law         | Wanted status, arrests and timed jail, release, search warrants, door ramming, printer confiscation, gun licenses, mayor laws and lockdowns                                           |
+| Social      | Nearby chat, global OOC, advertisements, roleplay actions, job/group chat, names and scoreboard                                                                                       |
+| Voice       | Hold V to talk within 28 metres; positional stereo audio, distance fade, explicit microphone consent, individual mute, mute all, independent volume and server-enforced proximity     |
+| Interface   | F4 jobs/shop/laws, Q build menu, C context actions, F1 guide, minimap, role-colored HUD, equipment selection, settings and procedural audio                                           |
+
+### Accounts and apartments
+
+Accounts need **only a username and password**: no email, payment or external identity provider. Usernames are case-insensitive, 3–24 characters, and use letters, numbers, dots, underscores or hyphens, starting with a letter or number. Passwords or passphrases are 15–128 characters. Use **F4 → Account** while playing as a guest to attach that character's existing belongings to an account. Sign in with the same account on any browser to recover inventory, ammunition, cash, props, businesses and property. Signing out keeps those belongings saved. Only one live session can use an identity.
+
+Guest play remains available and reconnects through its saved browser credential. Clearing that credential loses access to an unclaimed guest; create an account first. There is no email or automated forgotten-password recovery. Accounts belong to the server you join, so a different independently hosted server has its own accounts and world.
+
+Find **Alder Court** and **Mercer Court** in West Alder, and **Linden House** and **Canal House** in Canal Quarter. Each building has six independently purchasable apartments, two on each of three floors, with a living room/kitchen, bedroom and bathroom. The shared lobby and stairs stay public; private unit doors can be bought, locked, renamed and shared. North Market and the Foundry sit in Foundry Ward; South Studio and South Bakery are in Southbank. Each new business has a front room, workshop and back office. The original buildings keep their footprints and door IDs so existing homes and builds survive the expansion.
 
 ### Private analytics and chat logs
 
@@ -72,26 +80,28 @@ New players start with $1,500 to make the initial sandbox easy to explore. Salar
 
 ## Controls
 
-| Key                              | Action                                                    |
-| -------------------------------- | --------------------------------------------------------- |
-| WASD / mouse                     | Move / look                                               |
-| Shift / Ctrl / Space             | Sprint / crouch / jump                                    |
-| E                                | Use a door, printer, shipment, microwave or cash pile     |
-| C                                | Context menu for the object under your crosshair          |
-| F4                               | Jobs, purchases, laws and voting                          |
-| Q                                | Props and Tool Gun modes                                  |
-| 1–9 / mouse wheel                | Select equipment                                          |
-| Left / right mouse               | Primary / alternate equipment action                      |
-| R                                | Reload; rotate a held physics prop                        |
-| Hold left mouse with Physics Gun | Grab your prop; release to drop                           |
-| Right mouse while grabbing       | Freeze prop                                               |
-| Mouse wheel while grabbing       | Adjust hold distance                                      |
-| F / Z                            | Activate your fading doors / undo your last prop          |
-| Y or Enter                       | Open chat                                                 |
-| Hold V                           | Proximity voice after enabling the microphone in Settings |
-| Tab / F1 / Escape                | Scoreboard / field guide / pause                          |
+| Key                              | Action                                                            |
+| -------------------------------- | ----------------------------------------------------------------- |
+| WASD / mouse                     | Move / look                                                       |
+| Shift / Ctrl / Space             | Sprint / crouch / jump                                            |
+| E                                | Use a door, printer, shipment, microwave or cash pile             |
+| C                                | Actions for the resident, property or object under your crosshair |
+| F4                               | Jobs, purchases, laws and voting                                  |
+| Q                                | Props and Tool Gun modes                                          |
+| 1–9 / mouse wheel                | Select equipment                                                  |
+| Left / right mouse               | Primary / alternate equipment action                              |
+| R                                | Reload; rotate a held physics prop                                |
+| Hold left mouse with Physics Gun | Grab your prop; release to drop                                   |
+| Right mouse while grabbing       | Freeze prop                                                       |
+| Mouse wheel while grabbing       | Adjust hold distance                                              |
+| F / Z                            | Activate your fading doors / undo your last prop                  |
+| Y or Enter                       | Open chat                                                         |
+| Hold V                           | Proximity voice after enabling the microphone in Settings         |
+| Tab / F1 / Escape                | Scoreboard / field guide / pause                                  |
 
 Some embedded browsers disallow Pointer Lock. OpenRP then uses **hold right mouse and drag to look**, with **Alt + left click** for alternate use. A normal desktop Chrome, Edge or Firefox window is recommended for captured first-person controls. Menus do not pause a multiplayer server.
+
+Select a resident's name in **Tab**, or look at them and press **C**, to give cash or use government actions. Transfers require a living recipient within 3.5 metres and a clear view, and accept whole dollars up to $50,000. A full recipient wallet rejects the transfer without deducting cash. Government menus show wanted status, warrants and gun licenses, with actions limited to your current job. Names and permissions update while the menu is open; typed amounts and reasons survive name or status updates. Menus use the selected resident's identity, so a different person reusing their name must be selected again.
 
 ### Proximity voice
 
@@ -132,9 +142,11 @@ To hand over a personal firearm, equip it and use `/dropweapon` or **F4 → Shop
 
 ## Scope and fidelity
 
-The mechanics aim to capture the recognizable DarkRP loop, but this is an independent implementation. Union District is an original map, not `rp_downtown` or `rp_evocity`. Character rigs and collisions are simplified; upper stories are scenery. The alpha does not include Source/BSP/Lua compatibility, Workshop addons, vehicles, ragdolls, welded constraints or wire systems. Operators have authenticated kick/ban commands; verified accounts and a full admin UI remain future work. Physics Gun manipulation is owner-only. Police need a wanted flag before using the arrest baton. Gun licenses and most written laws are social roleplay rules rather than a complete legal simulation.
+The mechanics aim to capture the recognizable DarkRP loop, but this is an independent implementation. Union District is an original map, not `rp_downtown` or `rp_evocity`. Character rigs and collisions are simplified. All three floors of the four new apartment buildings are playable; upper stories of the original buildings and businesses remain scenery. The alpha does not include Source/BSP/Lua compatibility, Workshop addons, vehicles, ragdolls, welded constraints or wire systems. Operators have authenticated kick/ban commands; a full admin UI and forgotten-password recovery remain future work. Physics Gun manipulation is owner-only. Police need a wanted flag before using the arrest baton. Gun licenses and most written laws are social roleplay rules rather than a complete legal simulation.
 
-Names, wallets, inventory, ammunition, armor, position, props, shop stock, printer cash and property ownership persist together in `data/world.json`. Refreshing or restarting the server keeps your belongings; use the same browser identity and keep the server's data directory on persistent storage. Props retain their placement, rotation, paint and frozen state. Shops stay open while their owner is offline and sales credit the saved wallet. Jobs resume when a slot is available; a full job returns you as a Citizen with your inventory. Normal gameplay can still consume, destroy or remove items, and operator removals still clean up owned objects. Browser credentials are anonymous bearer tokens, not verified accounts; there is no cross-device account recovery. The server enforces bounds, prices, ownership, role restrictions and request limits, but this alpha has not been audited or load-tested for a large hostile public server.
+Names, wallets, inventory, ammunition, armor, position, props, shop stock, printer cash and property ownership persist together in `data/world.json`. Refreshing or restarting the server keeps your belongings; sign into your account or use the same guest browser identity, and keep the server's data directory on persistent storage. Props retain their placement, rotation, paint and frozen state. Shops stay open while their owner is offline and sales credit the saved wallet. Jobs resume when a slot is available; a full job returns you as a Citizen with your inventory. Normal gameplay can still consume, destroy or remove items, and operator removals still clean up owned objects. Accounts save a salted password hash and can recover their character across browsers. Guest access depends on its browser bearer credential. The server enforces bounds, prices, ownership, role restrictions and request limits, but this alpha has not been audited or load-tested for a large hostile public server.
+
+Full-world persistence starts with **0.4.0**. Earlier versions saved names, wallets and credentials only. Upgrading imports those saved profiles, but cannot recover inventory, props or property held only in an old server process after it stops. The official first 0.4.0 upgrade preserved saved wallets; no pre-upgrade world snapshot was available. Subsequent updates restore the full `world.json` checkpoint. See [persistence and upgrades](docs/HOSTING.md#persistence).
 
 ## Development
 

@@ -222,7 +222,7 @@ function draw(time: number, poster = false) {
     updateAvatar(a.avatar, a.player, 1 / 30, camera.position);
     a.avatar.label.visible = false;
   }
-  city.update(time, 1 / 30);
+  city.update(time, 1 / 30, camera.position);
   renderer.render(scene, camera);
   ctx.drawImage(renderer.domElement, 0, 0, canvas.width, canvas.height);
   const w = canvas.width,

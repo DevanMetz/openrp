@@ -2,10 +2,12 @@ import * as CANNON from 'cannon-es';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import {
   GOVERNMENT,
+  GIVE_RANGE,
   INTERACT_RANGE,
   JOBS,
   MAX_ENTITIES,
   MAX_PROPS,
+  MAX_TRANSFER,
   POLICE,
   PROPS,
   SHOP,
@@ -16,6 +18,7 @@ import {
 import { BLOCKS, INITIAL_DOORS, JAIL, MAP_BOUND, SPAWNS, doorBox } from '../shared/map.ts';
 import { direction, distance, eyes, idleInput, movePlayer, overlaps, rayBox } from '../shared/movement.ts';
 import type { Activity, ChatRecord } from './observability.ts';
+import type { Account } from './accounts.ts';
 import type {
   Box,
   ClientMessage,
@@ -26,6 +29,7 @@ import type {
   Input,
   JobId,
   Player,
+  ResidentAction,
   Snapshot,
   Vec3,
   Vote,
@@ -37,6 +41,7 @@ export interface Profile {
   name: string;
   money: number;
   tokenHash: string;
+  account?: Account;
   character?: SavedCharacter;
 }
 export type SavedCharacter = Omit<
@@ -66,6 +71,7 @@ type Runtime = {
   lastAction: number;
   lastShot: number;
   lastChat: number;
+  lastResidentAction: number;
   lastJob: number;
   inputSeq: number;
   grabDistance: number;
@@ -121,7 +127,7 @@ export class Game {
     this.physics.broadphase = new CANNON.SAPBroadphase(this.physics);
     this.physics.defaultContactMaterial.friction = 0.55;
     this.physics.defaultContactMaterial.restitution = 0.05;
-    this.addStatic({ x: 0, y: -0.5, z: 0, w: 160, h: 1, d: 160 });
+    this.addStatic({ x: 0, y: -0.5, z: 0, w: MAP_BOUND * 2 + 2, h: 1, d: MAP_BOUND * 2 + 2 });
     for (const b of BLOCKS) this.addStatic(b);
     for (const d of this.doors) this.doorBodies.set(d.id, this.addStatic(doorBox(d)));
     if (options.world) {
@@ -216,6 +222,7 @@ export class Game {
       lastAction: 0,
       lastShot: 0,
       lastChat: 0,
+      lastResidentAction: -Infinity,
       lastJob: profile.character?.lastJob ?? -Infinity,
       inputSeq: -1,
       grabDistance: 4,
@@ -460,6 +467,15 @@ export class Game {
       case 'demote':
         this.requestDemotion(p, target, cleanText(msg.value, 90));
         break;
+      case 'give':
+      case 'wanted':
+      case 'unwanted':
+      case 'warrant':
+      case 'unwarrant':
+      case 'license':
+      case 'unlicense':
+        this.residentAction(p, msg.action, target, msg.value);
+        break;
       case 'job':
         if (Object.hasOwn(JOBS, target)) this.changeJob(p, target as JobId);
         break;
@@ -583,7 +599,7 @@ export class Game {
         if (
           p.weapon !== 'lockpick' ||
           distance(p, r.lockpick.start) > 0.7 ||
-          !this.reachable(p, { x: d.x, y: 1.4, z: d.z }, 3.5, undefined, d.id)
+          !this.reachable(p, { x: d.x, y: (d.y ?? 0) + 1.4, z: d.z }, 3.5, undefined, d.id)
         ) {
           r.lockpick = undefined;
           this.notice(p.id, 'Lockpicking interrupted.');
@@ -1013,7 +1029,7 @@ export class Game {
       return;
     d.open = open;
     this.doorBodies.get(d.id)!.collisionResponse = !open;
-    this.sound('door', { x: d.x, y: 1, z: d.z });
+    this.sound('door', { x: d.x, y: (d.y ?? 0) + 1, z: d.z });
   }
   ownsDoor(p: Player, d: Door): boolean {
     return (
@@ -1024,7 +1040,12 @@ export class Game {
   }
   doorAction(p: Player, action: string, target: string, value: unknown): void {
     const d = this.doors.find((v) => v.id === target);
-    if (!d || !this.reachable(p, { x: d.x, y: 1.4, z: d.z }, INTERACT_RANGE, undefined, d.id)) return;
+    if (!d || !this.reachable(p, { x: d.x, y: (d.y ?? 0) + 1.4, z: d.z }, INTERACT_RANGE, undefined, d.id))
+      return;
+    if (d.public) {
+      this.notice(p.id, 'This shared entrance stays available to everyone.', 'error');
+      return;
+    }
     if (action === 'door-buy') {
       if (d.owner || d.group || p.job === 'hobo') {
         this.notice(p.id, 'This door is not available to you.', 'error');
@@ -1076,7 +1097,8 @@ export class Game {
   interact(p: Player, target: string): void {
     const d = this.doors.find((v) => v.id === target);
     if (d) {
-      if (!this.reachable(p, { x: d.x, y: 1.4, z: d.z }, INTERACT_RANGE, undefined, d.id)) return;
+      if (!this.reachable(p, { x: d.x, y: (d.y ?? 0) + 1.4, z: d.z }, INTERACT_RANGE, undefined, d.id))
+        return;
       if (d.locked && !this.ownsDoor(p, d)) {
         this.notice(p.id, 'Locked. You need keys or a lockpick.', 'error');
         return;
@@ -1464,6 +1486,115 @@ export class Game {
         )
           this.onEvent(event, other.id);
   }
+  residentAction(p: Player, action: ResidentAction, targetId: string, value?: unknown): void {
+    const runtime = this.runtime.get(p.id);
+    if (!runtime || this.players.get(p.id) !== p || p.deadUntil || p.arrestedUntil) return;
+    if (this.now() - runtime.lastResidentAction < 700) {
+      this.notice(p.id, 'Please wait a moment before another resident action.', 'error');
+      return;
+    }
+    runtime.lastResidentAction = this.now();
+    const target = this.players.get(targetId);
+    if (!target || target === p) {
+      this.notice(p.id, 'Choose another resident who is still connected.', 'error');
+      return;
+    }
+    if (action === 'give') {
+      if (
+        !finite(value) ||
+        !Number.isSafeInteger(value) ||
+        value <= 0 ||
+        value > MAX_TRANSFER ||
+        value > p.money
+      ) {
+        this.notice(p.id, 'Enter a whole dollar amount from $1 to $50,000 that you can afford.', 'error');
+        return;
+      }
+      const from = eyes(p),
+        to = eyes(target),
+        range = distance(from, to);
+      const hit =
+        range > 0.001 && range <= GIVE_RANGE
+          ? this.trace(
+              from,
+              { x: (to.x - from.x) / range, y: (to.y - from.y) / range, z: (to.z - from.z) / range },
+              range,
+              p.id,
+            )
+          : undefined;
+      if (
+        target.deadUntil ||
+        range > GIVE_RANGE ||
+        (range > 0.001 && (hit?.kind !== 'player' || hit.id !== target.id))
+      ) {
+        this.notice(p.id, 'Stand close to this resident with a clear view to give money.', 'error');
+        return;
+      }
+      if (target.money + value > 1e9) {
+        this.notice(p.id, 'This resident’s wallet is full. No money was transferred.', 'error');
+        return;
+      }
+      p.money -= value;
+      target.money += value;
+      this.notice(target.id, `${p.name} gave you $${value}.`, 'success');
+      this.notice(p.id, `Gave $${value} to ${target.name}.`, 'success');
+      return;
+    }
+    if (!GOVERNMENT.includes(p.job)) {
+      this.notice(p.id, 'Only government jobs can use this action.', 'error');
+      return;
+    }
+    const reason = cleanText(value, 90);
+    if (action === 'wanted') {
+      if (!reason || GOVERNMENT.includes(target.job)) {
+        this.notice(p.id, 'A reason is required; government staff cannot be marked wanted.', 'error');
+        return;
+      }
+      target.wantedUntil = this.now() + 120_000;
+      target.wantedReason = reason;
+      this.system(`${target.name} is wanted: ${reason}`);
+    } else if (action === 'unwanted') {
+      if (!target.wantedUntil) return;
+      target.wantedUntil = 0;
+      target.wantedReason = '';
+      this.system(`${target.name} is no longer wanted.`);
+    } else if (action === 'warrant') {
+      if (!['mayor', 'chief'].includes(p.job) || !reason) {
+        this.notice(p.id, 'A mayor or police chief must issue the warrant with a reason.', 'error');
+        return;
+      }
+      target.warrantUntil = this.now() + 90_000;
+      this.system(`Search warrant issued for ${target.name}: ${reason}`);
+    } else if (action === 'unwarrant') {
+      if (!['mayor', 'chief'].includes(p.job)) {
+        this.notice(p.id, 'Only the mayor or police chief can revoke search warrants.', 'error');
+        return;
+      }
+      target.warrantUntil = 0;
+      this.system(`Search warrant revoked for ${target.name}.`);
+    } else if (action === 'license' || action === 'unlicense') {
+      if (p.job !== 'mayor') {
+        this.notice(p.id, 'Only the mayor can grant or revoke gun licenses.', 'error');
+        return;
+      }
+      if (action === 'unlicense' && GOVERNMENT.includes(target.job)) {
+        this.notice(p.id, 'Government jobs have a gun license through their role.', 'error');
+        return;
+      }
+      if (target.license === (action === 'license')) return;
+      target.license = action === 'license';
+      this.notice(
+        target.id,
+        target.license ? 'The mayor granted you a gun license.' : 'The mayor revoked your gun license.',
+        target.license ? 'success' : 'info',
+      );
+      this.notice(
+        p.id,
+        `Gun license ${target.license ? 'granted to' : 'revoked for'} ${target.name}.`,
+        'success',
+      );
+    }
+  }
   command(p: Player, command: string, words: string[]): void {
     if (command === '/dropweapon') {
       this.dropWeapon(p);
@@ -1475,79 +1606,24 @@ export class Game {
         command,
       )
     ) {
-      const match = [...this.players.values()].filter(
-        (v) => v.name.toLowerCase() === words[0]?.toLowerCase() || v.id === words[0],
-      );
       // Quote-free commands accept the longest exact player-name prefix.
+      const byId = this.players.get(words[0]);
       const target =
+        byId ??
         [...this.players.values()]
           .sort((a, b) => b.name.length - a.name.length)
           .find(
             (v) =>
               args.toLowerCase() === v.name.toLowerCase() ||
               args.toLowerCase().startsWith(v.name.toLowerCase() + ' '),
-          ) ?? match[0];
+          );
       if (!target || target.id === p.id) {
         this.notice(p.id, 'Specify another player’s full name, followed by a reason.', 'error');
         return;
       }
-      const targetPrefix = args.toLowerCase().startsWith(target.name.toLowerCase()) ? target.name : target.id;
-      const reason = args.slice(targetPrefix.length).trim().slice(0, 90);
-      if (command === '/demote') {
-        this.requestDemotion(p, target.id, reason);
-        return;
-      }
-      if (!GOVERNMENT.includes(p.job)) {
-        this.notice(p.id, 'Only government jobs can use this command.', 'error');
-        return;
-      }
-      if (command === '/wanted') {
-        if (!reason || GOVERNMENT.includes(target.job)) {
-          this.notice(p.id, 'A reason is required; government staff cannot be marked wanted.', 'error');
-          return;
-        }
-        target.wantedUntil = this.now() + 120_000;
-        target.wantedReason = reason;
-        this.system(`${target.name} is wanted: ${reason}`);
-      }
-      if (command === '/unwanted') {
-        target.wantedUntil = 0;
-        target.wantedReason = '';
-        this.system(`${target.name} is no longer wanted.`);
-      }
-      if (command === '/warrant') {
-        if (!['mayor', 'chief'].includes(p.job) || !reason) {
-          this.notice(p.id, 'A mayor or police chief must issue the warrant with a reason.', 'error');
-          return;
-        }
-        target.warrantUntil = this.now() + 90_000;
-        this.system(`Search warrant issued for ${target.name}: ${reason}`);
-      }
-      if (command === '/unwarrant') {
-        if (!['mayor', 'chief'].includes(p.job)) {
-          this.notice(p.id, 'Only the mayor or police chief can revoke search warrants.', 'error');
-          return;
-        }
-        target.warrantUntil = 0;
-        this.system(`Search warrant revoked for ${target.name}.`);
-      }
-      if (command === '/license' || command === '/unlicense') {
-        if (p.job !== 'mayor') {
-          this.notice(p.id, 'Only the mayor can grant or revoke gun licenses.', 'error');
-          return;
-        }
-        if (command === '/unlicense' && GOVERNMENT.includes(target.job)) {
-          this.notice(p.id, 'Government jobs have a gun license through their role.', 'error');
-          return;
-        }
-        target.license = command === '/license';
-        this.notice(
-          target.id,
-          target.license ? 'The mayor granted you a gun license.' : 'The mayor revoked your gun license.',
-          target.license ? 'success' : 'info',
-        );
-        this.notice(p.id, `Gun license ${target.license ? 'granted to' : 'revoked for'} ${target.name}.`);
-      }
+      const reason = args.slice(byId ? byId.id.length : target.name.length).trim();
+      if (command === '/demote') this.requestDemotion(p, target.id, cleanText(reason, 90));
+      else this.residentAction(p, command.slice(1) as ResidentAction, target.id, reason);
       return;
     }
     if (['/lockdown', '/unlockdown', '/addlaw', '/removelaw', '/resetlaws'].includes(command)) {
@@ -1579,28 +1655,26 @@ export class Game {
         ];
       return;
     }
-    if (command === '/give' || command === '/dropmoney') {
+    if (command === '/give') {
+      const hit = this.trace(eyes(p), direction(p.yaw, p.pitch), GIVE_RANGE, p.id);
+      if (hit.kind !== 'player') {
+        this.notice(p.id, 'Look at a nearby player to give money.', 'error');
+        return;
+      }
+      this.residentAction(p, 'give', hit.id!, Number(words[0]));
+      return;
+    }
+    if (command === '/dropmoney') {
       const amount = Number(words[0]);
       if (!Number.isSafeInteger(amount) || amount <= 0 || amount > p.money || amount > 50_000) {
         this.notice(p.id, 'Enter a whole dollar amount from $1 to $50,000 that you can afford.', 'error');
         return;
       }
-      if (command === '/give') {
-        const hit = this.trace(eyes(p), direction(p.yaw, p.pitch), 3.5, p.id);
-        if (hit.kind !== 'player') {
-          this.notice(p.id, 'Look at a nearby player to give money.', 'error');
-          return;
-        }
-        const other = this.players.get(hit.id!)!;
-        other.money = Math.min(1e9, other.money + amount);
-        this.notice(other.id, `${p.name} gave you $${amount}.`, 'success');
-      } else {
-        const cash = this.spawn(p, 'money', true);
-        if (!cash) return;
-        cash.cash = amount;
-      }
+      const cash = this.spawn(p, 'money', true);
+      if (!cash) return;
+      cash.cash = amount;
       p.money -= amount;
-      this.notice(p.id, `${command === '/give' ? 'Gave' : 'Dropped'} $${amount}.`, 'success');
+      this.notice(p.id, `Dropped $${amount}.`, 'success');
       return;
     }
     const jobAliases: Record<string, JobId> = {

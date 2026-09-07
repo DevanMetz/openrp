@@ -23,7 +23,7 @@ function fixture() {
   };
 }
 test('legal revocations enforce authority and preserve government role licenses', () => {
-  const { game } = fixture();
+  const { game, advance } = fixture();
   const mayor = game.join('City Mayor').player;
   const chief = game.join('Police Chief').player;
   const officer = game.join('Patrol Officer').player;
@@ -32,26 +32,37 @@ test('legal revocations enforce authority and preserve government role licenses'
   chief.job = 'chief';
   officer.job = 'police';
   officer.license = true;
+  advance(701);
   game.command(mayor, '/license', ['Sam', 'Citizen']);
   assert.equal(civilian.license, true);
+  advance(701);
   game.command(chief, '/unlicense', ['Sam', 'Citizen']);
   assert.equal(civilian.license, true, 'chief cannot revoke licenses');
+  advance(701);
   game.command(mayor, '/unlicense', ['Sam', 'Citizen']);
   assert.equal(civilian.license, false);
+  advance(701);
   game.command(mayor, '/unlicense', ['Patrol', 'Officer']);
   assert.equal(officer.license, true);
+  advance(701);
   game.command(chief, '/warrant', ['Sam', 'Citizen', 'Illegal', 'printers']);
   assert.ok(civilian.warrantUntil > 0);
+  advance(701);
   game.command(officer, '/unwarrant', ['Sam', 'Citizen']);
   assert.ok(civilian.warrantUntil > 0, 'patrol cannot revoke warrants');
+  advance(701);
   game.command(civilian, '/unwarrant', ['Sam', 'Citizen']);
   assert.ok(civilian.warrantUntil > 0, 'suspect cannot revoke own warrant');
+  advance(701);
   game.command(chief, '/unwarrant', ['Sam', 'Citizen']);
   assert.equal(civilian.warrantUntil, 0);
+  advance(701);
   game.command(mayor, '/warrant', [civilian.id, 'Stolen', 'goods']);
   assert.ok(civilian.warrantUntil > 0, 'ID targets accept reasons');
+  advance(701);
   game.command(mayor, '/unwarrant', [civilian.id]);
   assert.equal(civilian.warrantUntil, 0);
+  advance(701);
   game.command(officer, '/wanted', [civilian.id, 'Armed', 'robbery']);
   assert.equal(civilian.wantedReason, 'Armed robbery');
 });

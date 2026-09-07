@@ -1,6 +1,6 @@
 import type { EntityKind, JobId, WeaponId } from './types.ts';
 
-export const VERSION = '0.4.0';
+export const VERSION = '0.5.1';
 export const PROTOCOL = 5;
 export const TICK_RATE = 30;
 export const SNAPSHOT_RATE = 15;
@@ -10,6 +10,8 @@ export const PLAYER_RADIUS = 0.32;
 export const PLAYER_HEIGHT = 1.78;
 export const EYE_HEIGHT = 1.63;
 export const INTERACT_RANGE = 3.4;
+export const GIVE_RANGE = 3.5;
+export const MAX_TRANSFER = 50_000;
 export const JOBS: Record<
   JobId,
   {

@@ -11,6 +11,7 @@ import { clientIP, JoinRate } from './network.ts';
 import { Moderation } from './moderation.ts';
 import { VoiceRelay } from './voice.ts';
 import { Observability } from './observability.ts';
+import { Accounts, profileForToken } from './accounts.ts';
 import { PROTOCOL, SNAPSHOT_RATE, TICK_RATE, VERSION } from '../shared/catalog.ts';
 import type { ClientMessage, Snapshot } from '../shared/types.ts';
 import { makeDelta } from '../shared/replication.ts';
@@ -95,6 +96,25 @@ export async function startServer(
     '.txt': 'text/plain; charset=utf-8',
   };
   let vite: ViteDevServer | undefined;
+  const accounts = new Accounts(
+    game,
+    () => {
+      if (persist) saveWorld(dataDir, game.exportWorld());
+    },
+    (id) => {
+      for (const [ws, session] of sessions)
+        if (session.id === id) {
+          send(ws, { type: 'notice', text: 'Your account session changed. Sign in to continue.' });
+          observations.left(id, 'account_session_changed');
+          game.disconnect(id);
+          voice.remove(id);
+          session.id = undefined;
+          ws.close(1008, 'Account session changed');
+        }
+      flush();
+    },
+    (id) => moderation.banned(id),
+  );
   const server = createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'same-origin');
@@ -103,6 +123,28 @@ export async function startServer(
     if (closed) {
       res.writeHead(503, { 'Retry-After': '5', 'Cache-Control': 'no-store' });
       res.end('Server restarting');
+      return;
+    }
+    if (req.url?.split('?')[0] === '/api/account') {
+      const origin = req.headers.origin;
+      let sameOrigin = !origin;
+      try {
+        if (origin) {
+          const url = new URL(origin);
+          sameOrigin =
+            ['http:', 'https:'].includes(url.protocol) &&
+            url.origin === origin &&
+            (url.host === req.headers.host || allowedOrigins.includes(origin));
+        }
+      } catch {
+        /* Invalid origins are rejected. */
+      }
+      if (!sameOrigin || req.url.includes('?')) {
+        res.writeHead(403, { 'Cache-Control': 'no-store', 'Content-Type': 'application/json' });
+        res.end('{"error":"Account requests must use this server’s page."}');
+        return;
+      }
+      await accounts.handle(req, res, clientIP(req, proxy), () => !closed && !res.destroyed);
       return;
     }
     if (req.url?.split('?')[0].startsWith('/api/admin/')) {
@@ -148,6 +190,7 @@ export async function startServer(
           players: game.players.size,
           maxPlayers: null,
           password: !!password,
+          accounts: true,
         }),
       );
       return;
@@ -320,6 +363,8 @@ export async function startServer(
           return;
         }
         try {
+          if (msg.account && !profileForToken(game, msg.token)?.account)
+            throw new Error('Your account session expired. Sign in with your username and password.');
           const joined = game.join(msg.name, msg.token);
           if (moderation.banned(joined.player.id)) {
             game.disconnect(joined.player.id);
@@ -337,6 +382,7 @@ export async function startServer(
             serverName: name,
             protocol: PROTOCOL,
             voiceTicket: voice.register(session.id),
+            username: profileForToken(game, joined.token)?.account?.username,
           });
           send(ws, {
             type: 'notice',
