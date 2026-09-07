@@ -250,13 +250,32 @@ export function makeAvatar(player: Player): Avatar {
   const color = JOBS[player.job].color;
   const police = ['police', 'chief'].includes(player.job);
   const suit = ['boss', 'mayor'].includes(player.job);
+  const hitman = player.job === 'hitman';
   const medic = player.job === 'medic',
     cook = player.job === 'cook';
   const appearance = [...player.id].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 0);
   const skin = ['#c5a182', '#9c735a', '#d4b093', '#795440'][appearance % 4];
   const hair = ['#342d29', '#564132', '#82705a', '#292d2c'][(appearance >>> 3) % 4];
-  const shirt = police ? '#354e60' : suit ? '#343c3e' : medic ? '#b9c8bd' : cook ? '#ddd6c1' : color;
-  const trousers = police ? '#293944' : suit ? '#30383b' : player.job === 'thief' ? '#3b3944' : '#4b5149';
+  const shirt = hitman
+    ? '#41434d'
+    : police
+      ? '#354e60'
+      : suit
+        ? '#343c3e'
+        : medic
+          ? '#b9c8bd'
+          : cook
+            ? '#ddd6c1'
+            : color;
+  const trousers = hitman
+    ? '#30343c'
+    : police
+      ? '#293944'
+      : suit
+        ? '#30383b'
+        : player.job === 'thief'
+          ? '#3b3944'
+          : '#4b5149';
   const chest = cylinder(root, 0, 1.11, 0, 0.235, 0.18, 0.49, shirt);
   chest.scale.z = 0.72;
   sphere(root, 0, 1.32, 0, 0.23, shirt, [1.07, 0.42, 0.68]);
@@ -316,6 +335,20 @@ export function makeAvatar(player: Player): Avatar {
       lapel.rotation.z = side * -0.22;
     }
     box(root, -0.126, 1.225, -0.18, 0.047, 0.019, 0.016, '#d8d5c5');
+  } else if (hitman) {
+    // Original short tailored jacket over a high-neck knit; no team insignia.
+    cylinder(root, 0, 1.413, 0, 0.083, 0.091, 0.09, '#666574');
+    box(root, 0, 1.214, -0.17, 0.098, 0.28, 0.025, '#666574');
+    for (const side of [-1, 1]) {
+      const lapel = box(root, side * 0.082, 1.248, -0.183, 0.077, 0.2, 0.027, '#555664');
+      lapel.rotation.z = side * -0.27;
+      box(root, side * 0.119, 1.035, -0.165, 0.087, 0.014, 0.024, '#222a31');
+      box(head, side * 0.057, 0.174, -0.146, 0.094, 0.047, 0.015, '#252f36');
+      box(head, side * 0.111, 0.174, -0.097, 0.012, 0.014, 0.09, '#4e5359');
+    }
+    box(head, 0, 0.178, -0.154, 0.028, 0.012, 0.012, '#777c80', true);
+    for (const y of [1.08, 1.15]) sphere(root, 0.042, y, -0.19, 0.009, '#9a9584');
+    sphere(head, 0.146, 0.132, 0.002, 0.019, '#30373c', [0.55, 1, 1]);
   } else if (cook) {
     box(root, 0, 1.085, -0.16, 0.28, 0.38, 0.034, '#eee5ce');
     box(root, 0, 0.81, -0.134, 0.32, 0.24, 0.025, '#eee5ce');

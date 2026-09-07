@@ -52,3 +52,5 @@ Local contract integration: Game wallets, lethal damage, disconnect/job/custody 
 Local contracts are now playable through F4 Contracts: choose a nearby hitman, explicit target and funded amount; the assigned hitman accepts or either party cancels. Private participant status updates and countdowns are implemented. All 107 tests and browser customer-offer review passed. No deployment in this increment. Next: settlement receipts, original hitman appearance and narrow UI review.
 
 Local contract completion feedback: customer/hitman receive online settlement receipts after money actually transfers. Delayed payouts retain escrow without premature success notices. Next: original hitman appearance, narrow contract UI and persistent transaction history consideration. Not deployed.
+
+Hitman now has an original tailored outfit and glasses, with standing/crouched visual review complete. Next: narrow contract UI, active-assignment presentation and remaining social channels. Local changes remain unreleased.
