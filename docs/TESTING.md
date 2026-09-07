@@ -1,5 +1,11 @@
 # Testing
 
+## Sky atmosphere pass
+
+The existing sky sphere now shades soft procedural cloud cover with slow drift, a horizon fade and a broad sun glow aligned with the directional light. The shader includes tone mapping and output color conversion, correcting the old gradient's missing output conversion. It uses the existing sky mesh with no new textures or geometry.
+
+Reviewed at street level and an upward-facing 1100 × 760 camera in the actual City renderer; the shader compiled and displayed soft cloud boundaries without a visible seam in those views. Build and production HTTP smoke passed. GPU cost at high resolutions and low-quality settings still needs measurement; unchanged geometry does not imply unchanged rendering cost. Local and undeployed.
+
 ## Planter ground detail
 
 Replaced the two Union Square planters' plain green bed surfaces with an original procedural soil texture and sparse low grass tufts, excluding the tree bases. Soil generation uses its own deterministic seed; grass positions do not consume the city's random sequence. Ground-cover triangles share one statically batched material.

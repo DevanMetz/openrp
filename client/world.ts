@@ -259,6 +259,7 @@ export class City {
   fountainRipples!: THREE.InstancedMesh;
   private rippleTransform = new THREE.Object3D();
   sun: THREE.DirectionalLight;
+  private skyMaterial!: THREE.ShaderMaterial;
   constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     this.scene = scene;
     const environment = new RoomEnvironment();
@@ -968,15 +969,43 @@ export class City {
     clock.position.set(0, 26, -78.96);
     this.scene.add(clock);
     const skyGeometry = new THREE.SphereGeometry(350, 24, 16);
-    const skyMaterial = new THREE.ShaderMaterial({
+    const skyMaterial = (this.skyMaterial = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
-      uniforms: { top: { value: new THREE.Color('#7f9cae') }, bottom: { value: new THREE.Color('#c3c6b8') } },
-      vertexShader:
-        'varying float h; void main(){h=normalize(position).y;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-      fragmentShader:
-        'uniform vec3 top;uniform vec3 bottom;varying float h;void main(){gl_FragColor=vec4(mix(bottom,top,pow(max(h,0.0),0.65)),1.0);}',
-    });
+      uniforms: {
+        top: { value: new THREE.Color('#7f9cae') },
+        bottom: { value: new THREE.Color('#c3c6b8') },
+        cloud: { value: new THREE.Color('#e5e7dc') },
+        time: { value: 0 },
+      },
+      vertexShader: `varying vec3 direction;
+        void main(){direction=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+      fragmentShader: `
+        uniform vec3 top, bottom, cloud;
+        uniform float time;
+        varying vec3 direction;
+        float hash(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}
+        float noise(vec3 p){
+          vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+          return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),
+            mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+            mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),
+            mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);
+        }
+        void main(){
+          vec3 d=normalize(direction);
+          vec3 p=d*5.0+vec3(time*0.002,0.0,time*0.001);
+          float field=noise(p)*0.58+noise(p*2.03)*0.28+noise(p*4.07)*0.14;
+          float cover=smoothstep(0.48,0.69,field)*smoothstep(0.03,0.28,d.y);
+          vec3 color=mix(bottom,top,pow(max(d.y,0.0),0.65));
+          float glow=pow(max(dot(d,normalize(vec3(-32.0,52.0,28.0))),0.0),48.0);
+          color+=vec3(0.12,0.10,0.055)*glow;
+          color=mix(color,cloud,cover*0.72);
+          gl_FragColor=vec4(color,1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+    }));
     this.scene.add(new THREE.Mesh(skyGeometry, skyMaterial));
   }
   updateDoors(doors: Door[]): void {
@@ -1046,6 +1075,7 @@ export class City {
     }
   }
   update(time: number, dt: number, focus: Vec3): void {
+    this.skyMaterial.uniforms.time.value = time;
     // Keep detailed shadows around the viewer as they enter the outer neighborhoods.
     const x = Math.round(focus.x / 8) * 8,
       z = Math.round(focus.z / 8) * 8;
