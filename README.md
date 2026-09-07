@@ -60,6 +60,12 @@ To test two identities yourself, use two different browsers or a private window.
 | Voice       | Hold V to talk within 28 metres; positional stereo audio, distance fade, explicit microphone consent, individual mute, mute all, independent volume and server-enforced proximity |
 | Interface   | F4 jobs/shop/laws, Q build menu, C context actions, F1 guide, minimap, role-colored HUD, equipment selection, settings and procedural audio                                       |
 
+### Private analytics and chat logs
+
+Operators can read live population, daily joins and returning identities, connected playtime, peak population, popular jobs, purchases and server performance. All accepted text-chat channels are searchable by player, date, channel or message. Logs stay on the private server volume for 30 days; voice audio is never recorded.
+
+On the configured owner's workstation, run `npm run analytics -- --days 7` or `npm run chatlogs -- --limit 100`. A separate read-only key cannot moderate players. See [analytics access, definitions and retention](docs/OBSERVABILITY.md) to configure your own host or read structured JSON.
+
 ### Default economy
 
 New players start with $1,500 to make the initial sandbox easy to explore. Salaries pay every 60 seconds. A $1,000 printer produces $100 per 30 seconds, with a $5,000 collection cap. Door prices range from $100 to $350; resale returns 65%. Jail lasts 60 seconds. Edit `.env` and [the catalog](shared/catalog.ts) to rebalance your server.
@@ -118,9 +124,9 @@ The microphone starts off on every join. Opening menus or chat, losing focus, hi
 
 ## Scope and fidelity
 
-The mechanics aim to capture the recognizable DarkRP loop, but this is an independent implementation. Union District is an original map, not `rp_downtown` or `rp_evocity`. Character rigs and collisions are simplified; upper stories are scenery. The alpha does not include Source/BSP/Lua compatibility, Workshop addons, vehicles, ragdolls, welded constraints, wire systems or persistent buildings. Operators have authenticated kick/ban commands; verified accounts and a full admin UI remain future work. Physics Gun manipulation is owner-only. Police need a wanted flag before using the arrest baton. Gun licenses and most written laws are social roleplay rules rather than a complete legal simulation.
+The mechanics aim to capture the recognizable DarkRP loop, but this is an independent implementation. Union District is an original map, not `rp_downtown` or `rp_evocity`. Character rigs and collisions are simplified; upper stories are scenery. The alpha does not include Source/BSP/Lua compatibility, Workshop addons, vehicles, ragdolls, welded constraints or wire systems. Operators have authenticated kick/ban commands; verified accounts and a full admin UI remain future work. Physics Gun manipulation is owner-only. Police need a wanted flag before using the arrest baton. Gun licenses and most written laws are social roleplay rules rather than a complete legal simulation.
 
-Names and wallet balances persist in `data/profiles.json`. Jobs, inventory, doors and entities are session state. Disconnecting releases doors and cleans up your objects. Browser credentials are anonymous bearer tokens, not verified accounts; there is no cross-device account recovery. The server enforces bounds, prices, ownership, role restrictions and request limits, but this alpha has not been audited or load-tested for a large hostile public server.
+Names, wallets, inventory, ammunition, armor, position, props, shop stock, printer cash and property ownership persist together in `data/world.json`. Refreshing or restarting the server keeps your belongings; use the same browser identity and keep the server's data directory on persistent storage. Props retain their placement, rotation, paint and frozen state. Shops stay open while their owner is offline and sales credit the saved wallet. Jobs resume when a slot is available; a full job returns you as a Citizen with your inventory. Normal gameplay can still consume, destroy or remove items, and operator removals still clean up owned objects. Browser credentials are anonymous bearer tokens, not verified accounts; there is no cross-device account recovery. The server enforces bounds, prices, ownership, role restrictions and request limits, but this alpha has not been audited or load-tested for a large hostile public server.
 
 ## Development
 

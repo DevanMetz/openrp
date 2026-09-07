@@ -139,7 +139,7 @@ function releaseControls(): void {
   fallbackActive = fallbackDrag = false;
   action('release');
   if (locked()) document.exitPointerLock();
-  send({ type: 'input', input: { ...idleInput(), seq: ++seq, yaw, pitch } });
+  if (me) send({ type: 'input', input: { ...idleInput(), seq: ++seq, yaw, pitch } });
 }
 ui.onResume = lock;
 ui.onMenu = releaseControls;
@@ -259,7 +259,7 @@ ui.onConnect = (name, password) => {
       rejection ||
         (event.code === 1008
           ? `Connection closed: ${event.reason || 'check your identity or server rules'}.`
-          : 'Disconnected. Your wallet is saved. Enter the district to reconnect.'),
+          : 'Disconnected. Your inventory and belongings are saved. Enter the district to reconnect.'),
     );
     state = undefined;
     me = undefined;
@@ -299,6 +299,10 @@ function receiveState(snapshot: Snapshot): void {
   const p = snapshot.players.find((p) => p.id === myId);
   if (!p) return;
   const first = !me;
+  if (first) {
+    yaw = p.yaw;
+    pitch = p.pitch;
+  }
   state = snapshot;
   me = p;
   voice.updateWorld(p, snapshot.players);
@@ -392,10 +396,10 @@ function aim(): AimTarget | undefined {
       title: d.name,
       detail: d.group
         ? 'Civil Protection property'
-        : owner
-          ? `Owned by ${owner.name}${d.locked ? ' · Locked' : ''}`
+        : d.owner
+          ? `Owned by ${owner?.name ?? 'an offline resident'}${d.locked ? ' · Locked' : ''}`
           : `Unowned · $${d.price}`,
-      hint: `E  ${d.open ? 'Close' : 'Open'} door     C  ${owner || d.group ? 'Manage' : 'Buy property'}`,
+      hint: `E  ${d.open ? 'Close' : 'Open'} door     C  ${d.owner || d.group ? 'Manage' : 'Buy property'}`,
     };
   }
   for (const e of state.entities) {
@@ -403,7 +407,7 @@ function aim(): AimTarget | undefined {
     const t = rayBox(origin, dir, entityBox(e), nearest);
     if (t === null) continue;
     nearest = t;
-    const owner = state.players.find((p) => p.id === e.owner)?.name ?? 'Unknown';
+    const owner = state.players.find((p) => p.id === e.owner)?.name ?? 'an offline resident';
     const title =
       PROPS.find((v) => v.id === e.kind)?.name ??
       {

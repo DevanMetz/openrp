@@ -15,13 +15,20 @@ Coverage includes:
 - Weapon damage, world occlusion, ammunition, reload timing, death and respawn.
 - Wanted/arrest permissions, custody restrictions, release and lockpicking.
 - Credential privacy, wallet reconnect, local/global chat delivery and text filtering.
-- Real WebSocket clients sharing players, props, jobs and chat; cleanup on disconnect.
+- Real WebSocket clients sharing players, props, jobs and chat; retained belongings on disconnect.
 - Invalid JSON, origin restrictions, flooding, optional passwords and server status.
-- Atomic wallet round-trip and refusal to load corrupt economy data.
+- Atomic world/inventory round-trip, migration from legacy wallets, and refusal to load corrupt or unsupported saves.
+- Real WebSocket purchases through a refresh and replacement server using the same data directory: inventory, ammo, armor, cash, props, property and stock.
+- Restored rigid-body rotation, frozen/fading collision, offline shop income, persistent prop limits, shared keys and reconnect penalties.
+- Authenticated offline-owner cleanup, preserved inventories and unrelated objects, immediate checkpointing, and rejection of analytics-only credentials.
 - Voice frame validation and quantization; capture at 44.1/48 kHz with no packets outside push-to-talk.
 - Real voice sockets: server-enforced range, dead-player suppression, individual mute, deafen and no self echo.
 - Voice ticket admission/revocation, duplicate sockets, origin rejection, replayed frames, flood isolation and operator removal.
 - Production worklet asset, same-origin microphone policy, and exclusion of the development voice lab.
+- Analytics across UTC midnight, new/returning identity counts, job time, completed-session averages and successful-only purchases.
+- Chat captured once before audience fan-out, all channels, search filters, Unicode disk boundaries, identical-timestamp pagination and interrupted-tail recovery.
+- Log and summary persistence through server replacement, expiration, disk-cap loss indicators and preservation of corrupt summaries.
+- Private HTTP endpoints, rejection of URL credentials, read-key isolation from moderation, credential redaction and human/JSON CLI reads against a real local server.
 
 ## Browser checklist
 
@@ -34,8 +41,10 @@ Coverage includes:
 7. Dealer → shipment → price in C → second player buys with E. Confirm both wallets, stock and inventory change once. Medic heals; Cook's microwave supplies meals.
 8. Test firearm ammo/reload and wall occlusion. Mark a suspect wanted, arrest them, verify jail constraints, then release them. Issue a warrant and ram the appropriate door.
 9. Verify local/OOC/group chat and mayor laws. Names containing `<`, `>` or quotes must display as text.
-10. Disconnect/reconnect and reload the page. Check wallet continuity, cleanup, readable errors, graphics settings and no console exceptions.
+10. Buy a weapon and armor, spend ammunition, place/freeze/paint props, and lock a purchased door. Refresh, rejoin with the same browser identity, then gracefully stop/restart the server with the same `DATA_DIR`. Verify inventory, ammo, armor, cash, prop placement, paint, frozen state, shop stock and property keys remain. Check an offline owner's shop still pays the owner, and that offline shared keys can be revoked. Verify readable errors, graphics settings and no console exceptions. Normal removal, death rules and operator cleanup must still work.
 11. Voice: Settings → Enable microphone → allow the browser permission → return to play → hold V. Another nearby resident should hear directional audio that fades with distance and stops at 28 metres. Test V release, menus, chat, blur, tab visibility, death, mute/unmute in Tab, mute all, volume and microphone off. Permission denial or a missing device must leave text/gameplay working and show a useful retry message.
+
+Persistence browser QA, September 7, 2026: an isolated production server retained a Civil Protection character's pistol (11/36 rounds), 100 armor and owned frozen shelf after a page reload/rejoin and after replacing the server process from its checkpoint. The shelf remained in the same place, equipped weapon and ownership matched, and the browser reported no console errors. Automated tests separately cover graceful shutdown, purchased inventory, shop stock, property keys, legacy migration and corrupt saves.
 
 ### Reproducible browser voice lab
 

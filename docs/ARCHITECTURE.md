@@ -14,7 +14,7 @@ flowchart LR
     P --> S
     S -->|Authoritative snapshots and events| A
     S -->|Authoritative snapshots and events| B
-    S --> D[Atomic wallet file]
+    S --> D[Atomic world and inventory checkpoint]
 ```
 
 Game messages are defined in `shared/types.ts`. The connection begins with `join`, followed by `welcome` (including a fresh or resumed bearer token and a separate ephemeral voice ticket) and a snapshot. A protocol number prevents a stale frontend from silently joining an incompatible server. Chat, notices, sound, lockpicking progress and bullet traces are transient events.
@@ -37,11 +37,21 @@ The Physics Gun uses a bounded velocity controller to pull an owned body toward 
 
 ## Economy and roleplay
 
+`server/persistence.ts` validates and atomically replaces a versioned `world.json` checkpoint. The checkpoint contains credential-hashed profiles with saved character state, property state keyed by map door ID, city laws and complete entities. Legacy wallet-only profiles migrate on the first startup. A corrupt checkpoint aborts startup and never falls back to stale balances. Snapshot messages still contain only connected players and public world state; saved profiles and credential hashes never enter game replication.
+
+Normal disconnects save the character and release physics holds while retaining world ownership and shared keys. Rejoins restore inventory, ammo, vitals, position and active penalties with fresh input sequencing. A blocked saved position moves the player to spawn without changing inventory. Jobs respect current slot limits. Server startup recreates Cannon bodies with the saved rotations and static/dynamic state, using current map geometry for doors. Offline shop purchases credit the owner's saved profile, so stock and cash remain part of the same checkpoint. Held-body links, input queues, reloads, lockpicks and votes are transient; production does not accrue while the server is stopped.
+
 Jobs and the shop catalog live in `shared/catalog.ts`; the client uses them to present options, while the server independently rechecks every transaction. A spawn must have valid space before cash is deducted. Shop transactions check stock, duplicate inventory, distance, role and price before money changes hands. There is no client-supplied custom item definition.
 
 Votes record eligible connected identities and one ballot per identity. A majority of the original eligible roster must vote yes. Disconnects do not reduce the majority threshold; candidate disconnect cancels the vote. Role limits are rechecked when the vote completes. The one-process game loop makes these changes sequential.
 
 Combat traces stop at walls, doors, entities or players. Ammo, reload timing, shot cooldown, spread, armor and death are server-owned. Tool access comes from the player's validated loadout. Written city laws are social rules; job permissions, warrants, lockpicks, arrests and printer confiscation are mechanical rules.
+
+## Analytics and text logs
+
+`server/observability.ts` receives explicit accepted-chat and successful-action hooks from the simulation. It records chat once before recipient fan-out and does not inspect raw incoming game or voice payloads. HTTP home-page counts retain referrer hostnames only. Connection bookkeeping accounts playtime by UTC day; a 60-second sample includes tick, event-loop, memory and game/voice traffic metrics.
+
+Asynchronous five-second batches append private daily JSONL streams; daily aggregate files use atomic replacement. Read-only authenticated endpoints and `scripts/observe.ts` expose readable or JSON reports. The separate analytics key cannot invoke moderation commands. Retention, bounded queues/files, incomplete-data indicators and exact byte cursors are documented in [OBSERVABILITY.md](OBSERVABILITY.md).
 
 ## Rendering and assets
 
@@ -57,4 +67,4 @@ The DOM layer in `client/ui.ts` renders HUD and game menus. Player-controlled te
 - Add tests around transactions, timers, permissions, visibility and reconnect behavior.
 - Preserve protocol compatibility intentionally, or increment the protocol number on both sides.
 
-Potential later work includes original richer art, multiple floors, player pushing/contacts, constraint tools, a map editor, verified accounts, spatial game-state networking, vehicles and persistent properties. None of those are represented as implemented systems in this release.
+Potential later work includes original richer art, multiple floors, player pushing/contacts, constraint tools, a map editor, verified accounts, spatial game-state networking and vehicles. None of those are represented as implemented systems in this release.

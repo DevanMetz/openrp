@@ -15,6 +15,7 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
 COPY --from=build /app/shared ./shared
 COPY --from=build /app/scripts/admin.ts ./scripts/admin.ts
+COPY --from=build /app/scripts/observe.ts ./scripts/observe.ts
 RUN mkdir -p /app/data && chown node:node /app/data
 EXPOSE 3000
 ENTRYPOINT ["sh", "/app/server/entrypoint.sh"]

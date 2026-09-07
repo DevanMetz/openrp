@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const [action = 'list', id = '', ...words] = process.argv.slice(2);
-if (!['list', 'kick', 'ban', 'unban', 'announce'].includes(action)) {
-  console.error('Usage: admin.ts list | kick/ban/unban <resident-id> [reason] | announce <message>');
+if (!['list', 'kick', 'ban', 'unban', 'cleanup', 'announce'].includes(action)) {
+  console.error('Usage: admin.ts list | kick/ban/unban/cleanup <resident-id> [reason] | announce <message>');
   process.exit(1);
 }
 // Read only inside the server/container; the key never enters the browser or repository.

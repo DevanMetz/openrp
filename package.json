@@ -1,6 +1,6 @@
 {
   "name": "openrp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "An open-source, multiplayer DarkRP-inspired city sandbox built with Three.js.",
@@ -16,7 +16,9 @@
     "test": "tsx --test tests/*.test.ts",
     "check": "npm run typecheck && npm test && npm run build && npm run test:production",
     "format": "prettier --write .",
-    "test:production": "tsx scripts/smoke-production.ts"
+    "test:production": "tsx scripts/smoke-production.ts",
+    "analytics": "node --import tsx scripts/observe.ts analytics --url https://openrp.dev",
+    "chatlogs": "node --import tsx scripts/observe.ts chat --url https://openrp.dev"
   },
   "dependencies": {
     "@fontsource/barlow": "^5.3.0",

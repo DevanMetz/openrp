@@ -27,6 +27,20 @@ export class VoiceRelay {
   private sessions = new Map<WebSocket, VoiceSession>();
   private joinRate = new JoinRate();
   private heartbeat: ReturnType<typeof setInterval>;
+  private framesIn = 0;
+  private framesOut = 0;
+  private bytesOut = 0;
+
+  metrics(reset = false): Record<string, number> {
+    const value = {
+      voiceConnections: [...this.sessions.values()].filter((s) => !!s.id).length,
+      voiceFramesIn: this.framesIn,
+      voiceFramesOut: this.framesOut,
+      voiceBytesOut: this.bytesOut,
+    };
+    if (reset) this.framesIn = this.framesOut = this.bytesOut = 0;
+    return value;
+  }
 
   constructor(private game: Game) {
     this.heartbeat = setInterval(() => {
@@ -128,6 +142,7 @@ export class VoiceRelay {
         // Recipient eligibility is decided here, using authoritative positions, on every frame.
         // Clients cannot request a distant player or provide a forged sender identity.
         const packet = identifyVoiceFrame(session.id, bytes);
+        this.framesIn++;
         for (const [peer, listener] of this.sessions) {
           if (
             peer === ws ||
@@ -139,8 +154,11 @@ export class VoiceRelay {
           )
             continue;
           const player = this.game.players.get(listener.id);
-          if (player && !player.deadUntil && inVoiceRange(speaker, player))
+          if (player && !player.deadUntil && inVoiceRange(speaker, player)) {
             peer.send(packet, { binary: true });
+            this.framesOut++;
+            this.bytesOut += packet.byteLength;
+          }
         }
         return;
       }

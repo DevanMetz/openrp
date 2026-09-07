@@ -1,10 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve, sep } from 'node:path';
 import { WebSocket } from 'ws';
 import { startServer } from '../server/main.ts';
 import { Game } from '../server/game.ts';
 import type { ClientMessage, ServerMessage, Snapshot } from '../shared/types.ts';
 import { applyDelta } from '../shared/replication.ts';
+import { loadWorld } from '../server/persistence.ts';
+import { idleInput } from '../shared/movement.ts';
 
 class Client {
   ws: WebSocket;
@@ -45,7 +50,7 @@ class Client {
     return await this.wait((m): m is Extract<ServerMessage, { type: 'welcome' }> => m.type === 'welcome');
   }
 }
-test('two real clients share player, prop, job and chat state; disconnect cleanup and reconnect preserve wallet', async () => {
+test('two real clients share player, prop, job and chat state; reconnect preserves wallet and props', async () => {
   const game = new Game(),
     app = await startServer({ port: 0, host: '127.0.0.1', production: true, persist: false, game });
   const a = new Client(`ws://127.0.0.1:${app.port}/ws`),
@@ -70,7 +75,7 @@ test('two real clients share player, prop, job and chat state; disconnect cleanu
     const closed = new Promise((ok) => a.ws.once('close', ok));
     a.ws.close();
     await closed;
-    await b.wait((m) => m.type === 'state' && m.players.length === 1 && m.entities.length === 0);
+    await b.wait((m) => m.type === 'state' && m.players.length === 1 && m.entities.length === 1);
     const rejoin = new Client(`ws://127.0.0.1:${app.port}/ws`);
     await rejoin.open();
     const wr = await rejoin.join('Alex Builder', wa.token);
@@ -79,6 +84,8 @@ test('two real clients share player, prop, job and chat state; disconnect cleanu
       (m): m is Snapshot => m.type === 'state' && m.players.some((p) => p.id === wr.id),
     );
     assert.equal(resumed.players.find((p) => p.id === wr.id)!.money, 1450);
+    assert.equal(resumed.entities[0].id, props.entities[0].id);
+    assert.equal(resumed.entities[0].owner, wr.id);
     rejoin.ws.close();
   } finally {
     a.ws.terminate();
@@ -86,6 +93,92 @@ test('two real clients share player, prop, job and chat state; disconnect cleanu
     await app.close();
   }
 });
+test('real client purchases survive a page refresh and a server replacement using the same data directory', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'openrp-network-world-'));
+  const options = { port: 0, host: '127.0.0.1', production: true, dataDir: dir };
+  let app = await startServer(options);
+  const clients: Client[] = [];
+  t.after(async () => {
+    clients.forEach((client) => client.ws.terminate());
+    await app.close();
+    const path = resolve(dir);
+    assert.ok(path.startsWith(resolve(tmpdir()) + sep) && path.includes('openrp-network-world-'));
+    rmSync(path, { recursive: true, force: true });
+  });
+  const connect = async (token?: string) => {
+    const client = new Client(`ws://127.0.0.1:${app.port}/ws`);
+    clients.push(client);
+    await client.open();
+    const welcome = await client.join('Saved Dealer', token);
+    return { client, welcome };
+  };
+  const { client, welcome } = await connect();
+  const act = async (action: string, target?: string) => {
+    await new Promise((done) => setTimeout(done, 80));
+    client.send({ type: 'action', action, target });
+  };
+  await act('job', 'dealer');
+  await client.wait(
+    (m) => m.type === 'state' && m.players.some((p) => p.id === welcome.id && p.job === 'dealer'),
+  );
+  await act('buy', 'pistol-shipment');
+  const shop = await client.wait((m): m is Snapshot => m.type === 'state' && m.entities.length === 1);
+  const shipment = shop.entities[0];
+  await act('interact', shipment.id);
+  await client.wait(
+    (m) => m.type === 'state' && m.players.some((p) => p.id === welcome.id && p.weapons.includes('pistol')),
+  );
+  await act('buy', 'armor');
+  await client.wait(
+    (m) => m.type === 'state' && m.players.some((p) => p.id === welcome.id && p.armor === 100),
+  );
+  client.send({ type: 'input', input: { ...idleInput(), seq: 1, yaw: Math.PI / 2 } });
+  await client.wait((m) => m.type === 'state' && m.players.some((p) => Math.abs(p.yaw - Math.PI / 2) < 0.01));
+  await act('spawn', 'crate');
+  const built = await client.wait((m): m is Snapshot => m.type === 'state' && m.entities.length === 2);
+  const prop = built.entities.find((e) => e.kind === 'crate')!;
+  app.game.freeze(prop.id, true);
+  await act('equip', 'pistol');
+  await act('primary');
+  await client.wait((m) => m.type === 'state' && m.players.some((p) => p.ammo.pistol === 11));
+  const door = app.game.doors.find((d) => d.id === 'cafe')!;
+  Object.assign(door, { owner: welcome.id, locked: true, name: 'Persistent Gun Shop' });
+  const closed = new Promise((done) => client.ws.once('close', done));
+  client.ws.close();
+  await closed;
+  const disconnectDeadline = Date.now() + 3000;
+  while (app.game.players.has(welcome.id) && Date.now() < disconnectDeadline)
+    await new Promise((done) => setTimeout(done, 5));
+  assert.equal(app.game.players.has(welcome.id), false);
+  assert.equal(loadWorld(dir)!.entities.length, 2, 'disconnect checkpoints the world immediately');
+  const refreshed = await connect(welcome.token);
+  const refreshState = await refreshed.client.wait(
+    (m): m is Snapshot => m.type === 'state' && m.players.length === 1,
+  );
+  assert.equal(refreshed.welcome.id, welcome.id);
+  assert.equal(refreshState.entities.length, 2);
+  assert.equal(refreshState.players[0].ammo.pistol, 11);
+  await app.close();
+  app = await startServer(options);
+  assert.equal(app.game.entities.size, 2, 'the world is restored before anyone connects');
+  const restarted = await connect(welcome.token);
+  const restored = await restarted.client.wait(
+    (m): m is Snapshot => m.type === 'state' && m.players.length === 1,
+  );
+  const p = restored.players[0];
+  assert.equal(p.id, welcome.id);
+  assert.equal(p.job, 'dealer');
+  assert.equal(p.weapon, 'pistol');
+  assert.equal(p.money, 500);
+  assert.equal(p.armor, 100);
+  assert.equal(p.ammo.pistol, 11);
+  assert.equal(p.reserve.pistol, 24);
+  assert.equal(restored.entities.find((e) => e.id === shipment.id)!.stock, 4);
+  assert.equal(restored.entities.find((e) => e.id === prop.id)!.frozen, true);
+  assert.equal(restored.doors.find((d) => d.id === door.id)!.name, 'Persistent Gun Shop');
+  assert.equal(restored.doors.find((d) => d.id === door.id)!.owner, p.id);
+});
+
 test('server rejects cross-origin socket use, invalid JSON, and message floods', async () => {
   const app = await startServer({ port: 0, host: '127.0.0.1', production: true, persist: false });
   const url = `ws://127.0.0.1:${app.port}/ws`;

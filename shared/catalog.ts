@@ -1,6 +1,6 @@
 import type { EntityKind, JobId, WeaponId } from './types.ts';
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.4.0';
 export const PROTOCOL = 3;
 export const TICK_RATE = 30;
 export const SNAPSHOT_RATE = 15;

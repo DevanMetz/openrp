@@ -84,7 +84,7 @@ export class UI {
         <header class="entry-header"><div class="brandmark">R<span>●</span></div><div class="entry-edition">OPEN SOURCE<br><b>CITY ROLEPLAY</b></div><div class="version">ALPHA ${VERSION}</div></header>
         <div class="entry-panel"><div class="eyebrow"><span class="status-dot"></span> UNION DISTRICT / MULTIPLAYER</div><h1>OPEN<span>RP</span><span class="title-period">.</span></h1><p class="entry-tagline">Another city. Your own story.</p><p class="entry-free">FREE TO PLAY · NO DOWNLOAD · PUBLIC ALPHA</p>
           <div class="entry-rule"></div><form id="join-form"><label class="field-label" for="player-name">YOUR ROLEPLAY NAME</label><input id="player-name" name="name" minlength="2" maxlength="24" required autocomplete="nickname" placeholder="Choose a name" value="${escape(localStorage.getItem('openrp-name') ?? '')}"><div id="password-row" hidden><label class="field-label" for="server-password">SERVER PASSWORD</label><input id="server-password" type="password" autocomplete="current-password"></div><button id="join-button" class="primary join-button" type="submit"><span>Enter the district</span><span>↗</span></button></form>
-          <p class="entry-consent">By joining, follow the <a href="/rules.html" target="_blank" rel="noopener">community rules</a>. <a href="/rules.html#privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://github.com/DevanMetz/openrp" target="_blank" rel="noopener">Source</a></p><p id="join-status" class="entry-status" role="status">Connecting to the district…</p><div class="entry-options"><button data-menu="help">How to play <span>↗</span></button><button data-menu="settings">Settings <span>⚙</span></button></div>
+          <p class="entry-consent">By joining, follow the <a href="/rules.html" target="_blank" rel="noopener">community rules</a>. Text chat is logged. <a href="/rules.html#privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://github.com/DevanMetz/openrp" target="_blank" rel="noopener">Source</a></p><p id="join-status" class="entry-status" role="status">Connecting to the district…</p><div class="entry-options"><button data-menu="help">How to play <span>↗</span></button><button data-menu="settings">Settings <span>⚙</span></button></div>
         </div>
         <div class="entry-location"><span class="location-line"></span><span>01 / UNION SQUARE<small>A city with room for you.</small></span></div>
         <footer class="entry-footer"><span>JOBS. PROPERTY. PHYSICS. POSSIBILITIES.</span><span>DESKTOP · KEYBOARD & MOUSE</span></footer>
@@ -499,8 +499,12 @@ export class UI {
       html += `<div class="context-actions"><button data-action="interact" data-target="${d.id}">${d.open ? 'Close' : 'Open'} door</button>${!d.owner && !d.group ? `<button class="primary" data-action="door-buy" data-target="${d.id}" ${p.money < d.price ? 'disabled' : ''}>Buy property · ${money(d.price)}</button>` : ''}${owns ? `<button data-action="door-lock" data-target="${d.id}">${d.locked ? 'Unlock' : 'Lock'} door</button>` : ''}</div>`;
       if (d.owner === p.id)
         html += `<div class="command-field"><input id="door-title" maxlength="40" value="${escape(d.name)}" aria-label="Property name"><button data-action="title" data-target="${d.id}">Rename</button></div><h3>Share keys</h3><div class="tool-buttons">${
-          s.players
-            .filter((v) => v.id !== p.id)
+          [
+            ...s.players.filter((v) => v.id !== p.id),
+            ...d.coowners
+              .filter((id) => !s.players.some((v) => v.id === id))
+              .map((id) => ({ id, name: `Offline resident (${id.slice(0, 8)})` })),
+          ]
             .map(
               (v) =>
                 `<button data-action="coowner" data-target="${d.id}" data-value="${v.id}">${d.coowners.includes(v.id) ? 'Revoke keys: ' : 'Give keys: '}${escape(v.name)}</button>`,

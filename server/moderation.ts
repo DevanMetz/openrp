@@ -7,11 +7,14 @@ import { cleanText, type Game } from './game.ts';
 export class Moderation {
   private key: string;
   private bans = new Map<string, string>();
+  private readKey?: string;
   constructor(
     private dir: string,
     private persist: boolean,
     key?: string,
+    readKey?: string,
   ) {
+    this.readKey = readKey ?? process.env.ANALYTICS_READ_TOKEN;
     if (persist) mkdirSync(dir, { recursive: true });
     const keyPath = join(dir, '.admin-token');
     this.key =
@@ -33,6 +36,16 @@ export class Moderation {
   banned(id: string): boolean {
     return this.bans.has(id);
   }
+  authorized(req: IncomingMessage, readOnly = false): boolean {
+    const candidate = Buffer.from(req.headers.authorization?.replace(/^Bearer /, '') ?? '');
+    const matches = (value: string) => {
+      const expected = Buffer.from(value);
+      return (
+        expected.length > 0 && candidate.length === expected.length && timingSafeEqual(candidate, expected)
+      );
+    };
+    return matches(this.key) || (readOnly && !!this.readKey && matches(this.readKey));
+  }
   private save(): void {
     if (!this.persist) return;
     const path = join(this.dir, 'bans.json');
@@ -44,12 +57,11 @@ export class Moderation {
     res: ServerResponse,
     game: Game,
     kick: (id: string, reason: string) => void,
+    checkpoint: () => void = () => {},
   ): Promise<void> {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/json');
-    const candidate = Buffer.from(req.headers.authorization?.replace(/^Bearer /, '') ?? '');
-    const expected = Buffer.from(this.key);
-    if (candidate.length !== expected.length || !timingSafeEqual(candidate, expected)) {
+    if (!this.authorized(req)) {
       res.writeHead(401);
       res.end('{"error":"Unauthorized"}');
       return;
@@ -58,6 +70,15 @@ export class Moderation {
       res.end(
         JSON.stringify({
           players: [...game.players.values()].map((p) => ({ id: p.id, name: p.name, job: p.job })),
+          owners: [...game.profiles.values()]
+            .map(({ id, name }) => ({
+              id,
+              name: game.players.get(id)?.name ?? name,
+              online: game.players.has(id),
+              entities: [...game.entities.values()].filter((e) => e.owner === id).length,
+              properties: game.doors.filter((d) => d.owner === id).length,
+            }))
+            .filter((owner) => owner.entities || owner.properties),
           bans: [...this.bans].map(([id, reason]) => ({ id, reason })),
         }),
       );
@@ -83,11 +104,15 @@ export class Moderation {
       const command = data as Record<string, unknown>;
       const id = cleanText(command.id, 80),
         reason = cleanText(command.reason, 160) || 'Server rules';
+      let removed: { entities: number; properties: number } | undefined;
       if (command.action === 'announce') {
         game.onEvent({ type: 'chat', channel: 'system', name: 'SERVER', text: reason });
       } else if (command.action === 'unban' && id) {
         this.bans.delete(id);
         this.save();
+      } else if (command.action === 'cleanup' && [...game.profiles.values()].some((p) => p.id === id)) {
+        removed = game.cleanupOwner(id);
+        game.notice(id, `An operator cleared your placed objects and property: ${reason}`);
       } else if ((command.action === 'kick' || command.action === 'ban') && game.players.has(id)) {
         if (command.action === 'ban') {
           this.bans.set(id, reason);
@@ -95,8 +120,10 @@ export class Moderation {
         }
         kick(id, reason);
       } else throw new Error('Unknown command or resident');
+      game.onActivity({ kind: 'moderation', action: String(command.action), playerId: id, reason });
+      checkpoint();
       console.log(`Operator ${String(command.action)}: ${id || 'announcement'}`);
-      res.end('{"ok":true}');
+      res.end(JSON.stringify({ ok: true, ...(removed && { removed }) }));
     } catch (error) {
       res.writeHead(400);
       res.end(JSON.stringify({ error: (error as Error).message }));

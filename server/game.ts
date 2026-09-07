@@ -15,6 +15,7 @@ import {
 } from '../shared/catalog.ts';
 import { BLOCKS, INITIAL_DOORS, JAIL, MAP_BOUND, SPAWNS, doorBox } from '../shared/map.ts';
 import { direction, distance, eyes, idleInput, movePlayer, overlaps, rayBox } from '../shared/movement.ts';
+import type { Activity, ChatRecord } from './observability.ts';
 import type {
   Box,
   ClientMessage,
@@ -36,12 +37,27 @@ export interface Profile {
   name: string;
   money: number;
   tokenHash: string;
+  character?: SavedCharacter;
+}
+export type SavedCharacter = Omit<
+  Player,
+  'id' | 'name' | 'money' | 'holding' | 'ping' | 'reloadUntil' | 'seq' | 'vy' | 'grounded'
+> & { lastJob: number; votesAt: number };
+export interface SavedWorld {
+  version: 1;
+  savedAt: number;
+  profiles: Profile[];
+  doors: Pick<Door, 'id' | 'name' | 'owner' | 'coowners' | 'locked' | 'open'>[];
+  entities: Entity[];
+  laws: string[];
+  lockdown: boolean;
 }
 export interface GameOptions {
   startingMoney: number;
   salarySeconds: number;
   jailSeconds: number;
   profiles?: Profile[];
+  world?: SavedWorld;
   now?: () => number;
 }
 type Runtime = {
@@ -86,6 +102,8 @@ export class Game {
   vote: Vote | null = null;
   physics = new CANNON.World({ gravity: new CANNON.Vec3(0, -15.5, 0), allowSleep: true });
   onEvent: (event: GameEvent, recipient?: string) => void = () => {};
+  onChat: (message: ChatRecord) => void = () => {};
+  onActivity: (activity: Activity) => void = () => {};
   now: () => number;
   nextSalary: number;
   nextProduction: number;
@@ -97,13 +115,27 @@ export class Game {
     this.nextSalary = this.now() + this.options.salarySeconds * 1000;
     this.nextProduction = this.now() + 30_000;
     this.nextHunger = this.now() + 10_000;
-    for (const p of options.profiles ?? []) this.profiles.set(p.tokenHash, p);
+    for (const p of structuredClone(options.world?.profiles ?? options.profiles ?? []))
+      this.profiles.set(p.tokenHash, p);
     this.physics.broadphase = new CANNON.SAPBroadphase(this.physics);
     this.physics.defaultContactMaterial.friction = 0.55;
     this.physics.defaultContactMaterial.restitution = 0.05;
     this.addStatic({ x: 0, y: -0.5, z: 0, w: 160, h: 1, d: 160 });
     for (const b of BLOCKS) this.addStatic(b);
     for (const d of this.doors) this.doorBodies.set(d.id, this.addStatic(doorBox(d)));
+    if (options.world) {
+      for (const saved of options.world.doors) {
+        const door = this.doors.find((d) => d.id === saved.id);
+        if (door) {
+          const { name, owner, coowners, locked, open } = saved;
+          Object.assign(door, { name, owner, coowners: [...coowners], locked, open });
+          this.doorBodies.get(door.id)!.collisionResponse = !door.open;
+        }
+      }
+      for (const saved of options.world.entities) this.addEntity({ ...structuredClone(saved), heldBy: null });
+      this.laws = [...options.world.laws];
+      this.lockdown = options.world.lockdown;
+    }
   }
   addStatic(b: Box): CANNON.Body {
     const body = new CANNON.Body({
@@ -114,7 +146,7 @@ export class Game {
     this.physics.addBody(body);
     return body;
   }
-  join(name: unknown, token?: unknown): { player: Player; token: string } {
+  join(name: unknown, token?: unknown): { player: Player; token: string; returning: boolean } {
     const validToken = typeof token === 'string' && /^[a-f0-9]{64}$/.test(token) ? token : '';
     const saved = validToken ? this.profiles.get(hash(validToken)) : undefined;
     if (saved && this.players.has(saved.id))
@@ -161,55 +193,134 @@ export class Game {
       ping: 0,
       license: false,
     };
+    if (profile.character) {
+      const { lastJob: _lastJob, votesAt: _votesAt, ...character } = structuredClone(profile.character);
+      Object.assign(player, character);
+      // Disconnected residents do not reserve limited job slots indefinitely.
+      const limit = JOBS[player.job].max;
+      if (limit && [...this.players.values()].filter((p) => p.job === player.job).length >= limit) {
+        player.job = 'citizen';
+        this.notice(player.id, 'Your previous job is full. You returned as a Citizen with your inventory.');
+      }
+    }
     this.players.set(player.id, player);
     this.runtime.set(player.id, {
-      input: idleInput(),
+      input: { ...idleInput(), yaw: player.yaw, pitch: player.pitch, crouch: player.crouch },
       lastInput: this.now(),
       lastAction: 0,
       lastShot: 0,
       lastChat: 0,
-      lastJob: -Infinity,
+      lastJob: profile.character?.lastJob ?? -Infinity,
       inputSeq: -1,
       grabDistance: 4,
       tool: 'freeze',
-      votesAt: -Infinity,
+      votesAt: profile.character?.votesAt ?? -Infinity,
     });
+    if (player.deadUntil && player.deadUntil <= this.now()) this.respawn(player);
+    if (player.arrestedUntil) {
+      if (player.arrestedUntil <= this.now()) this.free(player);
+      else Object.assign(player, JAIL);
+    } else if (
+      [...BLOCKS, ...this.doors.filter((d) => !d.open).map(doorBox), ...this.solidEntities()].some((b) =>
+        overlaps(player, b, player.crouch ? 1.15 : 1.78),
+      )
+    ) {
+      // A map update or another resident may have blocked the saved position.
+      Object.assign(player, spawn);
+    }
     this.system(`${player.name} arrived in Union District.`);
     this.notice(player.id, 'Welcome to the district. F4 for jobs and shops · Q to build · F1 for help.');
-    return { player, token: issued };
+    return { player, token: issued, returning: !!saved };
   }
-  disconnect(id: string): void {
+  disconnect(id: string, cleanup = false): void {
     const p = this.players.get(id);
     if (!p) return;
     this.saveProfile(p);
     this.release(p);
-    for (const d of this.doors) {
-      if (d.owner === id) {
-        d.owner = null;
-        d.locked = false;
-        d.coowners = [];
-        d.name = INITIAL_DOORS.find((v) => v.id === d.id)!.name;
-      }
-      d.coowners = d.coowners.filter((v) => v !== id);
-    }
-    for (const e of [...this.entities.values()]) if (e.owner === id) this.removeEntity(e.id);
+    if (cleanup) this.cleanupOwner(id);
     if (p.job === 'mayor') this.lockdown = false;
     this.players.delete(id);
     this.runtime.delete(id);
     if (this.vote?.candidate === id) this.vote = null;
     this.system(`${p.name} left the district.`);
   }
+  cleanupOwner(id: string): { entities: number; properties: number } {
+    const removed = { entities: 0, properties: 0 };
+    for (const d of this.doors) {
+      if (d.owner === id) {
+        d.owner = null;
+        d.locked = false;
+        d.coowners = [];
+        d.name = INITIAL_DOORS.find((v) => v.id === d.id)!.name;
+        removed.properties++;
+      }
+      d.coowners = d.coowners.filter((v) => v !== id);
+    }
+    for (const e of [...this.entities.values()])
+      if (e.owner === id) {
+        this.removeEntity(e.id);
+        removed.entities++;
+      }
+    return removed;
+  }
   saveProfile(p: Player): void {
     for (const v of this.profiles.values())
       if (v.id === p.id) {
         v.money = p.money;
         v.name = p.name;
+        const {
+          id: _id,
+          name: _name,
+          money: _money,
+          holding: _holding,
+          ping: _ping,
+          reloadUntil: _reload,
+          seq: _seq,
+          vy: _vy,
+          grounded: _grounded,
+          ...character
+        } = p;
+        const runtime = this.runtime.get(p.id)!;
+        v.character = {
+          ...structuredClone(character),
+          lastJob: Math.max(0, runtime.lastJob),
+          votesAt: Math.max(0, runtime.votesAt),
+        };
         break;
       }
   }
   exportProfiles(): Profile[] {
     for (const p of this.players.values()) this.saveProfile(p);
     return [...this.profiles.values()];
+  }
+  exportWorld(): SavedWorld {
+    return structuredClone({
+      version: 1,
+      savedAt: this.now(),
+      profiles: this.exportProfiles(),
+      doors: this.doors.map(({ id, name, owner, coowners, locked, open }) => ({
+        id,
+        name,
+        owner,
+        coowners,
+        locked,
+        open,
+      })),
+      entities: [...this.entities.values()].map((e) => {
+        // A rotation action can change the body between simulation ticks.
+        const { position, quaternion: q } = this.bodies.get(e.id)!;
+        return {
+          ...e,
+          x: position.x,
+          y: position.y,
+          z: position.z,
+          q: { x: q.x, y: q.y, z: q.z, w: q.w },
+          heldBy: null,
+        };
+      }),
+      laws: this.laws,
+      lockdown: this.lockdown,
+    });
   }
   notice(id: string, text: string, tone: 'info' | 'error' | 'success' = 'info'): void {
     this.onEvent({ type: 'notice', text, tone }, id);
@@ -605,7 +716,9 @@ export class Game {
       return;
     if (p.job === 'mayor') this.lockdown = false;
     this.release(p);
+    const previousJob = p.job;
     p.job = job;
+    this.onActivity({ kind: 'job', playerId: p.id, name: p.name, previousJob, job });
     p.weapons = ['keys', 'physgun', 'toolgun', ...JOBS[job].loadout];
     p.weapon = 'keys';
     p.ammo = {};
@@ -670,8 +783,7 @@ export class Game {
     return this.createEntity(kind, p.id, pos);
   }
   createEntity(kind: EntityKind, owner: string, pos: Vec3): Entity {
-    const def = PROPS.find((v) => v.id === kind),
-      [w, h, d] = entitySize(kind);
+    const def = PROPS.find((v) => v.id === kind);
     const e: Entity = {
       ...pos,
       id: randomUUID(),
@@ -688,23 +800,31 @@ export class Game {
       fadeUntil: 0,
       heldBy: null,
     };
+    this.addEntity(e);
+    return e;
+  }
+  private addEntity(e: Entity): void {
+    const def = PROPS.find((v) => v.id === e.kind),
+      [w, h, d] = entitySize(e.kind);
     const shape =
-      kind === 'barrel'
+      e.kind === 'barrel'
         ? new CANNON.Cylinder(w / 2, w / 2, h, 12)
         : new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2));
     const body = new CANNON.Body({
       mass: def?.mass ?? 12,
       shape,
-      position: new CANNON.Vec3(pos.x, pos.y, pos.z),
+      position: new CANNON.Vec3(e.x, e.y, e.z),
       linearDamping: 0.35,
       angularDamping: 0.55,
       allowSleep: true,
       sleepSpeedLimit: 0.12,
     });
+    body.quaternion.set(e.q.x, e.q.y, e.q.z, e.q.w);
+    body.collisionResponse = !(e.fading && e.fadeUntil > this.now());
     this.physics.addBody(body);
     this.entities.set(e.id, e);
     this.bodies.set(e.id, body);
-    return e;
+    if (e.frozen) this.freeze(e.id, true);
   }
   removeEntity(id: string): void {
     const e = this.entities.get(id);
@@ -758,6 +878,7 @@ export class Game {
       p.health = Math.min(100, p.health + 5);
     }
     p.money -= item.price;
+    this.onActivity({ kind: 'purchase', playerId: p.id, name: p.name, item: item.id, amount: item.price });
     this.notice(p.id, `Purchased ${item.name} for $${item.price}.`, 'success');
     this.sound('cash', p);
   }
@@ -793,6 +914,7 @@ export class Game {
       }
       p.money -= d.price;
       d.owner = p.id;
+      this.onActivity({ kind: 'purchase', playerId: p.id, name: p.name, item: 'property', amount: d.price });
       this.notice(p.id, `You own ${d.name}. Use your keys to lock it.`, 'success');
       this.sound('cash', p);
       return;
@@ -807,7 +929,7 @@ export class Game {
       this.sound('door', p);
     }
     if (action === 'door-sell' && d.owner === p.id) {
-      p.money += Math.floor(d.price * 0.65);
+      p.money = Math.min(1e9, p.money + Math.floor(d.price * 0.65));
       d.owner = null;
       d.coowners = [];
       d.locked = false;
@@ -816,7 +938,7 @@ export class Game {
     }
     if (action === 'door-title' && d.owner === p.id) d.name = cleanText(value, 40) || d.name;
     if (action === 'door-coowner' && d.owner === p.id && typeof value === 'string') {
-      const other = this.players.get(value);
+      const other = this.players.get(value) ?? [...this.profiles.values()].find((v) => v.id === value);
       if (other && other.id !== p.id) {
         d.coowners = d.coowners.includes(other.id)
           ? d.coowners.filter((v) => v !== other.id)
@@ -841,7 +963,7 @@ export class Game {
     if (e.kind === 'printer') {
       if (POLICE.includes(p.job)) {
         this.removeEntity(e.id);
-        p.money += 100;
+        p.money = Math.min(1e9, p.money + 100);
         this.notice(p.id, 'Illegal printer confiscated. +$100', 'success');
       } else if (e.cash > 0) {
         p.money = Math.min(1e9, p.money + e.cash);
@@ -872,7 +994,14 @@ export class Game {
         return;
       }
       p.money -= cost;
-      const owner = this.players.get(e.owner);
+      this.onActivity({
+        kind: 'purchase',
+        playerId: p.id,
+        name: p.name,
+        item: e.kind === 'shipment' ? `shop:${e.item}` : 'shop:meal',
+        amount: cost,
+      });
+      const owner = this.players.get(e.owner) ?? [...this.profiles.values()].find((v) => v.id === e.owner);
       if (owner) {
         owner.money = Math.min(1e9, owner.money + cost);
         if (cost) this.notice(owner.id, `${p.name} bought from your shop. +$${cost}`, 'success');
@@ -992,7 +1121,7 @@ export class Game {
       target.weapons = ['keys'];
       target.weapon = 'keys';
       target.reloadUntil = 0;
-      p.money += 75;
+      p.money = Math.min(1e9, p.money + 75);
       this.system(`${p.name} arrested ${target.name} for ${this.options.jailSeconds} seconds.`);
       this.sound('arrest', target);
       return;
@@ -1079,6 +1208,7 @@ export class Game {
       attacker.wantedReason = 'Assault with a firearm';
     }
     if (p.health <= 0) {
+      this.onActivity({ kind: 'death', playerId: p.id, name: p.name, attackerId: attacker?.id });
       this.release(p);
       this.runtime.get(p.id)!.lockpick = undefined;
       p.deadUntil = this.now() + 7000;
@@ -1091,6 +1221,7 @@ export class Game {
       }
       if (p.job === 'mayor') {
         p.job = 'citizen';
+        this.onActivity({ kind: 'job', playerId: p.id, name: p.name, previousJob: 'mayor', job: 'citizen' });
         this.lockdown = false;
         this.system('The mayor has died. The office is vacant.');
       }
@@ -1180,6 +1311,8 @@ export class Game {
       }
     }
     if (!message) return;
+    // Record one accepted message before fan-out, not one copy per recipient.
+    this.onChat({ playerId: p.id, name: p.name, job: p.job, text: message, channel });
     const event: GameEvent = { type: 'chat', name: p.name, text: message, channel, color: JOBS[p.job].color };
     if (channel === 'ooc' || channel === 'advert') this.onEvent(event);
     else

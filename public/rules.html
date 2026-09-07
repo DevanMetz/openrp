@@ -112,16 +112,31 @@
         load. Vehicles and Source-engine assets are not included.
       </p>
       <p>
-        Your wallet returns in the same browser. Jobs, inventory, props, and property reset when you leave or
-        the server restarts. Updates can briefly interrupt play. Clearing browser data loses your anonymous
-        identity; there is no account recovery yet.
+        Your wallet, inventory, ammunition, props, shops and property return with the same browser identity,
+        including after server updates. Props stay in the shared world while you are offline. Jobs resume when
+        a slot is available, and normal gameplay or operator cleanup can still remove items. Updates can
+        briefly interrupt play. Clearing browser data loses your anonymous identity; there is no account
+        recovery yet.
       </p>
       <h2 id="privacy">Privacy</h2>
       <p>
         No email, password, or payment is needed. Your browser stores a randomly generated reconnect
-        credential, name and settings. The server stores your name, wallet, an internal ID and a hash of that
-        credential. Bans store an identity ID and operator reason. Chat is sent to players in its channel and
-        is not archived by the game.
+        credential, name and settings. The server stores your character, inventory, wallet, owned world
+        objects, an internal ID and a hash of that credential so you can return after a refresh or update.
+        Bans store an identity ID and operator reason.
+      </p>
+      <p>
+        <b>Text chat is logged for 30 days for moderation and troubleshooting.</b> This includes nearby, OOC,
+        advert, action and group channels. Logs contain the message, time, public character ID, name, job and
+        channel. Operators can search these logs; they are not publicly accessible. Group chat is visible to
+        operators. Keep personal information and passwords out of all chat channels.
+      </p>
+      <p>
+        First-party analytics count visits to the home page, joins, anonymous returning identities, connected
+        playtime, jobs, in-game purchases, deaths and moderation actions. The game also records server
+        performance and traffic totals, including voice traffic counts. Referrers retain only the source
+        hostname, not the full URL. These analytics and text logs are automatically removed after 30 UTC
+        calendar days. They do not contain raw browser credentials, IP addresses or voice audio.
       </p>
       <p>
         Proximity voice starts with the microphone off. Enable it explicitly, allow the browser permission,
