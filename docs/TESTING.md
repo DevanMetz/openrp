@@ -1,5 +1,11 @@
 # Testing
 
+## Asphalt aggregate pass
+
+Added fine light/dark aggregate and low-contrast periodic wear to the existing asphalt texture. Deterministic placement preserves city random values, and the existing material and geometry are reused. Chrome review at a road-level camera by the Union Square crossing showed grain in the foreground and legible crossing markings. Texture repetition remains visible across large road areas and needs a broader treatment.
+
+Build and production HTTP smoke passed. This material-only increment remains local and undeployed; no frame-rate claim is made.
+
 ## Paving material detail
 
 Outdoor paving now has restrained per-slab tint variation, painted bevel highlights/shadows and fine mineral grain. The procedural additions use deterministic coordinates and preserve the existing city random sequence. They reuse the existing texture, geometry and material.

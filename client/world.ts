@@ -208,6 +208,25 @@ function surfaceTexture(kind: string, color: string): THREE.CanvasTexture {
     pixels.data[i + 2] += noise;
   }
   ctx.putImageData(pixels, 0, 0);
+  if (kind === 'asphalt') {
+    // Aggregate and periodic wear add detail without new texture-boundary jumps.
+    const worn = ctx.getImageData(0, 0, 256, 256);
+    for (let y = 0; y < 256; y++)
+      for (let x = 0; x < 256; x++) {
+        const variation =
+          Math.sin((x * Math.PI) / 128) * Math.cos((y * Math.PI) / 128) * 4 +
+          Math.sin(((x + y) * Math.PI) / 64) * 2;
+        const index = (y * 256 + x) * 4;
+        for (let channel = 0; channel < 3; channel++) worn.data[index + channel] += variation;
+      }
+    ctx.putImageData(worn, 0, 0);
+    for (let grain = 0; grain < 2600; grain++) {
+      const x = (grain * 73) % 256;
+      const y = (grain * 47 + Math.floor(grain / 7) * 13) % 256;
+      ctx.fillStyle = ['#a9aaa13b', '#151e2350', '#71797040'][grain % 3];
+      ctx.fillRect(x, y, grain % 5 === 0 ? 2 : 1, 1);
+    }
+  }
   for (let i = 0; i < 24; i++) {
     ctx.fillStyle = `rgba(26,33,23,${rand() * 0.06})`;
     ctx.fillRect(rand() * 256, rand() * 256, rand() * 50, rand() * 100);
