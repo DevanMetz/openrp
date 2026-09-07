@@ -395,6 +395,7 @@ export class UI {
       p.money,
       p.weapon,
       p.pocket,
+      p.evidence,
       p.weapons,
       giveNearby,
       resident && distance(eyes(p), eyes(resident)) <= 3,
@@ -602,6 +603,10 @@ export class UI {
         .join(
           '',
         )}</div>${items.length ? '' : '<p>Your pocket is empty. Store loose firearms, cash, food or your own unfrozen building props.</p>'}`;
+    }
+    if (this.menu === 'pocket' && p) {
+      const evidence = p.evidence ?? [];
+      html += `<section class="evidence-section"><div class="section-heading"><span class="eyebrow">POLICE PROPERTY STORAGE</span><h2>Your evidence.</h2><p>${evidence.length ? 'These firearms belong to you and are held by police. Ask a Police officer or Chief nearby to return them after you leave custody.' : 'No firearms are held in evidence.'}</p>${evidence.length ? `<b>${evidence.length} firearms held · ${POCKET_CAPACITY - (p.pocket?.length ?? 0)} free pocket slots</b>` : ''}</div>${evidence.length ? `<p class="muted">Returns go into your pocket with the ammunition shown below. Make space by placing pocket objects. Anything that does not fit stays in evidence. Held items survive reconnects and job changes.</p><div class="catalog-grid">${evidence.map((item, index) => `<article class="catalog-card pocket-card"><span class="eyebrow">HELD ITEM ${index + 1}</span><h3>${escape(item.item ? WEAPONS[item.item].name : 'Firearm')}</h3><p>${item.loadedAmmo ?? 0} loaded · ${item.reserveAmmo ?? 0} reserve</p><small>Police return required</small></article>`).join('')}</div>` : ''}</section>`;
     }
     if (this.menu === 'shop' && p && s)
       html = `<div class="section-heading"><span class="eyebrow">DISTRICT CATALOG</span><h2>Set up shop.</h2><p>Purchased entities appear in front of you. Leave some clear space.</p><b class="balance">${money(p.money)} available</b></div>${WEAPONS[p.weapon].damage ? `<div class="command-field"><span>${WEAPONS[p.weapon].name} · ${p.ammo[p.weapon] ?? 0} loaded / ${p.reserve[p.weapon] ?? 0} reserve</span><button data-action="drop-weapon" ${JOBS[p.job].loadout.includes(p.weapon) ? 'disabled' : ''}>${JOBS[p.job].loadout.includes(p.weapon) ? 'Job-issued equipment' : 'Drop firearm'}</button></div><p class="muted">Dropped firearms keep their ammunition. Anyone nearby can pick them up.</p>` : ''}<div class="catalog-grid">${SHOP.map(

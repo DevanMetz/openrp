@@ -1933,3 +1933,12 @@ small {
     margin: 0.65rem 0;
   }
 }
+
+.evidence-section {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #ffffff18;
+}
+.evidence-section > .muted {
+  margin-bottom: 1rem;
+}
