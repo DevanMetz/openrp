@@ -171,8 +171,9 @@ export type GameEvent =
       type: 'chat';
       name: string;
       text: string;
-      channel: 'local' | 'whisper' | 'yell' | 'ooc' | 'advert' | 'broadcast' | 'me' | 'system' | 'group';
+      channel: 'local' | 'whisper' | 'yell' | 'ooc' | 'advert' | 'broadcast' | 'radio' | 'me' | 'system' | 'group';
       color?: string;
+      radioChannel?: number;
     }
   | { type: 'notice'; text: string; tone?: 'info' | 'error' | 'success' }
   | { type: 'shot'; from: Vec3; to: Vec3; weapon: WeaponId; shooter: string; hit: boolean }

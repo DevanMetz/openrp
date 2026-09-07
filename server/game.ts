@@ -78,6 +78,7 @@ type Runtime = {
   lastAction: number;
   lastShot: number;
   lastChat: number;
+  radioChannel: number | null;
   lastResidentAction: number;
   contractKey?: string;
   lastJob: number;
@@ -303,6 +304,7 @@ export class Game {
       lastAction: 0,
       lastShot: 0,
       lastChat: 0,
+      radioChannel: 1,
       lastResidentAction: -Infinity,
       lastJob: profile.character?.lastJob ?? -Infinity,
       inputSeq: -1,
@@ -1678,7 +1680,7 @@ export class Game {
     r.lastChat = this.now();
     const [command, ...words] = text.split(/\s+/);
     const args = words.join(' ');
-    let channel: 'local' | 'whisper' | 'yell' | 'ooc' | 'advert' | 'broadcast' | 'me' | 'group' = 'local',
+    let channel: 'local' | 'whisper' | 'yell' | 'ooc' | 'advert' | 'broadcast' | 'radio' | 'me' | 'group' = 'local',
       message = text;
     if (command.startsWith('/')) {
       switch (command.toLowerCase()) {
@@ -1695,6 +1697,28 @@ export class Game {
         case '/ooc':
         case '//':
           channel = 'ooc';
+          message = args;
+          break;
+        case '/channel': {
+          if (!args) {
+            this.notice(p.id, r.radioChannel === null ? 'Text radio is off.' : `Text radio channel ${r.radioChannel}. Anyone tuned to this channel can hear; messages are logged.`);
+            return;
+          }
+          if (args.toLowerCase() === 'off') r.radioChannel = null;
+          else if (/^\d{1,3}$/.test(args) && Number(args) <= 100) r.radioChannel = Number(args);
+          else {
+            this.notice(p.id, 'Use /channel 0–100, /channel off, or /channel to check.', 'error');
+            return;
+          }
+          this.notice(p.id, r.radioChannel === null ? 'Text radio switched off.' : `Tuned to text radio ${r.radioChannel}. Anyone on this channel can hear; messages are logged. Rejoining resets to channel 1.`);
+          return;
+        }
+        case '/radio':
+          if (r.radioChannel === null) {
+            this.notice(p.id, 'Text radio is off. Use /channel 0–100 to tune in.', 'error');
+            return;
+          }
+          channel = 'radio';
           message = args;
           break;
         case '/broadcast':
@@ -1748,13 +1772,16 @@ export class Game {
     }
     if (!message) return;
     // Record one accepted message before fan-out, not one copy per recipient.
-    this.onChat({ playerId: p.id, name: p.name, job: p.job, text: message, channel });
-    const event: GameEvent = { type: 'chat', name: p.name, text: message, channel, color: JOBS[p.job].color };
+    const radioChannel = channel === 'radio' ? r.radioChannel! : undefined;
+    this.onChat({ playerId: p.id, name: p.name, job: p.job, text: message, channel, ...(radioChannel === undefined ? {} : { radioChannel }) });
+    const event: GameEvent = { type: 'chat', name: p.name, text: message, channel, ...(radioChannel === undefined ? {} : { radioChannel }), color: JOBS[p.job].color };
     if (channel === 'ooc' || channel === 'advert' || channel === 'broadcast') this.onEvent(event);
     else
       for (const other of this.players.values())
         if (
-          channel === 'group'
+          channel === 'radio'
+            ? this.runtime.get(other.id)?.radioChannel === r.radioChannel
+            : channel === 'group'
             ? GOVERNMENT.includes(p.job)
               ? GOVERNMENT.includes(other.job)
               : ['boss', 'gangster', 'thief'].includes(p.job)

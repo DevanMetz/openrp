@@ -1,5 +1,11 @@
 # Testing
 
+## Text radio — local implementation
+
+`/channel 0–100` selects a session-only text radio channel; `/channel off` disables sending and listening, and `/channel` reports tuning. Joining defaults to channel 1. `/radio message` reaches matching listeners independent of distance, with a channel-number label. The field guide explains open-channel access, logging and separation from proximity voice. Logs retain the radio channel number. Like existing group/local chat, text radio remains usable during death/custody; this is an explicit policy rather than a police-equipment permission.
+
+The Game test covers default listeners, distant matching recipients, channel isolation, off, invalid tuning, channel zero, shared cooldown, empty messages and reconnect reset. `npm run check` passed with 113 tests, typecheck, build and production HTTP smoke. Dedicated real-client delivery, persisted log metadata and browser review remain pending; the feature is not deployed.
+
 ## Mayor broadcast — local implementation
 
 Follow-up: a three-client WebSocket test verifies exactly one broadcast at distant positions, rejection after losing the Mayor role, and no log entry for that rejection. A persisted observability fixture verifies broadcast channel/player/text filters. All 24 network and observability tests passed. In an isolated 360 × 780 browser session, the command hint and submitted message worked; review led to a dark broadcast card and additional clearance above the status panel. The revised chat-history layout was visually checked. Final build and production smoke passed. This supersedes the pending dedicated checks listed below; production deployment remains pending.

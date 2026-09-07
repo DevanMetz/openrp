@@ -17,7 +17,7 @@ import type { JobId, Player } from '../shared/types.ts';
 
 const DAY = 86_400_000;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const CHANNELS = ['local', 'whisper', 'yell', 'ooc', 'advert', 'broadcast', 'me', 'group', 'system'];
+const CHANNELS = ['local', 'whisper', 'yell', 'ooc', 'advert', 'broadcast', 'radio', 'me', 'group', 'system'];
 const dateAt = (time: number) => new Date(time).toISOString().slice(0, 10);
 const safeText = (value: unknown, length: number) =>
   cleanText(value, length)
@@ -38,6 +38,7 @@ export type Activity =
   | { kind: 'death'; playerId: string; name: string; attackerId?: string }
   | { kind: 'moderation'; action: string; playerId: string; reason: string };
 export interface ChatRecord {
+  radioChannel?: number;
   playerId?: string;
   name: string;
   job?: JobId;
@@ -287,6 +288,7 @@ export class Observability {
       name: safeText(message.name, 24),
       job: message.job,
       channel: message.channel,
+      radioChannel: message.channel === 'radio' ? message.radioChannel : undefined,
       text: safeText(message.text, 500),
     });
   }
