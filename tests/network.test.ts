@@ -193,6 +193,9 @@ test('real client purchases survive a page refresh and a server replacement usin
   const prop = built.entities.find((e) => e.kind === 'crate')!;
   app.game.freeze(prop.id, true);
   await act('equip', 'pistol');
+  await client.wait(
+    (m) => m.type === 'state' && m.players.some((p) => p.id === welcome.id && p.weapon === 'pistol'),
+  );
   await act('primary');
   await client.wait((m) => m.type === 'state' && m.players.some((p) => p.ammo.pistol === 11));
   const door = app.game.doors.find((d) => d.id === 'cafe')!;
