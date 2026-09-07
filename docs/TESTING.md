@@ -1,5 +1,11 @@
 # Testing
 
+## Combined visual-pass validation
+
+At commit 44d5663, `npm run check` passed all 118 tests, typecheck, production build and production HTTP smoke. This validates the accumulated local gameplay and renderer changes against the existing automated suite; it does not establish full DarkRP parity.
+
+Chrome additionally reviewed the actual City renderer from (3, 1.7, 48), looking toward (0, 2, 0), at 1100 × 760. Crossings, cafe awnings, trees, fountain and sky remained visible together. The view reported 84 calls/103,656 triangles, a scene observation rather than a GPU benchmark. Broad road areas and distant buildings still need visual development. An attempted elevated follow-up could not run after the browser tab closed; it remains unverified. Local and undeployed.
+
 ## Cafe awning geometry
 
 Replaced the flat canopy, thick valance and raised stripe blocks with sloping cloth panels whose alternating stripes continue down the front edge. Two rough double-sided cloth materials support views from below; slim metal supports remain beneath the outer edges. Geometry still participates in static batching.
