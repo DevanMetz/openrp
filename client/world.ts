@@ -122,11 +122,21 @@ function surfaceTexture(kind: string, color: string): THREE.CanvasTexture {
   if (kind === 'brick' || kind === 'industrial') {
     ctx.fillStyle = kind === 'brick' ? '#4d4b42' : '#55594f';
     ctx.fillRect(0, 0, 256, 256);
-    for (let row = 0; row < 9; row++)
-      for (let col = -1; col < 5; col++) {
-        const light = 28 + rand() * 16;
+    const brickValues = Array.from({ length: 54 }, () => rand());
+    for (let row = 0; row < 8; row++)
+      for (let col = -1; col < 4; col++) {
+        const light = 32 + brickValues[row * 6 + ((col + 1) % 4)] * 12;
         ctx.fillStyle = `hsl(${kind === 'brick' ? 22 : 32},${kind === 'brick' ? 18 : 6}%,${light}%)`;
-        ctx.fillRect(col * 72 + (row % 2) * 36 + 2, row * 30 + 2, 69, 27);
+        // Four bricks by eight courses tile exactly, with alternating half-brick bonds.
+        // Shared edge-brick shades wrap; the precomputed values preserve city randomness.
+        const x = col * 64 + (row % 2) * 32 + 1,
+          y = row * 32 + 1;
+        ctx.fillRect(x, y, 62, 30);
+        ctx.fillStyle = '#dbbca32b';
+        ctx.fillRect(x, y, 62, 1);
+        ctx.fillRect(x, y, 1, 30);
+        ctx.fillStyle = '#292b2630';
+        ctx.fillRect(x, y + 29, 62, 1);
       }
   }
   if (kind === 'pavement') {

@@ -1,5 +1,11 @@
 # Testing
 
+## Brick course tiling
+
+Brick and industrial masonry textures now use four bricks by eight courses per tile, replacing dimensions that clipped the bond at repeat boundaries. Half-bricks at opposing edges share their shade. Narrow bevel highlights and reduced color contrast soften the mortar treatment. The original 54 random draws are retained before drawing, preserving later city placement.
+
+Chrome reviewed the Union Cafe facade close-up with aligned courses and matching edge bricks. The view also exposed awkward awning stripe geometry for a later pass. Final build and production HTTP smoke passed. No new materials or geometry; local and undeployed. Industrial facades still need dedicated review.
+
 ## Crossing placement correction
 
 The north-side review revealed the thin paint was mostly hidden under the raised plaza. Moved that crossing from z=-3.5 to z=-6.2, wholly onto asphalt beyond the plaza edge at z=-4.5. Lane dashes now exclude crossing footprints as well as the square; this also removes a pre-existing dash overlapping the south crossing.
