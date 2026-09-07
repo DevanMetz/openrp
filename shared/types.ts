@@ -26,7 +26,7 @@ export type WeaponId =
   | 'medkit'
   | 'ram';
 export type PropKind = 'crate' | 'barrel' | 'pallet' | 'fence' | 'couch' | 'table' | 'shelf';
-export type EntityKind = PropKind | 'printer' | 'microwave' | 'shipment' | 'money' | 'food';
+export type EntityKind = PropKind | 'printer' | 'microwave' | 'shipment' | 'money' | 'food' | 'weapon';
 export interface Input {
   seq: number;
   forward: number;
@@ -93,6 +93,8 @@ export interface Entity extends Vec3 {
   stock: number;
   price: number;
   item?: WeaponId;
+  loadedAmmo?: number;
+  reserveAmmo?: number;
   color: string;
   fading: boolean;
   fadeUntil: number;
@@ -100,7 +102,10 @@ export interface Entity extends Vec3 {
 }
 export interface Vote {
   id: string;
+  kind: 'job' | 'demote';
   candidate: string;
+  candidateName: string;
+  reason?: string;
   job: JobId;
   end: number;
   yes: number;

@@ -52,6 +52,67 @@ export function labelTexture(
   t.anisotropy = 8;
   return t;
 }
+function windowTexture(warm = false): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  const sky = ctx.createLinearGradient(0, 0, 0, 256);
+  sky.addColorStop(0, warm ? '#b49e70' : '#81999f');
+  sky.addColorStop(0.48, warm ? '#786e51' : '#506c75');
+  sky.addColorStop(1, warm ? '#454b42' : '#263e49');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, 128, 256);
+  // Reflected rooflines and soft curtain edges break up opaque glazing without extra geometry.
+  for (let i = 0; i < 8; i++) {
+    const height = 35 + ((i * 43 + 17) % 83);
+    ctx.fillStyle = i % 2 ? '#263c4660' : '#c0ccbb18';
+    ctx.fillRect(i * 18 - 5, 256 - height, 15, height);
+  }
+  ctx.fillStyle = warm ? '#e2cd9c50' : '#b1c0b426';
+  ctx.fillRect(5, 3, 19, 250);
+  ctx.fillRect(108, 3, 14, 250);
+  const reflection = ctx.createLinearGradient(0, 0, 128, 190);
+  reflection.addColorStop(0, '#eef5e73d');
+  reflection.addColorStop(0.45, '#eef5e709');
+  reflection.addColorStop(0.5, '#eef5e72b');
+  reflection.addColorStop(1, '#eef5e700');
+  ctx.fillStyle = reflection;
+  ctx.fillRect(0, 0, 128, 256);
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 8;
+  return map;
+}
+function foliageTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  // One original cutout cluster shared by every leaf card; no downloaded foliage assets.
+  for (let i = 0; i < 42; i++) {
+    const angle = i * 2.39996;
+    const radius = Math.sqrt(i / 42) * 99;
+    const x = 128 + Math.cos(angle) * radius,
+      y = 128 + Math.sin(angle) * radius;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle + 0.5);
+    ctx.fillStyle = ['#91a366', '#a7b879', '#6f894f', '#c0c789'][i % 4];
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 10 + (i % 5), 5 + (i % 3), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#d5d5a050';
+    ctx.beginPath();
+    ctx.moveTo(-8, 0);
+    ctx.lineTo(8, 0);
+    ctx.stroke();
+    ctx.restore();
+  }
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 4;
+  return map;
+}
 function surfaceTexture(kind: string, color: string): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 256;
@@ -135,12 +196,39 @@ export class City {
         key,
         new THREE.MeshStandardMaterial({
           color: '#ffffff',
-          map: surfaceTexture(key, color),
+          map: key === 'glass' ? windowTexture() : surfaceTexture(key, color),
           roughness: key === 'metal' || key === 'glass' ? 0.55 : 0.93,
           metalness: key === 'metal' ? 0.4 : 0,
         }),
       );
-    this.materials.get('glass')!.color.set('#709498');
+    this.materials.get('glass')!.color.set('#ffffff');
+    this.materials.get('glass')!.emissive.set('#597881');
+    this.materials.get('glass')!.emissiveIntensity = 0.13;
+    this.materials.set(
+      'window-warm',
+      new THREE.MeshStandardMaterial({
+        map: windowTexture(true),
+        roughness: 0.35,
+        metalness: 0.15,
+        emissive: '#957747',
+        emissiveIntensity: 0.18,
+      }),
+    );
+    const leaves = foliageTexture();
+    for (const [key, color] of [
+      ['foliage-light', '#c1ce9e'],
+      ['foliage-dark', '#899e6e'],
+    ])
+      this.materials.set(
+        key,
+        new THREE.MeshStandardMaterial({
+          map: leaves,
+          color,
+          alphaTest: 0.45,
+          side: THREE.DoubleSide,
+          roughness: 1,
+        }),
+      );
     this.materials.get('glass')!.roughness = 0.22;
     this.materials.get('glass')!.metalness = 0.55;
     this.ground();
@@ -198,7 +286,7 @@ export class City {
   ): void {
     const geo = new THREE.BoxGeometry(w, h, d);
     const uv = geo.attributes.uv;
-    for (let face = 0; face < 6; face++) {
+    for (let face = 0; face < 6 && material !== 'glass' && material !== 'window-warm'; face++) {
       const a = face < 2 ? d : w,
         b = face < 2 || face >= 4 ? h : d;
       for (let i = 0; i < 4; i++) {
@@ -317,7 +405,7 @@ export class City {
             1.38,
             1.82,
             0.08,
-            rand() > 0.88 ? '#827a53' : 'glass',
+            rand() > 0.8 ? 'window-warm' : 'glass',
           );
           local(x, y, z + (back ? -0.13 : 0.13), 0.075, 1.9, 0.04, 'trim');
           local(x, y + 0.16, z + (back ? -0.13 : 0.13), 1.45, 0.07, 0.04, 'trim');
@@ -466,17 +554,40 @@ export class City {
     for (const x of [-6.4, 6.4]) this.box(x, 2.4, 69.2, 0.4, 4.8, 0.4, 'metal');
   }
   tree(x: number, z: number): void {
-    this.cylinder(x, 2.1, z, 0.12, 0.22, 3.6, 'wood');
-    for (let k = 0; k < 8; k++) {
-      const a = rand() * Math.PI * 2,
-        radius = rand() * 1.2;
-      const geom = new THREE.IcosahedronGeometry(0.85 + rand() * 0.65, 1);
-      geom.scale(1, 0.9 + rand() * 0.6, 1);
-      this.add(
-        geom,
-        this.material(['#676e46', '#70794d', '#818458', '#59694b'][k % 4]),
-        new THREE.Vector3(x + Math.cos(a) * radius, 3.9 + rand() * 1.6, z + Math.sin(a) * radius),
+    this.cylinder(x, 1.95, z, 0.105, 0.23, 3.3, 'wood');
+    for (let branch = 0; branch < 7; branch++) {
+      const angle = branch * 2.39996;
+      const tip = new THREE.Vector3(
+        x + Math.cos(angle) * 1.25,
+        3.9 + (branch % 3) * 0.38,
+        z + Math.sin(angle) * 1.25,
       );
+      const base = new THREE.Vector3(x, 2.45 + branch * 0.1, z);
+      const direction = tip.clone().sub(base);
+      const rotation = new THREE.Euler().setFromQuaternion(
+        new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize()),
+      );
+      this.add(
+        new THREE.CylinderGeometry(0.025, 0.083, direction.length(), 7),
+        this.material('wood'),
+        base.add(tip).multiplyScalar(0.5),
+        rotation,
+      );
+      for (let leaf = 0; leaf < 18; leaf++) {
+        const a = rand() * Math.PI * 2,
+          radius = Math.sqrt(rand()) * 0.8;
+        const size = 0.85 + rand() * 0.55;
+        this.add(
+          new THREE.PlaneGeometry(size, size),
+          this.material(leaf % 3 ? 'foliage-light' : 'foliage-dark'),
+          new THREE.Vector3(
+            tip.x + Math.cos(a) * radius,
+            tip.y + (rand() - 0.35) * 1.1,
+            tip.z + Math.sin(a) * radius,
+          ),
+          new THREE.Euler((rand() - 0.5) * Math.PI, rand() * Math.PI * 2, rand() * Math.PI),
+        );
+      }
     }
   }
   car(x: number, z: number, color: string, rot: number): void {

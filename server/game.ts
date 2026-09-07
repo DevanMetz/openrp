@@ -42,7 +42,7 @@ export interface Profile {
 export type SavedCharacter = Omit<
   Player,
   'id' | 'name' | 'money' | 'holding' | 'ping' | 'reloadUntil' | 'seq' | 'vy' | 'grounded'
-> & { lastJob: number; votesAt: number };
+> & { lastJob: number; votesAt: number; jobBans?: Partial<Record<JobId, number>> };
 export interface SavedWorld {
   version: 1;
   savedAt: number;
@@ -72,6 +72,7 @@ type Runtime = {
   tool: string;
   lockpick?: { door: string; end: number; start: Vec3 };
   votesAt: number;
+  jobBans: Partial<Record<JobId, number>>;
 };
 type Hit = { kind: 'world' | 'player' | 'entity' | 'door'; id?: string; t: number; point: Vec3 };
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -194,7 +195,12 @@ export class Game {
       license: false,
     };
     if (profile.character) {
-      const { lastJob: _lastJob, votesAt: _votesAt, ...character } = structuredClone(profile.character);
+      const {
+        lastJob: _lastJob,
+        votesAt: _votesAt,
+        jobBans: _jobBans,
+        ...character
+      } = structuredClone(profile.character);
       Object.assign(player, character);
       // Disconnected residents do not reserve limited job slots indefinitely.
       const limit = JOBS[player.job].max;
@@ -215,6 +221,7 @@ export class Game {
       grabDistance: 4,
       tool: 'freeze',
       votesAt: profile.character?.votesAt ?? -Infinity,
+      jobBans: { ...profile.character?.jobBans },
     });
     if (player.deadUntil && player.deadUntil <= this.now()) this.respawn(player);
     if (player.arrestedUntil) {
@@ -241,7 +248,7 @@ export class Game {
     if (p.job === 'mayor') this.lockdown = false;
     this.players.delete(id);
     this.runtime.delete(id);
-    if (this.vote?.candidate === id) this.vote = null;
+    if (this.vote?.candidate === id && this.vote.kind === 'job') this.vote = null;
     this.system(`${p.name} left the district.`);
   }
   cleanupOwner(id: string): { entities: number; properties: number } {
@@ -285,6 +292,7 @@ export class Game {
           ...structuredClone(character),
           lastJob: Math.max(0, runtime.lastJob),
           votesAt: Math.max(0, runtime.votesAt),
+          jobBans: { ...runtime.jobBans },
         };
         break;
       }
@@ -446,6 +454,12 @@ export class Game {
       return;
     }
     switch (msg.action) {
+      case 'drop-weapon':
+        this.dropWeapon(p);
+        break;
+      case 'demote':
+        this.requestDemotion(p, target, cleanText(msg.value, 90));
+        break;
       case 'job':
         if (Object.hasOwn(JOBS, target)) this.changeJob(p, target as JobId);
         break;
@@ -642,6 +656,11 @@ export class Game {
       const vote = this.vote;
       this.vote = null;
       const candidate = this.players.get(vote.candidate);
+      if (vote.kind === 'demote') {
+        if (vote.yes > vote.eligible.length / 2) this.finishDemotion(vote);
+        else this.system(`The vote to demote ${vote.candidateName} did not pass.`);
+        return;
+      }
       if (
         candidate &&
         !candidate.deadUntil &&
@@ -670,6 +689,19 @@ export class Game {
     const r = this.runtime.get(p.id)!,
       def = JOBS[job];
     if (p.job === job) return;
+    if (this.vote?.kind === 'demote' && this.vote.candidate === p.id) {
+      this.notice(p.id, 'Wait for the demotion vote before changing jobs.', 'error');
+      return;
+    }
+    const banUntil = r.jobBans[job] ?? 0;
+    if (banUntil > this.now()) {
+      this.notice(
+        p.id,
+        `You were demoted from this role. Apply again in ${Math.ceil((banUntil - this.now()) / 1000)} seconds.`,
+        'error',
+      );
+      return;
+    }
     if (this.now() - r.lastJob < 30_000) {
       this.notice(p.id, 'Wait 30 seconds between job changes.', 'error');
       return;
@@ -688,7 +720,7 @@ export class Game {
     }
     if (def.vote && this.players.size > 1) {
       if (this.vote) {
-        this.notice(p.id, 'A job vote is already in progress.', 'error');
+        this.notice(p.id, 'A public vote is already in progress.', 'error');
         return;
       }
       if (this.now() - r.votesAt < 60_000) {
@@ -698,7 +730,9 @@ export class Game {
       r.votesAt = this.now();
       this.vote = {
         id: randomUUID(),
+        kind: 'job',
         candidate: p.id,
+        candidateName: p.name,
         job,
         end: this.now() + 20_000,
         yes: 1,
@@ -710,6 +744,72 @@ export class Game {
       return;
     }
     this.applyJob(p, job);
+  }
+  requestDemotion(p: Player, targetId: string, reason: string): void {
+    const target = this.players.get(targetId),
+      r = this.runtime.get(p.id)!;
+    if (p.deadUntil || p.arrestedUntil) {
+      this.notice(p.id, 'You cannot start a demotion vote while dead or in custody.', 'error');
+      return;
+    }
+    if (!target || target.id === p.id || target.job === 'citizen' || !reason) {
+      this.notice(p.id, 'Choose another resident with a job and give a reason for demotion.', 'error');
+      return;
+    }
+    if (this.vote) {
+      this.notice(p.id, 'A public vote is already in progress.', 'error');
+      return;
+    }
+    if (this.now() - r.votesAt < 60_000) {
+      this.notice(p.id, 'You can request another vote in one minute.', 'error');
+      return;
+    }
+    r.votesAt = this.now();
+    this.vote = {
+      id: randomUUID(),
+      kind: 'demote',
+      candidate: target.id,
+      candidateName: target.name,
+      job: target.job,
+      reason,
+      end: this.now() + 20_000,
+      yes: 1,
+      no: 0,
+      eligible: [...this.players.keys()],
+      voted: [p.id],
+    };
+    this.system(
+      `${p.name} requested ${target.name}'s demotion from ${JOBS[target.job].name}: ${reason}. Vote with F4.`,
+    );
+  }
+  finishDemotion(vote: Vote): void {
+    const player = this.players.get(vote.candidate);
+    const profile = [...this.profiles.values()].find((p) => p.id === vote.candidate);
+    const character = player ?? profile?.character;
+    if (!character) return;
+    const bans = player ? this.runtime.get(player.id)!.jobBans : (profile!.character!.jobBans ??= {});
+    for (const job of POLICE.includes(vote.job) ? POLICE : [vote.job]) bans[job] = this.now() + 300_000;
+    if (player) this.applyJob(player, 'citizen');
+    else {
+      character.job = 'citizen';
+      character.weapons = ['keys', 'physgun', 'toolgun'];
+      character.weapon = 'keys';
+      character.ammo = {};
+      character.reserve = {};
+      character.license = false;
+      profile!.character!.lastJob = this.now();
+      this.removeJobBusinesses(vote.candidate, 'citizen');
+      this.onActivity({
+        kind: 'job',
+        playerId: vote.candidate,
+        name: profile!.name,
+        previousJob: vote.job,
+        job: 'citizen',
+      });
+    }
+    this.system(
+      `${vote.candidateName} was demoted. Their former role is unavailable to them for five minutes.`,
+    );
   }
   applyJob(p: Player, job: JobId): void {
     if (JOBS[job].max && [...this.players.values()].filter((v) => v.job === job).length >= JOBS[job].max)
@@ -730,14 +830,18 @@ export class Game {
         p.ammo[w] = WEAPONS[w].magazine;
         p.reserve[w] = WEAPONS[w].magazine * 3;
       }
+    this.removeJobBusinesses(p.id, job);
+    this.runtime.get(p.id)!.lastJob = this.now();
+    this.runtime.get(p.id)!.lockpick = undefined;
+    this.system(`${p.name} is now ${JOBS[job].name}.`);
+  }
+  removeJobBusinesses(owner: string, job: JobId): void {
     for (const e of [...this.entities.values()])
       if (
-        e.owner === p.id &&
+        e.owner === owner &&
         ((e.kind === 'shipment' && job !== 'dealer') || (e.kind === 'microwave' && job !== 'cook'))
       )
         this.removeEntity(e.id);
-    this.runtime.get(p.id)!.lastJob = this.now();
-    this.system(`${p.name} is now ${JOBS[job].name}.`);
   }
   castVote(p: Player, yes: boolean): void {
     const v = this.vote;
@@ -781,6 +885,28 @@ export class Game {
       return null;
     }
     return this.createEntity(kind, p.id, pos);
+  }
+  dropWeapon(p: Player): void {
+    if (p.deadUntil || p.arrestedUntil) {
+      this.notice(p.id, 'You cannot drop equipment while dead or in custody.', 'error');
+      return;
+    }
+    const weapon = p.weapon;
+    if (!p.weapons.includes(weapon) || !WEAPONS[weapon].damage || JOBS[p.job].loadout.includes(weapon)) {
+      this.notice(p.id, 'Equip a personal firearm to drop it. Job-issued equipment stays with you.', 'error');
+      return;
+    }
+    const entity = this.spawn(p, 'weapon', true);
+    if (!entity) return;
+    entity.item = weapon;
+    entity.loadedAmmo = p.ammo[weapon] ?? 0;
+    entity.reserveAmmo = p.reserve[weapon] ?? 0;
+    p.weapons = p.weapons.filter((w) => w !== weapon);
+    delete p.ammo[weapon];
+    delete p.reserve[weapon];
+    p.weapon = 'keys';
+    p.reloadUntil = 0;
+    this.notice(p.id, `Dropped ${WEAPONS[weapon].name}. Anyone nearby can pick it up with E.`);
   }
   createEntity(kind: EntityKind, owner: string, pos: Vec3): Entity {
     const def = PROPS.find((v) => v.id === kind);
@@ -975,6 +1101,16 @@ export class Game {
       p.money = Math.min(1e9, p.money + e.cash);
       this.removeEntity(e.id);
       this.sound('cash', p);
+    } else if (e.kind === 'weapon' && e.item) {
+      if (p.weapons.includes(e.item)) {
+        this.notice(p.id, 'You already have this firearm. Drop it before taking another.', 'error');
+        return;
+      }
+      p.weapons.push(e.item);
+      p.ammo[e.item] = e.loadedAmmo ?? 0;
+      p.reserve[e.item] = e.reserveAmmo ?? 0;
+      this.removeEntity(e.id);
+      this.notice(p.id, `Picked up ${WEAPONS[e.item].name}.`, 'success');
     } else if (e.kind === 'shipment' || e.kind === 'microwave') {
       if (e.stock <= 0) {
         this.notice(p.id, 'Out of stock.', 'error');
@@ -1329,8 +1465,16 @@ export class Game {
           this.onEvent(event, other.id);
   }
   command(p: Player, command: string, words: string[]): void {
+    if (command === '/dropweapon') {
+      this.dropWeapon(p);
+      return;
+    }
     const args = words.join(' ');
-    if (['/wanted', '/unwanted', '/warrant', '/license'].includes(command)) {
+    if (
+      ['/wanted', '/unwanted', '/warrant', '/unwarrant', '/license', '/unlicense', '/demote'].includes(
+        command,
+      )
+    ) {
       const match = [...this.players.values()].filter(
         (v) => v.name.toLowerCase() === words[0]?.toLowerCase() || v.id === words[0],
       );
@@ -1347,11 +1491,16 @@ export class Game {
         this.notice(p.id, 'Specify another player’s full name, followed by a reason.', 'error');
         return;
       }
+      const targetPrefix = args.toLowerCase().startsWith(target.name.toLowerCase()) ? target.name : target.id;
+      const reason = args.slice(targetPrefix.length).trim().slice(0, 90);
+      if (command === '/demote') {
+        this.requestDemotion(p, target.id, reason);
+        return;
+      }
       if (!GOVERNMENT.includes(p.job)) {
         this.notice(p.id, 'Only government jobs can use this command.', 'error');
         return;
       }
-      const reason = args.slice(target.name.length).trim().slice(0, 90);
       if (command === '/wanted') {
         if (!reason || GOVERNMENT.includes(target.job)) {
           this.notice(p.id, 'A reason is required; government staff cannot be marked wanted.', 'error');
@@ -1374,14 +1523,30 @@ export class Game {
         target.warrantUntil = this.now() + 90_000;
         this.system(`Search warrant issued for ${target.name}: ${reason}`);
       }
-      if (command === '/license') {
-        if (p.job !== 'mayor') {
-          this.notice(p.id, 'Only the mayor can grant gun licenses.', 'error');
+      if (command === '/unwarrant') {
+        if (!['mayor', 'chief'].includes(p.job)) {
+          this.notice(p.id, 'Only the mayor or police chief can revoke search warrants.', 'error');
           return;
         }
-        target.license = true;
-        this.notice(target.id, 'The mayor granted you a gun license.', 'success');
-        this.notice(p.id, `Gun license granted to ${target.name}.`);
+        target.warrantUntil = 0;
+        this.system(`Search warrant revoked for ${target.name}.`);
+      }
+      if (command === '/license' || command === '/unlicense') {
+        if (p.job !== 'mayor') {
+          this.notice(p.id, 'Only the mayor can grant or revoke gun licenses.', 'error');
+          return;
+        }
+        if (command === '/unlicense' && GOVERNMENT.includes(target.job)) {
+          this.notice(p.id, 'Government jobs have a gun license through their role.', 'error');
+          return;
+        }
+        target.license = command === '/license';
+        this.notice(
+          target.id,
+          target.license ? 'The mayor granted you a gun license.' : 'The mayor revoked your gun license.',
+          target.license ? 'success' : 'info',
+        );
+        this.notice(p.id, `Gun license ${target.license ? 'granted to' : 'revoked for'} ${target.name}.`);
       }
       return;
     }

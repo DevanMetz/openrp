@@ -271,7 +271,7 @@ export class UI {
     );
     this.el('lockdown').hidden = !state.lockdown;
     this.el('status-flags').innerHTML =
-      `${p.wantedUntil ? '<span class="flag danger">WANTED</span>' : ''}${p.arrestedUntil ? `<span class="flag">IN CUSTODY · ${Math.max(0, Math.ceil((p.arrestedUntil - state.time) / 1000))}s</span>` : ''}${p.license ? '<span class="flag">GUN LICENSE</span>' : ''}`;
+      `${p.wantedUntil > state.time ? `<span class="flag danger" title="${escape(p.wantedReason)}">WANTED · ${Math.ceil((p.wantedUntil - state.time) / 1000)}s</span>` : ''}${p.warrantUntil > state.time ? `<span class="flag danger">SEARCH WARRANT · ${Math.ceil((p.warrantUntil - state.time) / 1000)}s</span>` : ''}${p.arrestedUntil ? `<span class="flag">IN CUSTODY · ${Math.max(0, Math.ceil((p.arrestedUntil - state.time) / 1000))}s</span>` : ''}${p.license ? '<span class="flag">GUN LICENSE</span>' : ''}`;
     this.el('death').hidden = !p.deadUntil;
     if (p.deadUntil)
       this.el('death').innerHTML =
@@ -281,8 +281,10 @@ export class UI {
     if (v)
       this.text(
         'vote-banner',
-        `VOTE: ${state.players.find((vp) => vp.id === v.candidate)?.name ?? 'Citizen'} for ${JOBS[v.job].name} · F4 to vote · ${Math.max(0, Math.ceil((v.end - state.time) / 1000))}s`,
+        `VOTE: ${v.kind === 'demote' ? 'Demote ' : ''}${v.candidateName} ${v.kind === 'demote' ? 'from' : 'for'} ${JOBS[v.job].name} · F4 to vote · ${Math.max(0, Math.ceil((v.end - state.time) / 1000))}s`,
       );
+    for (const countdown of document.querySelectorAll('[data-vote-countdown]'))
+      countdown.textContent = `${Math.max(0, Math.ceil(((v?.end ?? state.time) - state.time) / 1000))}s left`;
     const strip = p.weapons
       .map(
         (w, i) =>
@@ -290,7 +292,7 @@ export class UI {
       )
       .join('');
     if (this.el('weapon-strip').innerHTML !== strip) this.el('weapon-strip').innerHTML = strip;
-    const menuKey = `${p.job}:${p.money}:${p.weapons.join(',')}:${state.players.map((v) => v.id + v.job).join(',')}:${state.vote?.id}:${state.vote?.yes}:${state.vote?.no}:${state.entities.length}:${JSON.stringify(state.doors)}:${state.laws.join('|')}`;
+    const menuKey = `${p.job}:${p.money}:${p.weapon}:${p.weapons.join(',')}:${state.players.map((v) => v.id + v.job).join(',')}:${state.vote?.id}:${state.vote?.yes}:${state.vote?.no}:${state.entities.length}:${JSON.stringify(state.doors)}:${state.laws.join('|')}`;
     if (
       this.menu &&
       this.lastMenuKey !== menuKey &&
@@ -437,7 +439,7 @@ export class UI {
         )}</div><span class="eyebrow">${job.category}</span><h3>${job.name}</h3><p>${job.description}</p><div class="job-facts"><div><span>SALARY</span><b>${money(job.salary)}<small> / payday</small></b></div><div><span>POSITIONS</span><b>${count} / ${job.max || 'Unlimited'}</b></div></div><div class="loadout"><span class="field-label">ISSUED EQUIPMENT</span><p>${job.loadout.length ? job.loadout.map((w) => WEAPONS[w].name).join(' · ') : 'Keys · Physics Gun · Tool Gun'}</p></div><button class="primary" data-action="job" data-target="${this.selectedJob}" ${current || full ? 'disabled' : ''}>${current ? 'Your current job' : full ? 'All positions filled' : job.vote && s.players.length > 1 ? 'Start a public vote ↗' : 'Take this job ↗'}</button>${job.vote ? '<small class="muted">Public vote when other players are online.</small>' : ''}</div></div>`;
     }
     if (this.menu === 'shop' && p && s)
-      html = `<div class="section-heading"><span class="eyebrow">DISTRICT CATALOG</span><h2>Set up shop.</h2><p>Purchased entities appear in front of you. Leave some clear space.</p><b class="balance">${money(p.money)} available</b></div><div class="catalog-grid">${SHOP.map(
+      html = `<div class="section-heading"><span class="eyebrow">DISTRICT CATALOG</span><h2>Set up shop.</h2><p>Purchased entities appear in front of you. Leave some clear space.</p><b class="balance">${money(p.money)} available</b></div>${WEAPONS[p.weapon].damage ? `<div class="command-field"><span>${WEAPONS[p.weapon].name} · ${p.ammo[p.weapon] ?? 0} loaded / ${p.reserve[p.weapon] ?? 0} reserve</span><button data-action="drop-weapon" ${JOBS[p.job].loadout.includes(p.weapon) ? 'disabled' : ''}>${JOBS[p.job].loadout.includes(p.weapon) ? 'Job-issued equipment' : 'Drop firearm'}</button></div><p class="muted">Dropped firearms keep their ammunition. Anyone nearby can pick them up.</p>` : ''}<div class="catalog-grid">${SHOP.map(
         (item) => {
           const allowed =
             (!item.jobs || item.jobs.includes(p.job)) &&
@@ -474,7 +476,7 @@ export class UI {
         .map(([key, desc]) => `<div class="control-row"><kbd>${key}</kbd><span>${desc}</span></div>`)
         .join(
           '',
-        )}<h3>Building</h3><p>Q opens props and tools. Hold LMB with the Physics Gun to grab your object, then RMB to freeze it. Scroll changes reach. R rotates. F activates fading doors. Z undoes your most recent prop.</p></div><div><h3>Talk & trade</h3><div class="commands"><code>/ooc message</code><p>Talk to the whole server.</p><code>/me action</code><p>Describe an action to nearby players.</p><code>/advert message</code><p>Advertise your business for $50.</p><code>/give 100</code><p>Give money to the player you’re looking at.</p><code>/dropmoney 100</code><p>Drop cash for someone to collect.</p><code>/g message</code><p>Speak to your job group.</p><code>/rpname First Last</code><p>Change your roleplay name.</p></div><h3>Law & order</h3><div class="commands"><code>/wanted Full Name reason</code><p>Government: mark a suspect wanted, then use the arrest baton.</p><code>/unwanted Full Name</code><p>Clear a suspect’s wanted status.</p><code>/warrant Full Name reason</code><p>Mayor or Chief: authorize a search. Officers can then ram the owner’s door.</p><code>/license Full Name</code><p>Mayor: grant a gun license.</p><code>/addlaw text · /removelaw 1</code><p>Mayor: edit city laws.</p><code>/lockdown · /unlockdown</code><p>Mayor: start or end a city curfew.</p></div></div></div><div class="guide-start"><b>Play with friends</b><p>Everyone connects to the same server address. On a LAN, share the host computer’s IP and port. A private browser window creates a separate test identity. This is an early browser implementation: maps, characters and sounds are original; Source engine assets and vehicles are not included. Proximity voice is optional and requires HTTPS (or localhost).</p></div>`;
+        )}<h3>Building</h3><p>Q opens props and tools. Hold LMB with the Physics Gun to grab your object, then RMB to freeze it. Scroll changes reach. R rotates. F activates fading doors. Z undoes your most recent prop.</p></div><div><h3>Talk & trade</h3><div class="commands"><code>/ooc message</code><p>Talk to the whole server.</p><code>/me action</code><p>Describe an action to nearby players.</p><code>/advert message</code><p>Advertise your business for $50.</p><code>/give 100</code><p>Give money to the player you’re looking at.</p><code>/dropweapon</code><p>Drop your equipped personal firearm with its ammunition. Job-issued equipment cannot be dropped. E picks up a dropped firearm.</p><code>/dropmoney 100</code><p>Drop cash for someone to collect.</p><code>/g message</code><p>Speak to your job group.</p><code>/rpname First Last</code><p>Change your roleplay name.</p></div><h3>Law & order</h3><div class="commands"><code>/demote Full Name reason</code><p>Start a public demotion vote. A majority of residents must agree. Passed votes remove the role for five minutes.</p><code>/wanted Full Name reason</code><p>Government: mark a suspect wanted, then use the arrest baton.</p><code>/unwanted Full Name</code><p>Clear a suspect’s wanted status.</p><code>/warrant Full Name reason</code><p>Mayor or Chief: authorize a search. Officers can then ram the owner’s door.</p><code>/unwarrant Full Name</code><p>Mayor or Chief: revoke a search warrant.</p><code>/license Full Name · /unlicense Full Name</code><p>Mayor: grant or revoke a civilian gun license.</p><code>/addlaw text · /removelaw 1</code><p>Mayor: edit city laws.</p><code>/lockdown · /unlockdown</code><p>Mayor: start or end a city curfew.</p></div></div></div><div class="guide-start"><b>Play with friends</b><p>Everyone connects to the same server address. On a LAN, share the host computer’s IP and port. A private browser window creates a separate test identity. This is an early browser implementation: maps, characters and sounds are original; Source engine assets and vehicles are not included. Proximity voice is optional and requires HTTPS (or localhost).</p></div>`;
     if (this.menu === 'settings')
       html = `<div class="section-heading"><span class="eyebrow">MAKE IT YOURS</span><h2>Settings.</h2><p>Saved on this browser.</p></div><div class="settings-list"><label>Sound volume<output>${Math.round(this.settings.volume * 100)}%</output><input aria-label="Sound volume" data-setting="volume" type="range" min="0" max="1" step="0.05" value="${this.settings.volume}"></label><label>Voice volume<output>${Math.round(this.settings.voiceVolume * 100)}%</output><input aria-label="Voice volume" data-setting="voiceVolume" type="range" min="0" max="1" step="0.05" value="${this.settings.voiceVolume}"></label><label>Mouse sensitivity<output>${this.settings.sensitivity}</output><input aria-label="Mouse sensitivity" data-setting="sensitivity" type="range" min="0.2" max="2.5" step="0.1" value="${this.settings.sensitivity}"></label><label>Field of view<output>${this.settings.fov}</output><input aria-label="Field of view" data-setting="fov" type="range" min="65" max="105" step="1" value="${this.settings.fov}"></label><label>Graphics quality<select aria-label="Graphics quality" data-setting="quality"><option value="high" ${this.settings.quality === 'high' ? 'selected' : ''}>High · soft shadows</option><option value="low" ${this.settings.quality === 'low' ? 'selected' : ''}>Low · better performance</option></select></label></div><p class="muted">For smoother play on integrated graphics, choose Low. A mouse and keyboard are required.</p>${this.voiceControls()}`;
     this.el('menu-content').innerHTML = html;
@@ -483,9 +485,13 @@ export class UI {
   voteHtml(): string {
     const v = this.state?.vote;
     if (!v) return '';
-    const voted = v.voted.includes(this.player?.id ?? '');
-    return `<div class="vote-card"><div><b>${escape(this.state?.players.find((p) => p.id === v.candidate)?.name)} for ${JOBS[v.job].name}</b><span>${v.yes} yes · ${v.no} no · ${Math.max(0, Math.ceil((v.end - this.state!.time) / 1000))} seconds left</span></div>${voted ? '<span class="muted">VOTE RECORDED</span>' : '<button data-action="vote" data-value="yes">Yes</button><button data-action="vote" data-value="no">No</button>'}</div>`;
+    const playerId = this.player?.id ?? '';
+    const voted = v.voted.includes(playerId);
+    const eligible = v.eligible.includes(playerId);
+    const required = Math.floor(v.eligible.length / 2) + 1;
+    return `<div class="vote-card ${v.kind === 'demote' ? 'demotion-vote' : ''}"><div><span class="eyebrow">${v.kind === 'demote' ? 'PUBLIC DEMOTION' : 'JOB ELECTION'}</span><b>${v.kind === 'demote' ? 'Remove ' : ''}${escape(v.candidateName)} ${v.kind === 'demote' ? 'from' : 'as'} ${JOBS[v.job].name}?</b>${v.reason ? `<p class="vote-reason">${escape(v.reason)}</p>` : ''}<span>${v.yes} yes · ${v.no} no · ${required} yes votes required · <span data-vote-countdown>${Math.max(0, Math.ceil((v.end - this.state!.time) / 1000))}s left</span></span><div class="vote-meter" role="meter" aria-label="Yes votes" aria-valuemin="0" aria-valuemax="${required}" aria-valuenow="${Math.min(v.yes, required)}"><i style="width:${Math.min(100, (v.yes / required) * 100)}%"></i></div>${v.kind === 'demote' ? '<span>Passed: return to Citizen; former role blocked for five minutes.</span>' : ''}</div>${!eligible ? '<span class="muted">JOINED AFTER VOTE STARTED</span>' : voted ? '<span class="muted">VOTE RECORDED</span>' : '<button data-action="vote" data-value="yes">Yes</button><button data-action="vote" data-value="no">No</button>'}</div>`;
   }
+
   contextHtml(): string {
     const t = this.contextTarget,
       p = this.player,
@@ -514,12 +520,16 @@ export class UI {
     } else if (t.kind === 'entity') {
       const e = s.entities.find((v) => v.id === t.id);
       if (!e) return html + '<p>This entity is no longer here.</p>';
-      html += `<div class="context-actions"><button class="primary" data-action="interact" data-target="${e.id}">${e.kind === 'shipment' ? `Take weapon${e.owner === p.id ? '' : ` · ${money(e.price)}`}` : e.kind === 'microwave' ? `Buy meal · ${money(e.price)}` : e.kind === 'printer' ? 'Collect earnings / confiscate' : 'Use entity'}</button></div>`;
+      html += `<div class="context-actions"><button class="primary" data-action="interact" data-target="${e.id}">${e.kind === 'weapon' ? 'Pick up firearm' : e.kind === 'shipment' ? `Take weapon${e.owner === p.id ? '' : ` · ${money(e.price)}`}` : e.kind === 'microwave' ? `Buy meal · ${money(e.price)}` : e.kind === 'printer' ? 'Collect earnings / confiscate' : 'Use entity'}</button></div>`;
       if (e.owner === p.id && ['shipment', 'microwave'].includes(e.kind))
         html += `<div class="command-field"><input id="entity-price" type="number" min="1" max="50000" value="${e.price}" aria-label="Shop selling price"><button data-action="price" data-target="${e.id}">Set price</button></div>`;
-    } else
+    } else {
       html +=
         '<p>Use /give with this player in your crosshair to transfer cash. Government commands use the full name shown above.</p>';
+      const target = s.players.find((v) => v.id === t.id);
+      if (target && target.id !== p.id && target.job !== 'citizen')
+        html += `<h3>Request demotion</h3><p class="muted">Residents vote on whether this player should lose their job. Give a specific roleplay reason.</p><div class="command-field"><input id="demotion-reason" maxlength="90" placeholder="Reason for demotion" aria-label="Reason for demotion"><button data-action="demotion" data-target="${target.id}" ${s.vote ? 'disabled' : ''}>Start vote</button></div>${s.vote ? '<p class="muted">A public vote is already running.</p>' : ''}`;
+    }
     return html;
   }
   clickAction(action: string, target: string, value?: string): void {
@@ -540,6 +550,7 @@ export class UI {
       return;
     }
     if (action === 'vote') this.onAction('vote', undefined, value === 'yes');
+    else if (action === 'demotion') this.onAction('demote', target, this.input('demotion-reason').value);
     else if (action === 'title') this.onAction('door-title', target, this.input('door-title').value);
     else if (action === 'coowner') this.onAction('door-coowner', target, value);
     else if (action === 'price') this.onAction('price', target, Number(this.input('entity-price').value));
@@ -550,7 +561,7 @@ export class UI {
     else if (action === 'reset-laws') this.onChat('/resetlaws');
     else {
       this.onAction(action, target);
-      if (['spawn', 'buy', 'job', 'tool', 'interact'].includes(action)) this.close();
+      if (['spawn', 'buy', 'job', 'tool', 'interact', 'drop-weapon'].includes(action)) this.close();
     }
   }
   drawMap(): void {

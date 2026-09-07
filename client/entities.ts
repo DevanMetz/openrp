@@ -1,9 +1,12 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { JOBS, WEAPONS, entitySize } from '../shared/catalog.ts';
 import type { Entity, Player, WeaponId } from '../shared/types.ts';
 import { labelTexture } from './world.ts';
 
 const materials = new Map<string, THREE.MeshStandardMaterial>();
+const avatarSurface = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
+materials.set('avatar-surface', avatarSurface);
 const material = (color: string, metal = false) => {
   const key = `${color}:${metal}`;
   let m = materials.get(key);
@@ -89,7 +92,19 @@ export function makeEntity(e: Entity): THREE.Group {
   const group = new THREE.Group(),
     [w, h, d] = entitySize(e.kind),
     c = e.color;
-  if (e.kind === 'crate' || e.kind === 'shipment') {
+  if (e.kind === 'weapon' && e.item) {
+    const weapon = makeViewmodel(e.item, false);
+    weapon.rotation.z = Math.PI / 2;
+    weapon.position.z = 0.22;
+    weapon.traverse((object) => {
+      if (object instanceof THREE.Mesh) {
+        object.castShadow = object.receiveShadow = true;
+        object.frustumCulled = true;
+        object.renderOrder = 0;
+      }
+    });
+    group.add(weapon);
+  } else if (e.kind === 'crate' || e.kind === 'shipment') {
     box(group, 0, 0, 0, w, h, d, c);
     for (const side of [-1, 1]) {
       for (const y of [-h * 0.38, h * 0.38]) {
@@ -162,6 +177,14 @@ export function makeEntity(e: Entity): THREE.Group {
 }
 export interface Avatar {
   root: THREE.Group;
+  head: THREE.Group;
+  torso: THREE.Group;
+  leftShin: THREE.Group;
+  rightShin: THREE.Group;
+  leftForearm: THREE.Group;
+  rightForearm: THREE.Group;
+  leftFoot: THREE.Group;
+  rightFoot: THREE.Group;
   leftLeg: THREE.Group;
   rightLeg: THREE.Group;
   leftArm: THREE.Group;
@@ -169,92 +192,221 @@ export interface Avatar {
   label: THREE.Sprite;
   job: string;
   phase: number;
+  speed: number;
   last: THREE.Vector3;
   labelKey: string;
   equipment?: THREE.Group;
   weapon?: WeaponId;
 }
+// Keep articulation, but bake solid clothing/skin colors into one surface per body part.
+function batchAvatarPart(group: THREE.Group): void {
+  const buckets = new Map<THREE.Material, THREE.Mesh[]>();
+  for (const child of [...group.children]) {
+    if (child instanceof THREE.Group) batchAvatarPart(child);
+    else if (child instanceof THREE.Mesh && !Array.isArray(child.material)) {
+      const mat = child.material;
+      const batchMaterial =
+        mat instanceof THREE.MeshStandardMaterial && !mat.map && !mat.metalness ? avatarSurface : mat;
+      const meshes = buckets.get(batchMaterial) ?? [];
+      meshes.push(child);
+      buckets.set(batchMaterial, meshes);
+    }
+  }
+  for (const [mat, meshes] of buckets) {
+    if (meshes.length < 2) continue;
+    const parts = meshes.map((mesh) => {
+      mesh.updateMatrix();
+      const geometry = mesh.geometry.clone().applyMatrix4(mesh.matrix);
+      if (mat === avatarSurface) {
+        const color = (mesh.material as THREE.MeshStandardMaterial).color;
+        const colors = new Float32Array(geometry.getAttribute('position').count * 3);
+        for (let i = 0; i < colors.length; i += 3) color.toArray(colors, i);
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      }
+      return geometry;
+    });
+    const geometry = mergeGeometries(parts);
+    parts.forEach((part) => part.dispose());
+    if (!geometry) continue;
+    for (const mesh of meshes) {
+      mesh.geometry.dispose();
+      group.remove(mesh);
+    }
+    const combined = new THREE.Mesh(geometry, mat);
+    combined.castShadow = combined.receiveShadow = true;
+    group.add(combined);
+  }
+}
 export function makeAvatar(player: Player): Avatar {
   const root = new THREE.Group();
   const color = JOBS[player.job].color;
-  const police = ['police', 'chief'].includes(player.job),
-    suit = ['boss', 'mayor'].includes(player.job),
-    skin = ['#c5a182', '#a77f63', '#d4b093', '#987158'][player.id.charCodeAt(0) % 4];
-  const shirt = police
-    ? '#354e60'
-    : suit
-      ? '#414743'
-      : player.job === 'medic'
-        ? '#bcc5b4'
-        : player.job === 'cook'
-          ? '#d0c9b3'
-          : color;
-  cylinder(root, 0, 1.13, 0, 0.23, 0.2, 0.57, shirt);
-  sphere(root, 0, 1.32, 0, 0.23, shirt, [1.16, 0.65, 0.76]);
-  cylinder(root, 0, 0.83, 0, 0.2, 0.19, 0.13, '#3a403a');
-  cylinder(root, 0, 1.48, 0, 0.07, 0.085, 0.12, skin);
-  sphere(root, 0, 1.64, 0, 0.15, skin, [0.9, 1.14, 0.94]);
-  sphere(root, 0, 1.735, 0.01, 0.148, police ? '#3e5054' : '#4e493a', [0.95, 0.65, 1]);
-  box(root, 0, 1.635, -0.143, 0.075, 0.07, 0.055, police ? '#273736' : skin);
-  for (const x of [-0.056, 0.056])
-    sphere(root, x, 1.675, -0.127, police ? 0.04 : 0.012, police ? '#759494' : '#383d36');
+  const police = ['police', 'chief'].includes(player.job);
+  const suit = ['boss', 'mayor'].includes(player.job);
+  const medic = player.job === 'medic',
+    cook = player.job === 'cook';
+  const appearance = [...player.id].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 0);
+  const skin = ['#c5a182', '#9c735a', '#d4b093', '#795440'][appearance % 4];
+  const hair = ['#342d29', '#564132', '#82705a', '#292d2c'][(appearance >>> 3) % 4];
+  const shirt = police ? '#354e60' : suit ? '#343c3e' : medic ? '#b9c8bd' : cook ? '#ddd6c1' : color;
+  const trousers = police ? '#293944' : suit ? '#30383b' : player.job === 'thief' ? '#3b3944' : '#4b5149';
+  const chest = cylinder(root, 0, 1.11, 0, 0.235, 0.18, 0.49, shirt);
+  chest.scale.z = 0.72;
+  sphere(root, 0, 1.32, 0, 0.23, shirt, [1.07, 0.42, 0.68]);
+  const belt = cylinder(root, 0, 0.87, 0, 0.185, 0.19, 0.06, '#303735');
+  belt.scale.z = 0.78;
+  box(root, 0, 0.872, -0.15, 0.052, 0.039, 0.024, '#999782', true);
+  cylinder(root, 0, 1.45, 0, 0.065, 0.079, 0.13, skin);
+  for (const side of [-1, 1]) {
+    const collar = box(root, side * 0.062, 1.365, -0.119, 0.088, 0.071, 0.026, suit ? '#d8d5c5' : shirt);
+    collar.rotation.z = side * 0.4;
+  }
+  const head = new THREE.Group();
+  head.position.y = 1.49;
+  root.add(head);
+  sphere(head, 0, 0.145, 0, 0.145, skin, [0.94, 1.12, 0.94]);
+  sphere(head, 0, 0.075, -0.027, 0.096, skin, [0.9, 0.66, 0.93]);
+  for (const side of [-1, 1]) {
+    sphere(head, side * 0.135, 0.146, 0, 0.03, skin, [0.53, 1.2, 0.75]);
+    sphere(head, side * 0.053, 0.176, -0.127, 0.021, '#e7dfcd', [1, 0.6, 0.5]);
+    sphere(head, side * 0.053, 0.176, -0.139, 0.009, '#323d37', [0.8, 1, 0.5]);
+    const brow = box(head, side * 0.053, 0.206, -0.124, 0.046, 0.009, 0.013, hair);
+    brow.rotation.z = side * -0.08;
+  }
+  sphere(head, 0, 0.135, -0.143, 0.025, skin, [0.7, 1.05, 1]);
+  box(head, 0, 0.084, -0.123, 0.048, 0.009, 0.012, '#855e50');
+  const scalp = new THREE.Mesh(
+    new THREE.SphereGeometry(0.148, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.4),
+    material(hair),
+  );
+  scalp.position.set(0, 0.157, 0.006);
+  scalp.scale.set(0.98, 1.12, 0.98);
+  head.add(scalp);
+  if (!police && !cook && !['hobo', 'thief'].includes(player.job)) {
+    const fringe = sphere(head, -0.036, 0.262, -0.081, 0.072, hair, [1.3, 0.37, 0.68]);
+    fringe.rotation.z = -0.22;
+  }
   if (police) {
-    box(root, 0, 1.14, -0.18, 0.36, 0.42, 0.1, '#334744');
-    panel(root, 'CP', 0, 1.24, -0.237, 0.18, 0.09);
-  }
-  if (suit) {
-    box(root, 0, 1.27, -0.185, 0.12, 0.3, 0.025, '#c8c6b6');
-    box(root, 0, 1.21, -0.205, 0.038, 0.26, 0.025, '#926652');
-  }
-  if (player.job === 'medic') {
-    box(root, -0.14, 1.3, -0.2, 0.09, 0.025, 0.02, '#a4554d');
-    box(root, -0.14, 1.3, -0.2, 0.025, 0.09, 0.02, '#a4554d');
+    cylinder(head, 0, 0.28, 0.012, 0.15, 0.144, 0.085, '#293c4b');
+    box(head, 0, 0.238, -0.116, 0.25, 0.018, 0.18, '#202c32');
+    box(head, 0, 0.277, -0.141, 0.037, 0.04, 0.013, '#c2af70', true);
+    box(root, 0, 1.135, -0.161, 0.335, 0.36, 0.076, '#293b40');
+    for (const side of [-1, 1]) {
+      box(root, side * 0.11, 1.04, -0.214, 0.078, 0.105, 0.031, '#3d5050');
+      box(root, side * 0.183, 0.9, 0, 0.07, 0.095, 0.08, '#293b40');
+      box(root, side * 0.145, 1.327, 0, 0.065, 0.025, 0.2, '#293b40');
+    }
+    box(root, -0.096, 1.256, -0.207, 0.044, 0.058, 0.014, '#c2af70', true);
+    const badge = panel(root, player.job === 'chief' ? 'CHIEF' : 'CP', 0.043, 1.23, -0.203, 0.145, 0.066);
+    badge.rotation.y = Math.PI;
+    if (player.job === 'chief')
+      for (const side of [-1, 1]) box(root, side * 0.145, 1.343, -0.03, 0.05, 0.012, 0.042, '#c2af70', true);
+  } else if (suit) {
+    box(root, 0, 1.217, -0.158, 0.114, 0.302, 0.022, '#d8d5c5');
+    box(root, 0, 1.21, -0.177, 0.033, 0.25, 0.018, player.job === 'mayor' ? '#92574e' : '#776489');
+    for (const side of [-1, 1]) {
+      const lapel = box(root, side * 0.076, 1.248, -0.184, 0.067, 0.225, 0.024, '#454f50');
+      lapel.rotation.z = side * -0.22;
+    }
+    box(root, -0.126, 1.225, -0.18, 0.047, 0.019, 0.016, '#d8d5c5');
+  } else if (cook) {
+    box(root, 0, 1.085, -0.16, 0.28, 0.38, 0.034, '#eee5ce');
+    box(root, 0, 0.81, -0.134, 0.32, 0.24, 0.025, '#eee5ce');
+    cylinder(head, 0, 0.28, 0, 0.148, 0.146, 0.09, '#eee5ce');
+    for (const x of [-0.086, 0, 0.086]) sphere(head, x, 0.365, 0, 0.094, '#eee5ce', [0.85, 0.85, 1.1]);
+  } else {
+    box(root, 0, 1.115, -0.167, 0.014, 0.4, 0.013, '#626b60');
+    for (const side of [-1, 1]) box(root, side * 0.103, 1.227, -0.155, 0.082, 0.072, 0.026, shirt);
+    if (medic) {
+      box(root, -0.1, 1.245, -0.174, 0.058, 0.019, 0.014, '#a4554d');
+      box(root, -0.1, 1.245, -0.174, 0.019, 0.058, 0.014, '#a4554d');
+      box(root, 0.218, 0.95, 0.04, 0.105, 0.18, 0.16, '#e0d6bf');
+    }
+    if (player.job === 'dealer') {
+      for (const side of [-1, 1]) box(root, side * 0.16, 1.14, 0, 0.05, 0.47, 0.31, '#654f3c');
+      box(root, 0, 1.1, 0.136, 0.28, 0.39, 0.022, '#654f3c');
+    }
+    if (['hobo', 'thief', 'gangster'].includes(player.job)) {
+      sphere(head, 0, 0.243, 0.016, 0.151, player.job === 'hobo' ? '#7d6550' : '#42414b', [1.02, 0.57, 1.02]);
+      if (player.job === 'thief') box(head, 0, 0.1, -0.114, 0.19, 0.077, 0.055, '#42414b');
+      if (player.job === 'hobo') box(root, -0.102, 1.03, -0.156, 0.086, 0.087, 0.022, '#8c7e63');
+    }
   }
   const limb = (side: number, arm: boolean) => {
-    const g = new THREE.Group();
-    g.position.set(side * (arm ? 0.28 : 0.12), arm ? 1.3 : 0.82, 0);
-    root.add(g);
+    const upper = new THREE.Group(),
+      lower = new THREE.Group(),
+      foot = new THREE.Group();
+    upper.position.set(side * (arm ? 0.263 : 0.108), arm ? 1.3 : 0.835, 0);
+    root.add(upper);
     cylinder(
-      g,
+      upper,
       0,
-      arm ? -0.18 : -0.2,
+      arm ? -0.137 : -0.18,
       0,
-      arm ? 0.085 : 0.105,
-      arm ? 0.075 : 0.085,
-      arm ? 0.37 : 0.4,
-      arm ? shirt : '#50584f',
+      arm ? 0.084 : 0.102,
+      arm ? 0.065 : 0.079,
+      arm ? 0.28 : 0.36,
+      arm ? shirt : trousers,
     );
+    sphere(upper, 0, -0.025, 0, arm ? 0.088 : 0.1, arm ? shirt : trousers, [1, 0.7, 0.95]);
+    lower.position.y = arm ? -0.28 : -0.37;
+    upper.add(lower);
     cylinder(
-      g,
+      lower,
       0,
-      arm ? -0.41 : -0.55,
-      arm ? -0.05 : 0.015,
-      arm ? 0.07 : 0.075,
-      arm ? 0.055 : 0.065,
-      arm ? 0.25 : 0.31,
-      arm ? shirt : '#50584f',
+      arm ? -0.119 : -0.165,
+      0,
+      arm ? 0.065 : 0.079,
+      arm ? 0.05 : 0.061,
+      arm ? 0.24 : 0.33,
+      arm ? shirt : trousers,
     );
-    if (arm) sphere(g, 0, -0.56, -0.075, 0.068, skin, [0.9, 1.15, 0.8]);
-    else box(g, 0, -0.74, -0.055, 0.16, 0.12, 0.3, '#343d39');
-    return g;
+    if (arm) {
+      cylinder(lower, 0, -0.237, 0, 0.053, 0.053, 0.041, police ? '#293b40' : shirt);
+      sphere(lower, 0, -0.3, -0.01, 0.06, skin, [0.82, 1.17, 0.75]);
+    } else {
+      foot.position.y = -0.35;
+      lower.add(foot);
+      sphere(foot, 0, -0.007, -0.043, 0.102, '#303735', [0.82, 0.63, 1.4]);
+      box(foot, 0, -0.064, -0.038, 0.164, 0.028, 0.275, '#232c2c');
+    }
+    return { upper, lower, foot };
   };
   const leftArm = limb(-1, true),
     rightArm = limb(1, true),
     leftLeg = limb(-1, false),
     rightLeg = limb(1, false);
+  const torso = new THREE.Group();
+  torso.position.y = 0.835;
+  for (const child of [...root.children]) {
+    if (child === leftLeg.upper || child === rightLeg.upper) continue;
+    child.position.y -= 0.835;
+    torso.add(child);
+  }
+  root.add(torso);
+  batchAvatarPart(root);
   const label = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: true, transparent: true }));
-  label.position.set(0, 2.14, 0);
+  label.position.set(0, cook ? 2.23 : 2.14, 0);
   label.scale.set(2.9, 0.52, 1);
   root.add(label);
+  root.position.set(player.x, player.y, player.z);
   return {
     root,
-    leftArm,
-    rightArm,
-    leftLeg,
-    rightLeg,
+    head,
+    torso,
+    leftArm: leftArm.upper,
+    rightArm: rightArm.upper,
+    leftLeg: leftLeg.upper,
+    rightLeg: rightLeg.upper,
+    leftForearm: leftArm.lower,
+    rightForearm: rightArm.lower,
+    leftShin: leftLeg.lower,
+    rightShin: rightLeg.lower,
+    leftFoot: leftLeg.foot,
+    rightFoot: rightLeg.foot,
     label,
     job: player.job,
     phase: 0,
+    speed: 0,
     last: new THREE.Vector3(player.x, player.y, player.z),
     labelKey: '',
   };
@@ -263,16 +415,28 @@ export function updateAvatar(a: Avatar, p: Player, dt: number, localPosition: TH
   const dest = new THREE.Vector3(p.x, p.y, p.z);
   if (a.root.position.distanceTo(dest) > 5) a.root.position.copy(dest);
   else a.root.position.lerp(dest, 1 - Math.exp(-14 * dt));
-  const moving = a.last.distanceTo(dest) > 0.008;
-  a.last.copy(dest);
-  a.phase += dt * (moving ? 9 : 2);
-  const stride = moving ? Math.sin(a.phase) * 0.65 : 0;
-  a.leftLeg.rotation.x = stride;
-  a.rightLeg.rotation.x = -stride;
-  a.leftArm.rotation.x = p.weapon === 'keys' ? -stride * 0.65 : -0.95;
-  a.rightArm.rotation.x = p.weapon === 'keys' ? stride * 0.65 : -1.15;
+  const speed = Math.hypot(a.root.position.x - a.last.x, a.root.position.z - a.last.z) / Math.max(dt, 0.001);
+  a.speed = THREE.MathUtils.damp(a.speed, Math.min(speed, 8), 10, dt);
+  a.last.copy(a.root.position);
+  a.phase += dt * (3 + a.speed * 2.2);
+  const stride = Math.sin(a.phase) * 0.65 * Math.min(a.speed / 3, 1) * (p.crouch ? 0.22 : 1);
+  a.leftLeg.rotation.x = (p.crouch ? 1.15 : 0) + stride;
+  a.rightLeg.rotation.x = (p.crouch ? 1.15 : 0) - stride;
+  a.leftArm.rotation.x = p.weapon === 'keys' ? -stride * 0.65 : 0.95;
+  a.rightArm.rotation.x = p.weapon === 'keys' ? stride * 0.65 : 1.15;
+  a.leftShin.rotation.x = p.crouch ? -2.05 : -Math.max(0, stride) * 0.65;
+  a.rightShin.rotation.x = p.crouch ? -2.05 : -Math.max(0, -stride) * 0.65;
+  a.leftFoot.rotation.x = -a.leftLeg.rotation.x - a.leftShin.rotation.x;
+  a.rightFoot.rotation.x = -a.rightLeg.rotation.x - a.rightShin.rotation.x;
+  a.leftForearm.rotation.x = p.weapon === 'keys' ? 0.12 : 0.48;
+  a.rightForearm.rotation.x = p.weapon === 'keys' ? 0.12 : 0.35;
+  a.torso.position.y = p.crouch ? 0.46 : 0.835;
+  a.torso.rotation.x = p.crouch ? -0.65 : 0;
+  a.leftLeg.position.y = a.rightLeg.position.y = a.torso.position.y;
+  a.head.rotation.x = THREE.MathUtils.damp(a.head.rotation.x, p.pitch * 0.75 + (p.crouch ? 0.65 : 0), 12, dt);
   a.root.rotation.y = p.yaw;
-  a.root.scale.y = p.deadUntil ? 0.18 : p.crouch ? 0.67 : 1;
+  a.root.scale.y = p.deadUntil ? 0.18 : 1;
+  a.label.position.y = (p.job === 'cook' ? 2.23 : 2.14) - (p.crouch ? 0.57 : 0);
   if (a.weapon !== p.weapon) {
     if (a.equipment) disposeObject(a.equipment);
     a.equipment = makeViewmodel(p.weapon, false);
@@ -282,7 +446,10 @@ export function updateAvatar(a: Avatar, p: Player, dt: number, localPosition: TH
     a.root.add(a.equipment);
     a.weapon = p.weapon;
   }
-  if (a.equipment) a.equipment.rotation.x = p.pitch;
+  if (a.equipment) {
+    a.equipment.rotation.x = p.pitch;
+    a.equipment.position.y = p.crouch ? 0.76 : 1.13;
+  }
   a.label.visible = !p.deadUntil && localPosition.distanceTo(dest) < 23;
   const key = `${p.name}:${p.job}:${!!p.wantedUntil}:${!!p.arrestedUntil}`;
   if (a.labelKey !== key) {
@@ -439,12 +606,22 @@ export function makeViewmodel(weapon: WeaponId, withHands = true): THREE.Group {
   return group;
 }
 export function disposeObject(root: THREE.Object3D): void {
+  const shared = new Set(materials.values());
+  const owned = new Set<THREE.Material>();
   root.traverse((o) => {
-    if (o instanceof THREE.Mesh) o.geometry.dispose();
+    if (o instanceof THREE.Mesh) {
+      o.geometry.dispose();
+      for (const mat of Array.isArray(o.material) ? o.material : [o.material])
+        if (!shared.has(mat as THREE.MeshStandardMaterial)) owned.add(mat);
+    }
     if (o instanceof THREE.Sprite) {
       o.material.map?.dispose();
       o.material.dispose();
     }
   });
+  for (const mat of owned) {
+    if (mat instanceof THREE.MeshStandardMaterial) mat.map?.dispose();
+    mat.dispose();
+  }
   root.removeFromParent();
 }

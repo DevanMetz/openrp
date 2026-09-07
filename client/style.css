@@ -1252,6 +1252,29 @@ small {
 }
 .vote-card > div {
   flex: 1;
+  min-width: 0;
+}
+.demotion-vote {
+  border-left: 3px solid #d68e79;
+  background: linear-gradient(100deg, #b4442d1a, #c3a06308);
+}
+.vote-reason {
+  color: #dfd6c4;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+  margin: 0.6rem 0;
+}
+.vote-meter {
+  height: 4px;
+  background: #ffffff12;
+  max-width: 300px;
+  margin-top: 0.7rem;
+}
+.vote-meter i {
+  display: block;
+  height: 100%;
+  background: #d9b274;
+  transition: width 180ms ease;
 }
 .vote-card b {
   font-size: 0.86rem;

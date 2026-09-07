@@ -22,6 +22,89 @@ function directory(t: TestContext) {
   return dir;
 }
 
+test('offline demotion survives a saved world replacement, removes job stock and keeps property', (t) => {
+  const dir = directory(t);
+  let now = 100_000;
+  const game = new Game({ now: () => now });
+  const owner = game.join('Shop Owner');
+  const source = game.join('Requester').player;
+  const witness = game.join('Witness').player;
+  game.applyJob(owner.player, 'dealer');
+  const shipment = game.createEntity('shipment', owner.player.id, { x: 10, y: 1, z: 20 });
+  const prop = game.createEntity('shelf', owner.player.id, { x: 15, y: 1, z: 20 });
+  const door = game.doors.find((d) => d.id === 'cafe')!;
+  door.owner = owner.player.id;
+  game.requestDemotion(source, owner.player.id, 'Breaking shop agreements');
+  game.castVote(witness, true);
+  game.disconnect(owner.player.id);
+  assert.equal(game.vote?.kind, 'demote', 'disconnect does not cancel the public vote');
+  now += 20_001;
+  game.step();
+  assert.equal(game.entities.has(shipment.id), false);
+  assert.equal(game.entities.has(prop.id), true);
+  assert.equal(door.owner, owner.player.id);
+  saveWorld(dir, game.exportWorld());
+  const restored = new Game({ now: () => now, world: loadWorld(dir) });
+  const p = restored.join('Shop Owner', owner.token).player;
+  assert.equal(p.job, 'citizen');
+  assert.deepEqual(p.weapons, ['keys', 'physgun', 'toolgun']);
+  assert.equal(Object.hasOwn(p, 'jobBans'), false, 'private runtime fields stay out of snapshots');
+  now += 31_000;
+  restored.changeJob(p, 'dealer');
+  assert.equal(p.job, 'citizen', 'restart does not bypass role restriction');
+  now += 300_000;
+  restored.changeJob(p, 'dealer');
+  assert.equal(p.job, 'dealer');
+});
+test('a demotion target can reconnect during voting but cannot evade the police role ban', () => {
+  let now = 100_000;
+  const game = new Game({ now: () => now });
+  const target = game.join('Chief');
+  const source = game.join('Requester').player;
+  const witness = game.join('Witness').player;
+  game.applyJob(target.player, 'chief');
+  game.requestDemotion(source, target.player.id, 'Abuse of office');
+  game.disconnect(target.player.id);
+  const resumed = game.join('Chief', target.token).player;
+  game.castVote(witness, true);
+  now += 20_001;
+  game.step();
+  assert.equal(resumed.job, 'citizen');
+  now += 31_000;
+  game.changeJob(resumed, 'police');
+  assert.equal(game.vote, null, 'police and chief share the demotion restriction');
+  assert.equal(resumed.job, 'citizen');
+});
+test('dropped firearm and exact ammunition survive a world replacement without restoring the source gun', (t) => {
+  const dir = directory(t);
+  const game = new Game();
+  const source = game.join('Trader');
+  source.player.weapons.push('smg');
+  source.player.weapon = 'smg';
+  source.player.ammo.smg = 13;
+  source.player.reserve.smg = 47;
+  game.dropWeapon(source.player);
+  const dropped = [...game.entities.values()].find((e) => e.kind === 'weapon')!;
+  assert.ok(dropped);
+  saveWorld(dir, game.exportWorld());
+  const restored = new Game({ world: loadWorld(dir) });
+  const trader = restored.join('Trader', source.token).player;
+  assert.equal(trader.weapons.includes('smg'), false);
+  const buyer = restored.join('Customer').player;
+  Object.assign(buyer, { x: dropped.x + 0.8, y: 0.08, z: dropped.z + 1 });
+  restored.interact(buyer, dropped.id);
+  assert.equal(buyer.ammo.smg, 13);
+  assert.equal(buyer.reserve.smg, 47);
+  assert.equal(restored.entities.has(dropped.id), false);
+  saveWorld(dir, restored.exportWorld());
+  assert.equal(
+    loadWorld(dir)!.entities.some((e) => e.kind === 'weapon'),
+    false,
+  );
+  const corrupt = game.exportWorld();
+  corrupt.entities.find((e) => e.id === dropped.id)!.loadedAmmo = 31;
+  assert.throws(() => saveWorld(dir, corrupt), /Invalid entity/);
+});
 test('refresh preserves inventory, vitals, ownership and shared keys while releasing transient physics holds', () => {
   let now = 100_000;
   const game = new Game({ now: () => now });

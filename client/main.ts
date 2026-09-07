@@ -416,21 +416,24 @@ function aim(): AimTarget | undefined {
         shipment: `${e.item ? WEAPONS[e.item].name : 'Weapon'} shipment`,
         money: `$${e.cash}`,
         food: 'Meal',
+        weapon: e.item ? WEAPONS[e.item].name : 'Dropped firearm',
       }[e.kind as 'printer'];
     target = {
       kind: 'entity',
       id: e.id,
       title,
       detail:
-        e.kind === 'printer'
-          ? `$${e.cash} ready · ${owner}`
-          : e.kind === 'shipment' || e.kind === 'microwave'
-            ? `${e.stock} in stock · $${e.price} each · ${owner}`
-            : `Owned by ${owner}${e.frozen ? ' · Frozen' : ''}`,
+        e.kind === 'weapon'
+          ? `${e.loadedAmmo ?? 0} loaded · ${e.reserveAmmo ?? 0} reserve · E to pick up`
+          : e.kind === 'printer'
+            ? `$${e.cash} ready · ${owner}`
+            : e.kind === 'shipment' || e.kind === 'microwave'
+              ? `${e.stock} in stock · $${e.price} each · ${owner}`
+              : `Owned by ${owner}${e.frozen ? ' · Frozen' : ''}`,
       hint:
         e.kind === 'printer'
           ? 'E  Collect / confiscate     C  Options'
-          : ['shipment', 'microwave', 'money'].includes(e.kind)
+          : ['shipment', 'microwave', 'money', 'weapon'].includes(e.kind)
             ? 'E  Use / buy     C  Options'
             : me.weapon === 'physgun'
               ? 'Hold LMB  Grab     RMB  Freeze'

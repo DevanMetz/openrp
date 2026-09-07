@@ -48,7 +48,7 @@ To test two identities yourself, use two different browsers or a private window.
 | City        | Original Union District map: central square, café, gun store, clinic, apartments, warehouse, pawn shop, police station, holding cell and alleys; enterable ground floors          |
 | Movement    | First-person mouse look, WASD, sprint, crouch, jump, gravity, shared world collision, browser mouse-capture fallback                                                              |
 | Jobs        | Citizen, Civil Protection, Gangster, Mob Boss, Gun Dealer, Medic, Police Chief, Mayor, Hobo, Cook, Thief; limits, loadouts, salaries and job cooldowns                            |
-| Elections   | Public votes for Mayor and Civil Protection when more than one player is online; one vote per connected identity; solo applications are immediate                                 |
+| Elections   | Public elections and reasoned demotion votes; fixed electorate, majority required, one vote per identity; five-minute demotion bans persist                                       |
 | Property    | Buy and sell doors, lock/unlock/open, rename your property, share and revoke keys, up to three properties per player                                                              |
 | Building    | Seven prop types, server-side Cannon rigid-body physics, Physics Gun grab/rotate/distance/freeze, Tool Gun freeze/remove/paint/fading doors, undo and cleanup                     |
 | Economy     | Salaries, saved wallets, money printers, cash drops, direct cash transfers, food, hunger and armor                                                                                |
@@ -109,16 +109,24 @@ The microphone starts off on every join. Opening menus or chat, losing focus, hi
 /rpname Alex Citizen
 /give 100
 /dropmoney 100
+/dropweapon
+/demote Full Player Name reason
 /wanted Full Player Name reason
 /unwanted Full Player Name
 /warrant Full Player Name reason
+/unwarrant Full Player Name
 /license Full Player Name
+/unlicense Full Player Name
 /addlaw Keep firearms holstered in the square.
 /removelaw 1
 /resetlaws
 /lockdown reason
 /unlockdown
 ```
+
+To hand over a personal firearm, equip it and use `/dropweapon` or **F4 → Shop → Drop firearm**. Anyone nearby can pick it up with **E**, retaining its loaded and reserve ammunition. Equipment supplied by your current job cannot be dropped.
+
+`/demote Full Player Name reason` (or C on a player → Request demotion) opens a 20-second public vote. More than half of the residents connected at the start must vote yes, including the requester’s automatic yes. The target may vote; late arrivals cannot. A passed vote returns the target to Citizen and blocks the former role for five minutes (Civil Protection and Chief share this restriction). Custody, property and ordinary props remain; job-specific shop stock is removed as with a normal job change. Disconnecting does not cancel a demotion; completed bans and request cooldowns survive reconnects and server restarts. Pending votes are cancelled by a server restart.
 
 `/give` uses the nearby player under your crosshair. Government commands enforce job permissions on the server. Full names with spaces work without quotes. Job aliases (`/citizen`, `/cp`, `/gundealer`, `/medic`, `/mayor`, etc.) use the same rules as F4.
 

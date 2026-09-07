@@ -1,7 +1,7 @@
 import type { EntityKind, JobId, WeaponId } from './types.ts';
 
 export const VERSION = '0.4.0';
-export const PROTOCOL = 3;
+export const PROTOCOL = 5;
 export const TICK_RATE = 30;
 export const SNAPSHOT_RATE = 15;
 export const MAX_PROPS = 20;
@@ -273,6 +273,7 @@ export const PROPS: {
   { id: 'shelf', name: 'Shelving', size: [1.5, 2.3, 0.5], mass: 20, color: '#64767b' },
 ];
 export function entitySize(kind: EntityKind): [number, number, number] {
+  if (kind === 'weapon') return [0.5, 0.28, 1.1];
   return (
     PROPS.find((p) => p.id === kind)?.size ??
     (kind === 'printer'

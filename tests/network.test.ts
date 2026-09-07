@@ -50,6 +50,83 @@ class Client {
     return await this.wait((m): m is Extract<ServerMessage, { type: 'welcome' }> => m.type === 'welcome');
   }
 }
+test('real clients receive demotion ballots, cast votes and observe the authoritative result', async () => {
+  let now = 100_000;
+  const game = new Game({ now: () => now });
+  const app = await startServer({ port: 0, host: '127.0.0.1', production: true, persist: false, game });
+  const clients = Array.from({ length: 3 }, () => new Client(`ws://127.0.0.1:${app.port}/ws`));
+  const [requester, target, witness] = clients;
+  try {
+    await Promise.all(clients.map((c) => c.open()));
+    await requester.join('Requester');
+    const elected = await target.join('Mayor');
+    await witness.join('Witness');
+    game.applyJob(game.players.get(elected.id)!, 'mayor');
+    requester.send({ type: 'action', action: 'demote', target: elected.id, value: 'Ignoring the city' });
+    const ballot = await witness.wait((m): m is Snapshot => m.type === 'state' && m.vote?.kind === 'demote');
+    assert.equal(ballot.vote?.candidateName, 'Mayor');
+    assert.equal(ballot.vote?.reason, 'Ignoring the city');
+    witness.send({ type: 'action', action: 'vote', value: true });
+    await target.wait((m) => m.type === 'state' && m.vote?.yes === 2);
+    now += 20_001;
+    const result = await requester.wait(
+      (m): m is Snapshot =>
+        m.type === 'state' &&
+        m.time === now &&
+        !m.vote &&
+        m.players.some((p) => p.id === elected.id && p.job === 'citizen'),
+    );
+    assert.equal(result.players.find((p) => p.id === elected.id)?.license, false);
+    now += 31_000;
+    target.send({ type: 'action', action: 'job', target: 'mayor' });
+    await target.wait((m) => m.type === 'notice' && m.text.includes('You were demoted'));
+    assert.equal(game.vote, null);
+  } finally {
+    clients.forEach((c) => c.ws.terminate());
+    await app.close();
+  }
+});
+test('real clients replicate a dropped firearm and transfer ammunition through pickup', async () => {
+  let now = 100_000;
+  const game = new Game({ now: () => now });
+  const app = await startServer({ game, port: 0, host: '127.0.0.1', production: true, persist: false });
+  const a = new Client(`ws://127.0.0.1:${app.port}/ws`),
+    b = new Client(`ws://127.0.0.1:${app.port}/ws`);
+  try {
+    await Promise.all([a.open(), b.open()]);
+    const source = await a.join('Trader'),
+      buyer = await b.join('Customer');
+    const p = game.players.get(source.id)!;
+    p.weapons.push('pistol');
+    p.weapon = 'pistol';
+    p.ammo.pistol = 5;
+    p.reserve.pistol = 17;
+    a.send({ type: 'action', action: 'drop-weapon' });
+    const state = await b.wait(
+      (m): m is Snapshot => m.type === 'state' && m.entities.some((e) => e.kind === 'weapon'),
+    );
+    const entity = state.entities.find((e) => e.kind === 'weapon')!;
+    assert.equal(entity.loadedAmmo, 5);
+    assert.equal(entity.reserveAmmo, 17);
+    Object.assign(game.players.get(buyer.id)!, { x: entity.x + 0.7, z: entity.z + 0.9 });
+    now += 100;
+    b.send({ type: 'action', action: 'interact', target: entity.id });
+    const picked = await a.wait(
+      (m): m is Snapshot =>
+        m.type === 'state' && m.players.some((p) => p.id === buyer.id && p.weapons.includes('pistol')),
+    );
+    assert.equal(
+      picked.entities.some((e) => e.id === entity.id),
+      false,
+    );
+    assert.equal(picked.players.find((p) => p.id === buyer.id)?.reserve.pistol, 17);
+    assert.equal(picked.players.find((p) => p.id === source.id)?.weapons.includes('pistol'), false);
+  } finally {
+    a.ws.terminate();
+    b.ws.terminate();
+    await app.close();
+  }
+});
 test('two real clients share player, prop, job and chat state; reconnect preserves wallet and props', async () => {
   const game = new Game(),
     app = await startServer({ port: 0, host: '127.0.0.1', production: true, persist: false, game });

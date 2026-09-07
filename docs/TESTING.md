@@ -10,9 +10,11 @@ Coverage includes:
 - Closed-door collision and passage into an actual building when open.
 - Remote/unauthorized property actions, purchase, shared keys and resale.
 - Role limits, elections, duplicate votes, job cooldowns and chief prerequisites.
+- Demotion majority/ties, fixed electorates, request cooldowns, role bans, custody preservation, offline results, reconnects and real WebSocket ballot/result replication.
 - Printer purchase/production/collection/confiscation and shipment cash/stock transfers.
 - Physics settling, freezing, ownership restrictions and fading collision restoration.
 - Weapon damage, world occlusion, ammunition, reload timing, death and respawn.
+- Physical firearm drop/pickup with exact ammunition transfer, duplicate/reach/custody/issued-equipment restrictions, obstructed placement, corrupt ammunition rejection, saved-world replacement and real multi-client WebSocket replication.
 - Wanted/arrest permissions, custody restrictions, release and lockpicking.
 - Credential privacy, wallet reconnect, local/global chat delivery and text filtering.
 - Real WebSocket clients sharing players, props, jobs and chat; retained belongings on disconnect.
@@ -31,6 +33,14 @@ Coverage includes:
 - Private HTTP endpoints, rejection of URL credentials, read-key isolation from moderation, credential redaction and human/JSON CLI reads against a real local server.
 
 ## Browser checklist
+
+Firearm browser QA, September 7, 2026: on a disposable local server, Chrome used F4 Shop's Drop firearm button with a personal pistol holding 7 loaded / 19 reserve rounds. The menu closed, the pistol left inventory, and its floor model displayed both ammunition counts and the E pickup prompt. E recovered the firearm; selecting slot 4 displayed the same 7 / 19 rounds. Automated tests separately cover transfer to another resident and saved-world replacement. Context-menu pickup, other firearm models and other browsers still need manual coverage.
+
+City-surface browser QA, September 7, 2026: Chrome rendered Union Square with branching cutout foliage and detailed cool/warm glazing in the actual game. A separate same-camera comparison (pixel ratio 1, soft shadows enabled, no residents) measured 103 calls / 55,444 triangles / 39 textures after the change versus 105 / 57,844 / 37 before. Map collision files were unchanged and the full 55-test suite, build and production smoke check passed. Foliage alpha overdraw, lower-end hardware and other browsers have not been profiled. Temporary comparison files are gitignored under `test-results/`.
+
+Character browser QA, September 7, 2026: an isolated Chrome review compared all 11 jobs using the current `makeAvatar` against the previous implementation. Verified role accessories, colored geometry batching, head pitch, bent-knee crouching and articulated feet. With labels hidden and no shadow pass, the same scene measured 150 draw calls / 46,050 triangles for updated characters versus 242 / 19,242 previously. A live local WebSocket session separately displayed updated Citizen, Cook and Medic models in the city. These checks do not establish full-game frame rates, large-crowd GPU capacity or final weapon-grip fidelity. Temporary comparison files are in gitignored `test-results/`; they are excluded from deployment.
+
+Demotion browser QA, September 7, 2026: on an isolated development server with two synthetic residents, Chrome submitted `/demote Morgan Vale Ignoring public requests`. F4 displayed the correct target, reason, two-vote majority threshold, countdown and recorded vote. The server's synthetic witness cast the deciding vote; after expiry, the Players menu showed Morgan Vale as Citizen and chat announced the five-minute role restriction. The context-menu submission path and narrow-screen ballot layout still need manual coverage. Automated tests cover ties, late joiners, offline demotion, saved-world replacement, retained custody and property, job-stock removal, ban expiry and real multi-client ballot/result delivery.
 
 1. Inspect the initial city and name-entry screen at desktop and narrow viewport sizes.
 2. Join, return to play and capture the mouse. Verify WASD, look, sprint, crouch and jump. In embedded browsers that reject mouse capture, test right-drag look and Alt + left click alternate use.

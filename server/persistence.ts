@@ -49,6 +49,11 @@ function validCharacter(value: unknown): boolean {
       return false;
   }
   return (
+    (value.jobBans === undefined ||
+      (object(value.jobBans) &&
+        Object.entries(value.jobBans).every(
+          ([job, until]) => Object.hasOwn(JOBS, job) && integer(until, 0),
+        ))) &&
     position(value) &&
     number(value.yaw, -1e6, 1e6) &&
     number(value.pitch, -1.48, 1.48) &&
@@ -83,6 +88,7 @@ function validCharacter(value: unknown): boolean {
         'license',
         'lastJob',
         'votesAt',
+        'jobBans',
       ].includes(key),
     )
   );
@@ -122,7 +128,7 @@ function validateWorld(value: unknown): asserts value is SavedWorld {
   )
     throw new Error('Invalid or unsupported world save.');
   const owners = new Set(value.profiles.map((p) => p.id));
-  const kinds = [...PROPS.map((p) => p.id), 'printer', 'microwave', 'shipment', 'money', 'food'];
+  const kinds = [...PROPS.map((p) => p.id), 'printer', 'microwave', 'shipment', 'money', 'food', 'weapon'];
   for (const e of value.entities) {
     if (
       !object(e) ||
@@ -142,7 +148,11 @@ function validateWorld(value: unknown): asserts value is SavedWorld {
       typeof e.color !== 'string' ||
       !/^#[a-f0-9]{6}$/i.test(e.color) ||
       (e.item !== undefined && !['pistol', 'smg', 'shotgun'].includes(e.item as string)) ||
-      (e.kind === 'shipment' && e.item === undefined)
+      (['shipment', 'weapon'].includes(e.kind as string) && e.item === undefined) ||
+      (e.kind === 'weapon' &&
+        (!integer(e.loadedAmmo, 0, WEAPONS[e.item as keyof typeof WEAPONS]?.magazine ?? 0) ||
+          !integer(e.reserveAmmo, 0, 360))) ||
+      (e.kind !== 'weapon' && (e.loadedAmmo !== undefined || e.reserveAmmo !== undefined))
     )
       throw new Error('Invalid entity in world save.');
   }
