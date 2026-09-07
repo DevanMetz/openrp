@@ -58,6 +58,7 @@ export interface Player extends Motion {
   weapons: WeaponId[];
   ammo: Partial<Record<WeaponId, number>>;
   reserve: Partial<Record<WeaponId, number>>;
+  pocket?: PocketItem[];
   arrestedUntil: number;
   wantedUntil: number;
   wantedReason: string;
@@ -104,6 +105,10 @@ export interface Entity extends Vec3 {
   fadeUntil: number;
   heldBy: string | null;
 }
+export type PocketItem = Pick<
+  Entity,
+  'id' | 'health' | 'cash' | 'stock' | 'price' | 'item' | 'loadedAmmo' | 'reserveAmmo' | 'color'
+> & { kind: PropKind | 'weapon' | 'food' | 'money' };
 export interface Vote {
   id: string;
   kind: 'job' | 'demote';

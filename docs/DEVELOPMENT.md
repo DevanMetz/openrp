@@ -16,11 +16,13 @@ The active objective is comprehensive DarkRP feature coverage and the best pract
 
 ## Next work
 
+Local increment after 0.5.1: eight-object pocket with C storage and F4 inventory/placement. Preserves ammunition, cash, health and paint; reserves stored prop quota; rejects foreign props, held/frozen/fading objects and businesses. Persistence validates bounds and unique IDs across pockets/world objects. Contents survive death, custody and job changes. Protocol 6 is required for the next release. This increment is not deployed yet.
+
 1. Finish browser coverage of context-menu demotion and ballots at narrow widths.
 2. Continue character polish: equipment grip/aim poses, transitions, clothing surfaces and distance-based detail. The first detailed model pass is implemented; large-crowd GPU costs and weapon poses still need dedicated visual review.
 3. Continue foliage and window polish: wind motion, texture variation, distant leaf stability and GPU profiling. The initial branching foliage and window-surface pass is implemented; reflections are painted texture detail, not dynamic scene reflections.
-4. Expand physical trading with pocket storage and explicit capacity and ownership rules. Dropped firearms, ammunition transfer, pickup and persistence are implemented.
+4. Continue physical trading polish: pocket storage and placement are implemented locally. Add object thumbnails and narrow-screen review, and assess configurable death/arrest dropping against the server's intended economy.
 5. Audit the upstream DarkRP modules against actual OpenRP behavior to track remaining base features separately from common server addons. Follow through on remaining systems, including social/job tools, building tools, entities and roleplay activities.
 6. Continue city interiors, equipment animation, lighting and atmosphere, followed by player-visible performance checks and multiplayer regression coverage.
 
-Production deployment is being prepared for these increments. Preserve the persistent production volume across releases. Vote and dropped-firearm schema changes use protocol 5; clients must refresh to match the server.
+Released as 0.5.1 on September 7, 2026, commit `bfabc2d`, Railway deployment `3aa9ad7a-7044-47e1-b6a6-929a0c5d2bec`. GitHub CI passed on Node 22 and 24. The public health endpoint, version/protocol, Chrome entry screen and exact built JS/CSS bytes were verified. The same `/app/data` volume remains attached, with one replica, zero overlap and 30-second draining. Vote and dropped-firearm schema changes use protocol 5; clients must refresh to match the server.

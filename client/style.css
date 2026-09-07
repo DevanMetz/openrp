@@ -1137,6 +1137,14 @@ small {
   font-size: 0.92rem;
   margin-bottom: 0.5rem;
 }
+.pocket-card {
+  padding-top: 1rem;
+}
+.pocket-note {
+  max-width: 60ch;
+  line-height: 1.6;
+  margin-bottom: 1.25rem;
+}
 .catalog-card p {
   font-size: 0.76rem;
   color: #9fae9a;

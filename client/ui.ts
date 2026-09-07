@@ -4,6 +4,7 @@ import {
   JOBS,
   MAX_PROPS,
   MAX_TRANSFER,
+  POCKET_CAPACITY,
   PROPS,
   SHOP,
   VERSION,
@@ -44,6 +45,7 @@ const icons: Record<string, string> = {
   build: '⊞',
   context: '◇',
   account: '◈',
+  pocket: '▱',
 };
 export class UI {
   root: HTMLElement;
@@ -359,6 +361,7 @@ export class UI {
       p.job,
       p.money,
       p.weapon,
+      p.pocket,
       p.weapons,
       giveNearby,
       state.players.map((v) => [
@@ -497,12 +500,12 @@ export class UI {
     const p = this.player,
       s = this.state;
     const pages = this.playing
-      ? ['jobs', 'shop', 'build', 'laws', 'players', 'account', 'help', 'settings']
+      ? ['jobs', 'shop', 'pocket', 'build', 'laws', 'players', 'account', 'help', 'settings']
       : ['help', 'settings'];
     this.el('menu-nav').innerHTML = pages
       .map(
         (page) =>
-          `<button data-menu="${page}" class="${this.menu === page ? 'active' : ''}"><span>${icons[page]}</span>${{ jobs: 'Jobs', shop: 'Shop', build: 'Build', laws: 'City laws', players: 'Players', account: 'Account', help: 'Field guide', settings: 'Settings' }[page]}</button>`,
+          `<button data-menu="${page}" class="${this.menu === page ? 'active' : ''}"><span>${icons[page]}</span>${{ jobs: 'Jobs', shop: 'Shop', pocket: 'Pocket', build: 'Build', laws: 'City laws', players: 'Players', account: 'Account', help: 'Field guide', settings: 'Settings' }[page]}</button>`,
       )
       .join('');
     this.text(
@@ -542,6 +545,26 @@ export class UI {
           2,
         )}</div><span class="eyebrow">${job.category}</span><h3>${job.name}</h3><p>${job.description}</p><div class="job-facts"><div><span>SALARY</span><b>${money(job.salary)}<small> / payday</small></b></div><div><span>POSITIONS</span><b>${count} / ${job.max || 'Unlimited'}</b></div></div><div class="loadout"><span class="field-label">ISSUED EQUIPMENT</span><p>${job.loadout.length ? job.loadout.map((w) => WEAPONS[w].name).join(' · ') : 'Keys · Physics Gun · Tool Gun'}</p></div><button class="primary" data-action="job" data-target="${this.selectedJob}" ${current || full ? 'disabled' : ''}>${current ? 'Your current job' : full ? 'All positions filled' : job.vote && s.players.length > 1 ? 'Start a public vote ↗' : 'Take this job ↗'}</button>${job.vote ? '<small class="muted">Public vote when other players are online.</small>' : ''}</div></div>`;
     }
+    if (this.menu === 'pocket' && p) {
+      const items = p.pocket ?? [];
+      html = `<div class="section-heading"><span class="eyebrow">CARRIED OBJECTS</span><h2>Your pocket.</h2><p>Aim at an object and press C to store it. Your props still count toward the build limit. Businesses stay in the world.</p><b class="balance">${items.length} / ${POCKET_CAPACITY} objects</b></div><p class="muted pocket-note">Contents survive job changes, death and reconnects. Storage and placement are unavailable while dead or in custody.</p><div class="catalog-grid">${items
+        .map((e) => {
+          const name =
+            e.kind === 'weapon' && e.item
+              ? WEAPONS[e.item].name
+              : (PROPS.find((v) => v.id === e.kind)?.name ?? (e.kind === 'money' ? 'Cash bundle' : 'Food'));
+          const detail =
+            e.kind === 'weapon'
+              ? `${e.loadedAmmo} loaded · ${e.reserveAmmo} reserve`
+              : e.kind === 'money'
+                ? money(e.cash)
+                : `${Math.ceil(e.health)} health`;
+          return `<article class="catalog-card pocket-card"><h3>${escape(name)}</h3><p>${detail}</p><button data-action="pocket-drop" data-target="${e.id}" ${p.deadUntil || p.arrestedUntil ? 'disabled' : ''}>Place in front of me</button></article>`;
+        })
+        .join(
+          '',
+        )}</div>${items.length ? '' : '<p>Your pocket is empty. Store loose firearms, cash, food or your own unfrozen building props.</p>'}`;
+    }
     if (this.menu === 'shop' && p && s)
       html = `<div class="section-heading"><span class="eyebrow">DISTRICT CATALOG</span><h2>Set up shop.</h2><p>Purchased entities appear in front of you. Leave some clear space.</p><b class="balance">${money(p.money)} available</b></div>${WEAPONS[p.weapon].damage ? `<div class="command-field"><span>${WEAPONS[p.weapon].name} · ${p.ammo[p.weapon] ?? 0} loaded / ${p.reserve[p.weapon] ?? 0} reserve</span><button data-action="drop-weapon" ${JOBS[p.job].loadout.includes(p.weapon) ? 'disabled' : ''}>${JOBS[p.job].loadout.includes(p.weapon) ? 'Job-issued equipment' : 'Drop firearm'}</button></div><p class="muted">Dropped firearms keep their ammunition. Anyone nearby can pick them up.</p>` : ''}<div class="catalog-grid">${SHOP.map(
         (item) => {
@@ -554,7 +577,7 @@ export class UI {
         },
       ).join('')}</div>`;
     if (this.menu === 'build' && p && s)
-      html = `<div class="section-heading"><span class="eyebrow">SANDBOX</span><h2>Make yourself at home.</h2><p>Spawn a prop. Equip your Physics Gun to move it. Right click to freeze.</p><b class="balance">${s.entities.filter((e) => e.owner === p.id && PROPS.some((pr) => pr.id === e.kind)).length} / ${MAX_PROPS} props</b></div><div class="prop-grid">${PROPS.map((prop, i) => `<button class="prop-card" data-action="spawn" data-target="${prop.id}"><div class="prop-icon prop-${prop.id}"><span>${['▧', '◉', '▤', '▥', '▰', '⊓', '▥'][i]}</span></div><b>${prop.name}</b><small>FREE · PHYSICS PROP</small></button>`).join('')}</div><div class="tools-heading"><h3>Tool Gun</h3><span>Choose a mode, then left click your prop.</span></div><div class="tool-buttons">${['freeze', 'remove', 'paint', 'fading'].map((tool) => `<button data-action="tool" data-target="${tool}">${{ freeze: '❄ Freeze / unfreeze', remove: '× Remove', paint: '◐ Paint', fading: '◇ Fading door' }[tool]}</button>`).join('')}</div><p class="muted">F opens your fading doors for 6 seconds. Z undoes the last prop. While holding: scroll adjusts distance; R rotates.</p><button class="subtle" data-action="cleanup">Remove all my building props</button>`;
+      html = `<div class="section-heading"><span class="eyebrow">SANDBOX</span><h2>Make yourself at home.</h2><p>Spawn a prop. Equip your Physics Gun to move it. Right click to freeze.</p><b class="balance">${s.entities.filter((e) => e.owner === p.id && PROPS.some((pr) => pr.id === e.kind)).length + (p.pocket ?? []).filter((e) => PROPS.some((pr) => pr.id === e.kind)).length} / ${MAX_PROPS} props (including pocket)</b></div><div class="prop-grid">${PROPS.map((prop, i) => `<button class="prop-card" data-action="spawn" data-target="${prop.id}"><div class="prop-icon prop-${prop.id}"><span>${['▧', '◉', '▤', '▥', '▰', '⊓', '▥'][i]}</span></div><b>${prop.name}</b><small>FREE · PHYSICS PROP</small></button>`).join('')}</div><div class="tools-heading"><h3>Tool Gun</h3><span>Choose a mode, then left click your prop.</span></div><div class="tool-buttons">${['freeze', 'remove', 'paint', 'fading'].map((tool) => `<button data-action="tool" data-target="${tool}">${{ freeze: '❄ Freeze / unfreeze', remove: '× Remove', paint: '◐ Paint', fading: '◇ Fading door' }[tool]}</button>`).join('')}</div><p class="muted">F opens your fading doors for 6 seconds. Z undoes the last prop. While holding: scroll adjusts distance; R rotates.</p><button class="subtle" data-action="cleanup">Remove all my building props</button>`;
     if (this.menu === 'laws' && s && p)
       html = `<div class="section-heading"><span class="eyebrow">MUNICIPAL NOTICEBOARD</span><h2>The law of the district.</h2><p>Mayor: ${escape(s.players.find((v) => v.job === 'mayor')?.name ?? 'Office vacant')}</p></div><div class="laws-list">${s.laws.map((law, i) => `<div><span>${String(i + 1).padStart(2, '0')}</span><p>${escape(law)}</p></div>`).join('')}</div><p class="muted">${s.lockdown ? 'A citywide lockdown is in effect.' : 'The district is open. No lockdown is in effect.'}</p>${p.job === 'mayor' ? '<div class="command-field"><input id="new-law" maxlength="120" placeholder="Write a new city law" aria-label="New city law"><button data-action="add-law">Add law</button></div><div class="tool-buttons"><button data-action="lockdown">Toggle lockdown</button><button data-action="reset-laws">Restore default laws</button></div>' : ''}${this.voteHtml()}`;
     if (this.menu === 'players' && s)
@@ -630,6 +653,11 @@ export class UI {
       const e = s.entities.find((v) => v.id === t.id);
       if (!e) return html + '<p>This entity is no longer here.</p>';
       html += `<div class="context-actions"><button class="primary" data-action="interact" data-target="${e.id}">${e.kind === 'weapon' ? 'Pick up firearm' : e.kind === 'shipment' ? `Take weapon${e.owner === p.id ? '' : ` · ${money(e.price)}`}` : e.kind === 'microwave' ? `Buy meal · ${money(e.price)}` : e.kind === 'printer' ? 'Collect earnings / confiscate' : 'Use entity'}</button></div>`;
+      if (
+        ['weapon', 'food', 'money'].includes(e.kind) ||
+        (e.owner === p.id && PROPS.some((v) => v.id === e.kind))
+      )
+        html += `<button data-action="pocket-store" data-target="${e.id}" ${e.frozen || e.fading || e.heldBy || p.deadUntil || p.arrestedUntil || (p.pocket?.length ?? 0) >= POCKET_CAPACITY ? 'disabled' : ''}>Store in pocket · ${p.pocket?.length ?? 0}/${POCKET_CAPACITY}</button><p class="muted">Release and unfreeze props before storing. Fading props cannot be pocketed.</p>`;
       if (e.owner === p.id && ['shipment', 'microwave'].includes(e.kind))
         html += `<div class="command-field"><input id="entity-price" type="number" min="1" max="50000" value="${e.price}" aria-label="Shop selling price"><button data-action="price" data-target="${e.id}">Set price</button></div>`;
     }
@@ -705,7 +733,12 @@ export class UI {
     else if (action === 'reset-laws') this.onChat('/resetlaws');
     else {
       this.onAction(action, target);
-      if (['spawn', 'buy', 'job', 'tool', 'interact', 'drop-weapon'].includes(action)) this.close();
+      if (
+        ['spawn', 'buy', 'job', 'tool', 'interact', 'drop-weapon', 'pocket-store', 'pocket-drop'].includes(
+          action,
+        )
+      )
+        this.close();
     }
   }
   drawMap(): void {

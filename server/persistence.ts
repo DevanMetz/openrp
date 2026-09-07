@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Profile, SavedWorld } from './game.ts';
-import { JOBS, MAX_ENTITIES, PROPS, WEAPONS } from '../shared/catalog.ts';
+import { JOBS, MAX_ENTITIES, POCKET_CAPACITY, PROPS, WEAPONS } from '../shared/catalog.ts';
 import { MAP_BOUND } from '../shared/map.ts';
 import { validAccount } from './accounts.ts';
 
@@ -50,6 +50,11 @@ function validCharacter(value: unknown): boolean {
       return false;
   }
   return (
+    (value.pocket === undefined ||
+      (Array.isArray(value.pocket) &&
+        value.pocket.length <= POCKET_CAPACITY &&
+        value.pocket.every(validPocketItem) &&
+        unique(value.pocket.map((e) => e.id)))) &&
     (value.jobBans === undefined ||
       (object(value.jobBans) &&
         Object.entries(value.jobBans).every(
@@ -90,9 +95,50 @@ function validCharacter(value: unknown): boolean {
         'lastJob',
         'votesAt',
         'jobBans',
+        'pocket',
       ].includes(key),
     )
   );
+}
+
+function validPocketItem(e: unknown): e is Record<string, unknown> {
+  if (
+    !object(e) ||
+    !id(e.id) ||
+    ![...PROPS.map((p) => p.id), 'weapon', 'food', 'money'].includes(e.kind as string)
+  )
+    return false;
+  if (
+    !number(e.health, 0, 180) ||
+    !integer(e.cash, 0, 50_000) ||
+    !integer(e.stock, 0, 12) ||
+    !integer(e.price, 1, 50_000) ||
+    typeof e.color !== 'string' ||
+    !/^#[a-f0-9]{6}$/i.test(e.color)
+  )
+    return false;
+  if (
+    !Object.keys(e).every((key) =>
+      [
+        'id',
+        'kind',
+        'health',
+        'cash',
+        'stock',
+        'price',
+        'item',
+        'loadedAmmo',
+        'reserveAmmo',
+        'color',
+      ].includes(key),
+    )
+  )
+    return false;
+  return e.kind === 'weapon'
+    ? ['pistol', 'smg', 'shotgun'].includes(e.item as string) &&
+        integer(e.loadedAmmo, 0, WEAPONS[e.item as keyof typeof WEAPONS].magazine) &&
+        integer(e.reserveAmmo, 0, 360)
+    : e.item === undefined && e.loadedAmmo === undefined && e.reserveAmmo === undefined;
 }
 
 function validProfiles(value: unknown): value is Profile[] {
@@ -173,7 +219,11 @@ function validateWorld(value: unknown): asserts value is SavedWorld {
     )
       throw new Error('Invalid property in world save.');
   }
-  if (!unique(value.entities.map((e) => e.id)) || !unique(value.doors.map((d) => d.id)))
+  const objectIds = [
+    ...value.entities.map((e) => e.id),
+    ...value.profiles.flatMap((p) => (p.character?.pocket ?? []).map((e) => e.id)),
+  ];
+  if (!unique(objectIds) || !unique(value.doors.map((d) => d.id)))
     throw new Error('Duplicate object IDs in world save.');
 }
 

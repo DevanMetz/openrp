@@ -8,6 +8,7 @@ import {
   MAX_ENTITIES,
   MAX_PROPS,
   MAX_TRANSFER,
+  POCKET_CAPACITY,
   POLICE,
   PROPS,
   SHOP,
@@ -29,6 +30,7 @@ import type {
   Input,
   JobId,
   Player,
+  PocketItem,
   ResidentAction,
   Snapshot,
   Vec3,
@@ -189,6 +191,7 @@ export class Game {
       weapons: ['keys', 'physgun', 'toolgun'],
       ammo: {},
       reserve: {},
+      pocket: [],
       arrestedUntil: 0,
       wantedUntil: 0,
       wantedReason: '',
@@ -461,6 +464,12 @@ export class Game {
       return;
     }
     switch (msg.action) {
+      case 'pocket-store':
+        this.storePocket(p, target);
+        break;
+      case 'pocket-drop':
+        this.dropPocket(p, target);
+        break;
       case 'drop-weapon':
         this.dropWeapon(p);
         break;
@@ -874,7 +883,9 @@ export class Game {
     if (
       !paid &&
       [...this.entities.values()].filter((e) => e.owner === p.id && PROPS.some((v) => v.id === e.kind))
-        .length >= MAX_PROPS
+        .length +
+        (p.pocket ?? []).filter((e) => PROPS.some((v) => v.id === e.kind)).length >=
+        MAX_PROPS
     ) {
       this.notice(p.id, `You can have ${MAX_PROPS} building props. Undo or remove a prop first.`, 'error');
       return null;
@@ -923,6 +934,50 @@ export class Game {
     p.weapon = 'keys';
     p.reloadUntil = 0;
     this.notice(p.id, `Dropped ${WEAPONS[weapon].name}. Anyone nearby can pick it up with E.`);
+  }
+  storePocket(p: Player, target: string): void {
+    if (p.deadUntil || p.arrestedUntil) return;
+    const e = this.entities.get(target);
+    if (!e || !this.reachable(p, e, INTERACT_RANGE, e.id)) return;
+    const prop = PROPS.some((v) => v.id === e.kind);
+    if ((!prop && !['weapon', 'food', 'money'].includes(e.kind)) || (prop && e.owner !== p.id)) {
+      this.notice(
+        p.id,
+        'Store your own building props or loose firearms, cash and food. Businesses stay in the world.',
+        'error',
+      );
+      return;
+    }
+    if (e.heldBy || e.frozen || e.fading) {
+      this.notice(p.id, 'Release and unfreeze the object first. Fading props cannot be pocketed.', 'error');
+      return;
+    }
+    const pocket = (p.pocket ??= []);
+    if (pocket.length >= POCKET_CAPACITY) {
+      this.notice(p.id, `Your pocket is full (${POCKET_CAPACITY} objects).`, 'error');
+      return;
+    }
+    const { id, kind, health, cash, stock, price, item, loadedAmmo, reserveAmmo, color } = e;
+    pocket.push({ id, kind, health, cash, stock, price, item, loadedAmmo, reserveAmmo, color } as PocketItem);
+    this.removeEntity(id);
+    this.notice(
+      p.id,
+      `Stored in pocket (${pocket.length}/${POCKET_CAPACITY}). Open F4 → Pocket to place it.`,
+      'success',
+    );
+  }
+  dropPocket(p: Player, id: string): void {
+    if (p.deadUntil || p.arrestedUntil) return;
+    const pocket = p.pocket ?? [];
+    const index = pocket.findIndex((e) => e.id === id);
+    if (index < 0) return;
+    const { id: _id, ...item } = pocket[index];
+    // The item remains stored until world placement has succeeded. Its prop slot is already reserved.
+    const e = this.spawn(p, item.kind, true);
+    if (!e) return;
+    Object.assign(e, item);
+    pocket.splice(index, 1);
+    this.notice(p.id, 'Placed pocket object in front of you.', 'success');
   }
   createEntity(kind: EntityKind, owner: string, pos: Vec3): Entity {
     const def = PROPS.find((v) => v.id === kind);

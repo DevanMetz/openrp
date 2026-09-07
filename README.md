@@ -136,6 +136,8 @@ The microphone starts off on every join. Opening menus or chat, losing focus, hi
 
 To hand over a personal firearm, equip it and use `/dropweapon` or **F4 → Shop → Drop firearm**. Anyone nearby can pick it up with **E**, retaining its loaded and reserve ammunition. Equipment supplied by your current job cannot be dropped.
 
+Aim at your own unfrozen building prop or a loose firearm, cash bundle or food item and choose **C → Store in pocket**. **F4 → Pocket** holds up to eight objects and places them back into clear space. Stored props still use your build allowance. Contents survive job changes, death, custody and reconnects; storage and placement are unavailable while dead or arrested. Printers, microwaves, shipments, held objects and fading props cannot be stored.
+
 `/demote Full Player Name reason` (or C on a player → Request demotion) opens a 20-second public vote. More than half of the residents connected at the start must vote yes, including the requester’s automatic yes. The target may vote; late arrivals cannot. A passed vote returns the target to Citizen and blocks the former role for five minutes (Civil Protection and Chief share this restriction). Custody, property and ordinary props remain; job-specific shop stock is removed as with a normal job change. Disconnecting does not cancel a demotion; completed bans and request cooldowns survive reconnects and server restarts. Pending votes are cancelled by a server restart.
 
 `/give` uses the nearby player under your crosshair. Government commands enforce job permissions on the server. Full names with spaces work without quotes. Job aliases (`/citizen`, `/cp`, `/gundealer`, `/medic`, `/mayor`, etc.) use the same rules as F4.

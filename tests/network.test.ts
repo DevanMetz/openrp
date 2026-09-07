@@ -50,6 +50,45 @@ class Client {
     return await this.wait((m): m is Extract<ServerMessage, { type: 'welcome' }> => m.type === 'welcome');
   }
 }
+
+test('real clients observe pocket storage and placement without duplicate world objects', async () => {
+  let now = 100_000;
+  const game = new Game({ now: () => now });
+  const app = await startServer({ game, port: 0, host: '127.0.0.1', production: true, persist: false });
+  const a = new Client(`ws://127.0.0.1:${app.port}/ws`),
+    b = new Client(`ws://127.0.0.1:${app.port}/ws`);
+  try {
+    await Promise.all([a.open(), b.open()]);
+    const source = await a.join('Pocket Trader');
+    await b.join('Pocket Witness');
+    const p = game.players.get(source.id)!;
+    Object.assign(p, { x: 0, y: 0, z: 20, yaw: 0 });
+    const gun = game.createEntity('weapon', p.id, { x: 0, y: 0.5, z: 18 });
+    Object.assign(gun, { item: 'pistol', loadedAmmo: 2, reserveAmmo: 23 });
+    await b.wait((m) => m.type === 'state' && m.entities.some((e) => e.id === gun.id));
+    a.send({ type: 'action', action: 'pocket-store', target: gun.id });
+    const stored = await a.wait(
+      (m): m is Snapshot => m.type === 'state' && !!m.players.find((v) => v.id === p.id)?.pocket?.length,
+    );
+    assert.equal(
+      stored.entities.some((e) => e.id === gun.id),
+      false,
+    );
+    now += 1000;
+    a.send({ type: 'action', action: 'pocket-drop', target: gun.id });
+    const placed = await b.wait(
+      (m): m is Snapshot =>
+        m.type === 'state' && m.entities.some((e) => e.kind === 'weapon' && e.id !== gun.id),
+    );
+    assert.equal(placed.entities.filter((e) => e.kind === 'weapon').length, 1);
+    assert.equal(placed.players.find((v) => v.id === p.id)?.pocket?.length, 0);
+    assert.equal(placed.entities.find((e) => e.kind === 'weapon')?.reserveAmmo, 23);
+  } finally {
+    a.ws.terminate();
+    b.ws.terminate();
+    await app.close();
+  }
+});
 test('real clients receive demotion ballots, cast votes and observe the authoritative result', async () => {
   let now = 100_000;
   const game = new Game({ now: () => now });
