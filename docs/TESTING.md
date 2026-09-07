@@ -1,5 +1,11 @@
 # Testing
 
+## Crossing placement correction
+
+The north-side review revealed the thin paint was mostly hidden under the raised plaza. Moved that crossing from z=-3.5 to z=-6.2, wholly onto asphalt beyond the plaza edge at z=-4.5. Lane dashes now exclude crossing footprints as well as the square; this also removes a pre-existing dash overlapping the south crossing.
+
+Chrome verified all seven north stripes are visible and the south crossing no longer has a lane dash through its centre stripe. Build and production HTTP smoke passed. Local and undeployed; markings are visual only.
+
 ## Road paint geometry and wear
 
 Crossings and dashed lane markings now use planes one millimetre above the asphalt instead of raised boxes. A shared original cutout texture adds fine paint loss and irregular edges; an independent deterministic seed preserves city placement. Polygon offset helps prevent depth conflict with the road.

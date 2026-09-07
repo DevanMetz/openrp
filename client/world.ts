@@ -580,11 +580,13 @@ export class City {
       this.box(b.x, -0.005, b.z, w + 3.4, 0.05, d + 3.4, 'pavement');
     }
     for (const x of [-13.7, 13.7]) this.box(x, 0.045, 8, 0.25, 0.14, 25, 'concrete');
+    const crossings = [-6.2, 26];
     for (let z = -65; z < 69; z += 7) {
-      if (z > -7 && z < 24) continue;
+      if ((z > -7 && z < 24) || crossings.some((crossing) => Math.abs(z - crossing) < (3.3 + 3.2) / 2))
+        continue;
       this.roadMark(0, z, 0.16, 3.3, 'road-line');
     }
-    for (const z of [-3.5, 26]) for (let x = -6; x <= 6; x += 2) this.roadMark(x, z, 1.1, 3.2, 'crossing');
+    for (const z of crossings) for (let x = -6; x <= 6; x += 2) this.roadMark(x, z, 1.1, 3.2, 'crossing');
     for (let x = -63; x <= 63; x += 7) if (Math.abs(x) > 15) this.roadMark(x, -29, 3, 0.13, 'road-line');
     for (const x of [-14.8, 15.2])
       for (let z = -23; z < 48; z += 20) {
