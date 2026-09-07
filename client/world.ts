@@ -668,10 +668,71 @@ export class City {
         for (let k = -2; k <= 2; k++)
           local(side * 4.4 + k * 0.7, 1.67, b.d / 2 + 0.2, 0.04, 1.9, 0.04, 'metal');
       if (b.use === 'cafe') {
-        local(side * 4.4, 2.9, b.d / 2 + 0.65, 4.9, 0.13, 1.35, b.accent);
-        local(side * 4.4, 2.69, b.d / 2 + 1.25, 4.9, 0.4, 0.07, b.accent);
-        for (let i = -3; i <= 3; i++)
-          local(side * 4.4 + i * 0.62, 2.72, b.d / 2 + 1.3, 0.25, 0.34, 0.05, '#c8c4aa');
+        const anchor = toWorld(b, side * 4.4, 0, 0);
+        for (let stripe = 0; stripe < 16; stripe++) {
+          const left = -2.45 + (stripe * 4.9) / 16,
+            right = left + 4.9 / 16;
+          const back = b.d / 2 + 0.12,
+            front = b.d / 2 + 1.35;
+          const cloth = new THREE.BufferGeometry();
+          cloth.setAttribute(
+            'position',
+            new THREE.Float32BufferAttribute(
+              [
+                left,
+                3.02,
+                back,
+                right,
+                3.02,
+                back,
+                right,
+                2.75,
+                front,
+                left,
+                2.75,
+                front,
+                left,
+                2.75,
+                front,
+                right,
+                2.75,
+                front,
+                right,
+                2.48,
+                front,
+                left,
+                2.48,
+                front,
+              ],
+              3,
+            ),
+          );
+          cloth.setAttribute(
+            'uv',
+            new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1], 2),
+          );
+          cloth.setIndex([0, 3, 2, 0, 2, 1, 4, 6, 5, 4, 7, 6]);
+          cloth.computeVertexNormals();
+          const color = stripe % 2 ? '#c8c4aa' : b.accent;
+          const key = `awning-${color}`;
+          if (!this.materials.has(key))
+            this.materials.set(
+              key,
+              new THREE.MeshStandardMaterial({
+                color,
+                roughness: 1,
+                side: THREE.DoubleSide,
+              }),
+            );
+          this.add(
+            cloth,
+            this.material(key),
+            new THREE.Vector3(anchor.x, anchor.y, anchor.z),
+            new THREE.Euler(0, b.rotation, 0),
+          );
+        }
+        for (const edge of [-2.4, 2.4])
+          local(side * 4.4 + edge, 2.73, b.d / 2 + 0.72, 0.035, 0.035, 1.25, 'metal');
       }
     }
     local(0, 3.08, b.d / 2 + 0.1, b.w - 0.9, 0.62, 0.25, b.accent);

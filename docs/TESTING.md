@@ -1,5 +1,11 @@
 # Testing
 
+## Cafe awning geometry
+
+Replaced the flat canopy, thick valance and raised stripe blocks with sloping cloth panels whose alternating stripes continue down the front edge. Two rough double-sided cloth materials support views from below; slim metal supports remain beneath the outer edges. Geometry still participates in static batching.
+
+Chrome reviewed the Union Cafe awning at street level and from an elevated camera, verifying continuous top/front stripes. At the established street camera, calls changed from 62 to 63 and triangles from 93,014 to 92,918. Build and production HTTP smoke passed. Fabric weave, sag and weathering remain possible visual improvements. Local and undeployed; no collision changes.
+
 ## Brick course tiling
 
 Brick and industrial masonry textures now use four bricks by eight courses per tile, replacing dimensions that clipped the bond at repeat boundaries. Half-bricks at opposing edges share their shade. Narrow bevel highlights and reduced color contrast soften the mortar treatment. The original 54 random draws are retained before drawing, preserving later city placement.
