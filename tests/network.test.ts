@@ -402,3 +402,30 @@ test('server status is real and optional server passwords are enforced', async (
     await app.close();
   }
 });
+
+test('real clients receive both sides of a tip jar payment', async () => {
+  const game = new Game();
+  const app = await startServer({ game, port: 0, host: '127.0.0.1', production: true, persist: false });
+  const a = new Client(`ws://127.0.0.1:${app.port}/ws`),
+    b = new Client(`ws://127.0.0.1:${app.port}/ws`);
+  try {
+    await Promise.all([a.open(), b.open()]);
+    const owner = await a.join('Tip Owner'),
+      donor = await b.join('Tip Visitor');
+    Object.assign(game.players.get(owner.id)!, { x: 5, y: 0, z: 20 });
+    Object.assign(game.players.get(donor.id)!, { x: 0, y: 0, z: 20 });
+    const jar = game.createEntity('tipjar', owner.id, { x: 0, y: 0.32, z: 18 });
+    b.send({ type: 'action', action: 'tip', target: jar.id, value: 37 });
+    for (const client of [a, b]) {
+      const state = await client.wait(
+        (m): m is Snapshot => m.type === 'state' && m.players.find((p) => p.id === owner.id)?.money === 1537,
+      );
+      assert.equal(state.players.find((p) => p.id === donor.id)?.money, 1463);
+      assert.equal(state.entities.filter((e) => e.id === jar.id).length, 1);
+    }
+  } finally {
+    a.ws.terminate();
+    b.ws.terminate();
+    await app.close();
+  }
+});

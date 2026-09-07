@@ -28,7 +28,8 @@ export type WeaponId =
 export type PropKind = 'crate' | 'barrel' | 'pallet' | 'fence' | 'couch' | 'table' | 'shelf';
 export type ResidentAction =
   'give' | 'wanted' | 'unwanted' | 'warrant' | 'unwarrant' | 'license' | 'unlicense';
-export type EntityKind = PropKind | 'printer' | 'microwave' | 'shipment' | 'money' | 'food' | 'weapon';
+export type EntityKind =
+  PropKind | 'tipjar' | 'printer' | 'microwave' | 'shipment' | 'money' | 'food' | 'weapon';
 export interface Input {
   seq: number;
   forward: number;

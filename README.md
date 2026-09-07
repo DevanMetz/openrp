@@ -188,3 +188,7 @@ OpenRP code and original procedural assets: **MIT**, copyright Devan Metz. See [
 - Barlow and Barlow Condensed by Jeremy Tribby, distributed locally through Fontsource — SIL Open Font License 1.1. Their licenses are included in the dependency packages.
 
 Garry’s Mod, DarkRP, and Valve names identify the inspiration. OpenRP is not affiliated with their creators.
+
+### 0.5.2
+
+Tip jars cost $25 in F4 Shop, with one per resident. Aim and press E or C to enter a voluntary whole-dollar tip. Payments go directly to the owner's wallet, including while offline; destroying the jar does not remove paid tips. Self-tipping, blocked reach, unaffordable amounts and wallet overflow are rejected.

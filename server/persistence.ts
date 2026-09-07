@@ -179,7 +179,16 @@ function validateWorld(value: unknown): asserts value is SavedWorld {
   )
     throw new Error('Invalid or unsupported world save.');
   const owners = new Set(value.profiles.map((p) => p.id));
-  const kinds = [...PROPS.map((p) => p.id), 'printer', 'microwave', 'shipment', 'money', 'food', 'weapon'];
+  const kinds = [
+    ...PROPS.map((p) => p.id),
+    'printer',
+    'microwave',
+    'shipment',
+    'money',
+    'food',
+    'weapon',
+    'tipjar',
+  ];
   for (const e of value.entities) {
     if (
       !object(e) ||

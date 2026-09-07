@@ -483,6 +483,7 @@ function aim(): AimTarget | undefined {
       PROPS.find((v) => v.id === e.kind)?.name ??
       {
         printer: 'Money printer',
+        tipjar: 'Tip jar',
         microwave: 'Microwave',
         shipment: `${e.item ? WEAPONS[e.item].name : 'Weapon'} shipment`,
         money: `$${e.cash}`,
@@ -494,21 +495,25 @@ function aim(): AimTarget | undefined {
       id: e.id,
       title,
       detail:
-        e.kind === 'weapon'
-          ? `${e.loadedAmmo ?? 0} loaded · ${e.reserveAmmo ?? 0} reserve · E to pick up`
-          : e.kind === 'printer'
-            ? `$${e.cash} ready · ${owner}`
-            : e.kind === 'shipment' || e.kind === 'microwave'
-              ? `${e.stock} in stock · $${e.price} each · ${owner}`
-              : `Owned by ${owner}${e.frozen ? ' · Frozen' : ''}`,
+        e.kind === 'tipjar'
+          ? `Voluntary tips for ${owner}`
+          : e.kind === 'weapon'
+            ? `${e.loadedAmmo ?? 0} loaded · ${e.reserveAmmo ?? 0} reserve · E to pick up`
+            : e.kind === 'printer'
+              ? `$${e.cash} ready · ${owner}`
+              : e.kind === 'shipment' || e.kind === 'microwave'
+                ? `${e.stock} in stock · $${e.price} each · ${owner}`
+                : `Owned by ${owner}${e.frozen ? ' · Frozen' : ''}`,
       hint:
-        e.kind === 'printer'
-          ? 'E  Collect / confiscate     C  Options'
-          : ['shipment', 'microwave', 'money', 'weapon'].includes(e.kind)
-            ? 'E  Use / buy     C  Options'
-            : me.weapon === 'physgun'
-              ? 'Hold LMB  Grab     RMB  Freeze'
-              : 'Equip Physics Gun to move · Q for tools',
+        e.kind === 'tipjar'
+          ? 'E  Leave a tip     C  Options'
+          : e.kind === 'printer'
+            ? 'E  Collect / confiscate     C  Options'
+            : ['shipment', 'microwave', 'money', 'weapon'].includes(e.kind)
+              ? 'E  Use / buy     C  Options'
+              : me.weapon === 'physgun'
+                ? 'Hold LMB  Grab     RMB  Freeze'
+                : 'Equip Physics Gun to move · Q for tools',
     };
   }
   for (const p of state.players) {
@@ -574,7 +579,9 @@ document.addEventListener('keydown', (event) => {
   }
   if (event.code === 'KeyE') {
     const t = aim();
-    if (t) action('interact', t.id);
+    if (t?.kind === 'entity' && state?.entities.find((e) => e.id === t.id)?.kind === 'tipjar')
+      ui.open('context', t);
+    else if (t) action('interact', t.id);
   }
   if (event.code === 'KeyR') action(me.holding ? 'rotate' : 'reload');
   if (event.code === 'KeyF') action('fade');

@@ -182,6 +182,13 @@ export class UI {
     this.el('menu-content').addEventListener('submit', (event) => {
       event.preventDefault();
       const form = event.target;
+      if (form instanceof HTMLFormElement && form.dataset.tipjar) {
+        if (!form.reportValidity()) return;
+        const input = form.querySelector<HTMLInputElement>('input')!;
+        this.onAction('tip', form.dataset.tipjar, Number(input.value));
+        input.value = '';
+        return;
+      }
       if (!(form instanceof HTMLFormElement) || !form.dataset.residentAction) return;
       const target = this.state?.players.find((p) => p.id === form.dataset.target);
       if (!target || !this.player || this.player.deadUntil || this.player.arrestedUntil) {
@@ -600,7 +607,7 @@ export class UI {
             !(item.id === 'printer' && GOVERNMENT.includes(p.job));
           const count = s.entities.filter((e) => e.owner === p.id && e.kind === item.kind).length;
           const atLimit = !!item.limit && count >= item.limit;
-          return `<article class="catalog-card"><div class="item-sketch ${item.kind ?? item.id}"><span>${{ printer: '▤', microwave: '▣', shipment: '▰', ammo: '▥', armor: '◇', meal: '◒' }[item.kind ?? item.id] ?? '▣'}</span><small>${item.jobs ? item.jobs.map((j) => JOBS[j].name).join(' / ') : item.id === 'printer' ? 'ILLEGAL ENTITY' : 'SUPPLIES'}</small></div><h3>${item.name}</h3><p>${item.description}</p><button data-action="buy" data-target="${item.id}" ${!allowed || atLimit || p.money < item.price ? 'disabled' : ''}><span>${!allowed ? 'Job restricted' : atLimit ? 'Limit reached' : 'Purchase'}</span><b>${money(item.price)}</b></button></article>`;
+          return `<article class="catalog-card"><div class="item-sketch ${item.kind ?? item.id}"><span>${{ tipjar: '◉', printer: '▤', microwave: '▣', shipment: '▰', ammo: '▥', armor: '◇', meal: '◒' }[item.kind ?? item.id] ?? '▣'}</span><small>${item.jobs ? item.jobs.map((j) => JOBS[j].name).join(' / ') : item.id === 'printer' ? 'ILLEGAL ENTITY' : 'SUPPLIES'}</small></div><h3>${item.name}</h3><p>${item.description}</p><button data-action="buy" data-target="${item.id}" ${!allowed || atLimit || p.money < item.price ? 'disabled' : ''}><span>${!allowed ? 'Job restricted' : atLimit ? 'Limit reached' : 'Purchase'}</span><b>${money(item.price)}</b></button></article>`;
         },
       ).join('')}</div>`;
     if (this.menu === 'build' && p && s)
@@ -679,6 +686,17 @@ export class UI {
     } else if (t.kind === 'entity') {
       const e = s.entities.find((v) => v.id === t.id);
       if (!e) return html + '<p>This entity is no longer here.</p>';
+      if (e.kind === 'tipjar') {
+        if (e.owner === p.id)
+          return (
+            html +
+            '<p>This is your tip jar. Donations go directly to your wallet, even while you are offline. Use your Physics Gun to position it.</p>'
+          );
+        return (
+          html +
+          `<p>Tips go directly to the owner's wallet. Choose an amount you would like to give.</p><form class="resident-form" data-tipjar="${e.id}"><label class="field-label" for="tip-amount">TIP IN DOLLARS</label><div class="command-field"><input id="tip-amount" type="number" min="1" max="${Math.min(MAX_TRANSFER, p.money)}" step="1" required placeholder="25" aria-label="Tip amount"><button type="submit" ${p.deadUntil || p.arrestedUntil || !p.money ? 'disabled' : ''}>Leave tip</button></div></form>`
+        );
+      }
       html += `<div class="context-actions"><button class="primary" data-action="interact" data-target="${e.id}">${e.kind === 'weapon' ? 'Pick up firearm' : e.kind === 'shipment' ? `Take weapon${e.owner === p.id ? '' : ` · ${money(e.price)}`}` : e.kind === 'microwave' ? `Buy meal · ${money(e.price)}` : e.kind === 'printer' ? 'Collect earnings / confiscate' : 'Use entity'}</button></div>`;
       if (
         ['weapon', 'food', 'money'].includes(e.kind) ||

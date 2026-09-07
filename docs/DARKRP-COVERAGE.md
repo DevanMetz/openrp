@@ -12,25 +12,25 @@ Common server addons and Source/Sandbox functionality remain part of the broader
 
 ## Gameplay findings
 
-| Area | Current evidence | Remaining work |
-| --- | --- | --- |
-| Jobs and elections | Eleven catalog roles, salaries, equipment, role limits, majority ballots and persistent demotion bans | Audit upstream job configuration, agendas, role-specific permissions and additional roles |
-| Identity | Persistent accounts, roleplay names and custom titles; titles do not change job authority | Additional identity/social tools and configurable restrictions |
-| Local chat | Local, whisper, yell, actions, OOC, group and paid advertisements; authoritative delivery and logs | Private messaging, tuned radio channels and mayor broadcasts |
-| Police | Wanted status, warrant issue/revoke, arrest/release, ram, civilian licenses and lockdown/laws | Weapon searching/confiscation tools, stunstick behavior and a complete police-rule comparison |
-| Property | Purchasable doors, shared keys, lock/open, rename and resale; apartments and public stairs | Upstream ownership groups, administration and additional door-policy options |
-| Trading | Shipments, adjustable prices, direct money, loose firearms with ammunition and pocket storage | Tip jars, recipient-bound cheques and additional shop types |
-| Illegal economy | Printer purchase, periodic income, collection, health and police confiscation | Printer lifecycle/fire behavior and other original illegal-production counterparts |
-| Food and medicine | Hunger, meals, microwave stock/production and medical-kit healing | Food variety and fuller upstream medic/hunger behavior comparison |
-| Combat | Three firearms, ammunition/reload, armor, damage and respawn | Wider original weapon roster, better aiming/reload poses and weapon-search tools |
-| Contracts | No contract state, requests, acceptance, payout or dedicated role in types/catalog/game rules | Hit-contract lifecycle and original hitman presentation |
-| Hobo activities | Hobo job and ordinary prop building | Dedicated donation and role activities |
-| AFK and sleep | No player AFK/sleep state or commands; physics sleeping is unrelated | Player state, presentation, input restrictions and economy policy |
-| World communication | Laws menu and map signage | Player-authored letters, notices and billboards |
-| Administration | Authenticated operator kick/ban/unban/cleanup and private observability | Broader permissions, in-game moderation workflow and upstream FAdmin/FPP comparison |
-| Building | Seven props, Physics Gun, Tool Gun, freeze, paint, fading and undo | Wider construction tooling, constraints, precision placement and duplication workflows |
+| Area                | Current evidence                                                                                      | Remaining work                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Jobs and elections  | Eleven catalog roles, salaries, equipment, role limits, majority ballots and persistent demotion bans | Audit upstream job configuration, agendas, role-specific permissions and additional roles     |
+| Identity            | Persistent accounts, roleplay names and custom titles; titles do not change job authority             | Additional identity/social tools and configurable restrictions                                |
+| Local chat          | Local, whisper, yell, actions, OOC, group and paid advertisements; authoritative delivery and logs    | Private messaging, tuned radio channels and mayor broadcasts                                  |
+| Police              | Wanted status, warrant issue/revoke, arrest/release, ram, civilian licenses and lockdown/laws         | Weapon searching/confiscation tools, stunstick behavior and a complete police-rule comparison |
+| Property            | Purchasable doors, shared keys, lock/open, rename and resale; apartments and public stairs            | Upstream ownership groups, administration and additional door-policy options                  |
+| Trading             | Shipments, adjustable prices, direct money, loose firearms with ammunition and pocket storage         | Tip jars, recipient-bound cheques and additional shop types                                   |
+| Illegal economy     | Printer purchase, periodic income, collection, health and police confiscation                         | Printer lifecycle/fire behavior and other original illegal-production counterparts            |
+| Food and medicine   | Hunger, meals, microwave stock/production and medical-kit healing                                     | Food variety and fuller upstream medic/hunger behavior comparison                             |
+| Combat              | Three firearms, ammunition/reload, armor, damage and respawn                                          | Wider original weapon roster, better aiming/reload poses and weapon-search tools              |
+| Contracts           | No contract state, requests, acceptance, payout or dedicated role in types/catalog/game rules         | Hit-contract lifecycle and original hitman presentation                                       |
+| Hobo activities     | Hobo job, ordinary prop building and basic tip jars with offline wallet payments                      | Further role activities and donation presentation                                             |
+| AFK and sleep       | No player AFK/sleep state or commands; physics sleeping is unrelated                                  | Player state, presentation, input restrictions and economy policy                             |
+| World communication | Laws menu and map signage                                                                             | Player-authored letters, notices and billboards                                               |
+| Administration      | Authenticated operator kick/ban/unban/cleanup and private observability                               | Broader permissions, in-game moderation workflow and upstream FAdmin/FPP comparison           |
+| Building            | Seven props, Physics Gun, Tool Gun, freeze, paint, fading and undo                                    | Wider construction tooling, constraints, precision placement and duplication workflows        |
 
-Specific upstream checks: [chat declarations](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/chat/sh_chatcommands.lua) include private messages, mayor broadcasts and radio selection/speech. [Money declarations](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/money/sh_commands.lua) include recipient-bound cheques. The [hit module](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/hitmenu/sh_init.lua) defines designated hitman jobs, requests, prices, active targets and cooldown constraints. [Tip-jar communication](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/tipjar/sv_communication.lua) checks donation distance, affordability and ownership and distributes donation updates. OpenRP has no equivalent states or action handlers for these systems yet.
+Specific upstream checks: [chat declarations](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/chat/sh_chatcommands.lua) include private messages, mayor broadcasts and radio selection/speech. [Money declarations](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/money/sh_commands.lua) include recipient-bound cheques. The [hit module](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/hitmenu/sh_init.lua) defines designated hitman jobs, requests, prices, active targets and cooldown constraints. [Tip-jar communication](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/tipjar/sv_communication.lua) checks donation distance, affordability and ownership and distributes donation updates. OpenRP now has a basic tip-jar counterpart; the other systems in this paragraph remain missing.
 
 ## Visual findings
 
@@ -40,7 +40,7 @@ Outstanding work includes equipment grip/aim/reload motion; richer clothing and 
 
 ## Next implementation sequence
 
-1. Tip jars: a visible donation object, amount entry, authoritative distance/ownership checks, exact money transfer and saved-world behavior. This adds a missing interaction to Hobo and service-business play and requires an original prop model.
+1. Tip jars implemented for 0.5.2: original prop, amount form, authoritative payment checks and offline persistence. Continue donation presentation and narrow-screen review.
 2. Police weapon searching/confiscation: inspect upstream authority and tool rules, then implement targeted interactions with custody and inventory tests.
 3. Hit contracts: establish request, acceptance, cancellation, target exit/death, payout and cooldown rules before building the role/menu/model.
 4. Social systems: mayor broadcast, private messages and radio with explicit recipient handling and accurate log/privacy wording.

@@ -466,6 +466,9 @@ export class Game {
       return;
     }
     switch (msg.action) {
+      case 'tip':
+        this.donate(p, target, msg.value);
+        break;
       case 'job-title':
         this.setJobTitle(p, msg.value);
         break;
@@ -1156,6 +1159,38 @@ export class Game {
       }
     }
   }
+  donate(p: Player, target: string, amount: unknown): void {
+    if (p.deadUntil || p.arrestedUntil) return;
+    const jar = this.entities.get(target);
+    if (!jar || jar.kind !== 'tipjar' || !this.reachable(p, jar, INTERACT_RANGE, jar.id)) {
+      this.notice(p.id, 'Stand near a tip jar with a clear view to donate.', 'error');
+      return;
+    }
+    if (jar.owner === p.id) {
+      this.notice(p.id, 'This is your tip jar. Other residents can donate here.', 'info');
+      return;
+    }
+    if (
+      !finite(amount) ||
+      !Number.isSafeInteger(amount) ||
+      amount < 1 ||
+      amount > MAX_TRANSFER ||
+      amount > p.money
+    ) {
+      this.notice(p.id, 'Choose a whole dollar tip from $1 to $50,000 that you can afford.', 'error');
+      return;
+    }
+    const owner = this.players.get(jar.owner) ?? [...this.profiles.values()].find((v) => v.id === jar.owner);
+    if (!owner || owner.money + amount > 1e9) {
+      this.notice(p.id, 'The owner cannot receive this tip. No money was transferred.', 'error');
+      return;
+    }
+    p.money -= amount;
+    owner.money += amount;
+    this.notice(p.id, `Tipped ${owner.name} $${amount}. Thank you!`, 'success');
+    this.notice(owner.id, `${p.name} left you a $${amount} tip.`, 'success');
+    this.sound('cash', jar);
+  }
   interact(p: Player, target: string): void {
     const d = this.doors.find((v) => v.id === target);
     if (d) {
@@ -1170,6 +1205,10 @@ export class Game {
     }
     const e = this.entities.get(target);
     if (!e || !this.reachable(p, e, INTERACT_RANGE, e.id)) return;
+    if (e.kind === 'tipjar') {
+      this.notice(p.id, 'Open this tip jar with C to choose a donation amount.');
+      return;
+    }
     if (e.kind === 'printer') {
       if (POLICE.includes(p.job)) {
         this.removeEntity(e.id);

@@ -1,6 +1,6 @@
 import type { EntityKind, JobId, WeaponId } from './types.ts';
 
-export const VERSION = '0.5.1';
+export const VERSION = '0.5.2';
 export const PROTOCOL = 6;
 export const POCKET_CAPACITY = 8;
 export const CHAT_RANGES = { local: 28, whisper: 5, yell: 56 } as const;
@@ -208,6 +208,14 @@ export interface ShopItem {
 }
 export const SHOP: ShopItem[] = [
   {
+    id: 'tipjar',
+    name: 'Tip jar',
+    description: 'Accept voluntary donations. Tips go directly to your wallet, even while offline.',
+    price: 25,
+    kind: 'tipjar',
+    limit: 1,
+  },
+  {
     id: 'printer',
     name: 'Money printer',
     description: '$100 every 30 seconds. Illegal. Collect earnings with E.',
@@ -277,6 +285,7 @@ export const PROPS: {
   { id: 'shelf', name: 'Shelving', size: [1.5, 2.3, 0.5], mass: 20, color: '#64767b' },
 ];
 export function entitySize(kind: EntityKind): [number, number, number] {
+  if (kind === 'tipjar') return [0.55, 0.64, 0.55];
   if (kind === 'weapon') return [0.5, 0.28, 1.1];
   return (
     PROPS.find((p) => p.id === kind)?.size ??

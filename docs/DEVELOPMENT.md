@@ -30,3 +30,5 @@ Local increment after 0.5.1: eight-object pocket with C storage and F4 inventory
 6. Continue city interiors, equipment animation, lighting and atmosphere, followed by player-visible performance checks and multiplayer regression coverage.
 
 Released as 0.5.1 on September 7, 2026, commit `bfabc2d`, Railway deployment `3aa9ad7a-7044-47e1-b6a6-929a0c5d2bec`. GitHub CI passed on Node 22 and 24. The public health endpoint, version/protocol, Chrome entry screen and exact built JS/CSS bytes were verified. The same `/app/data` volume remains attached, with one replica, zero overlap and 30-second draining. Vote and dropped-firearm schema changes use protocol 5; clients must refresh to match the server.
+
+0.5.2 release candidate: persistent pockets, custom roleplay titles, ranged whisper/yell, narrow chat layout, warrant/license revocation controls, and original ceramic tip jars. Protocol 6 requires a client refresh. Tip jars transfer directly to online or saved offline wallets and preserve paid donations independently of the jar. Next gameplay work: police weapon searching/confiscation, then contracts and social channels.

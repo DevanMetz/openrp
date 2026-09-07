@@ -92,7 +92,15 @@ export function makeEntity(e: Entity): THREE.Group {
   const group = new THREE.Group(),
     [w, h, d] = entitySize(e.kind),
     c = e.color;
-  if (e.kind === 'weapon' && e.item) {
+  if (e.kind === 'tipjar') {
+    cylinder(group, 0, -0.045, 0, 0.23, 0.25, 0.49, '#547566');
+    cylinder(group, 0, -0.29, 0, 0.25, 0.25, 0.035, '#c2ad7b', true);
+    cylinder(group, 0, 0.22, 0, 0.255, 0.24, 0.065, '#c2ad7b', true);
+    box(group, 0, 0.256, 0, 0.19, 0.006, 0.035, '#17251e');
+    panel(group, 'TIPS', 0, 0.04, 0.252, 0.31, 0.14, '#e1d7b9', '#263c30');
+    panel(group, 'THANK YOU', 0, -0.1, 0.252, 0.32, 0.055, '#547566', '#eee3bc');
+    cylinder(group, 0.13, 0.274, 0.07, 0.055, 0.055, 0.02, '#c3a65a', true);
+  } else if (e.kind === 'weapon' && e.item) {
     const weapon = makeViewmodel(e.item, false);
     weapon.rotation.z = Math.PI / 2;
     weapon.position.z = 0.22;
