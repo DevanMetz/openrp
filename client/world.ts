@@ -209,17 +209,7 @@ function surfaceTexture(kind: string, color: string): THREE.CanvasTexture {
   }
   ctx.putImageData(pixels, 0, 0);
   if (kind === 'asphalt') {
-    // Aggregate and periodic wear add detail without new texture-boundary jumps.
-    const worn = ctx.getImageData(0, 0, 256, 256);
-    for (let y = 0; y < 256; y++)
-      for (let x = 0; x < 256; x++) {
-        const variation =
-          Math.sin((x * Math.PI) / 128) * Math.cos((y * Math.PI) / 128) * 4 +
-          Math.sin(((x + y) * Math.PI) / 64) * 2;
-        const index = (y * 256 + x) * 4;
-        for (let channel = 0; channel < 3; channel++) worn.data[index + channel] += variation;
-      }
-    ctx.putImageData(worn, 0, 0);
+    // Fine aggregate remains in the repeating texture; broad wear belongs to the ground.
     for (let grain = 0; grain < 2600; grain++) {
       const x = (grain * 73) % 256;
       const y = (grain * 47 + Math.floor(grain / 7) * 13) % 256;
@@ -507,7 +497,25 @@ export class City {
     return mesh;
   }
   ground(): void {
-    this.box(0, -0.08, 0, MAP_BOUND * 2 + 2, 0.15, MAP_BOUND * 2 + 2, 'asphalt');
+    const size = MAP_BOUND * 2 + 2;
+    const road = new THREE.PlaneGeometry(size, size, 48, 48);
+    road.rotateX(-Math.PI / 2);
+    const positions = road.attributes.position;
+    const uv = road.attributes.uv;
+    const colors = new Float32Array(positions.count * 3);
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i),
+        z = positions.getZ(i);
+      // World-scale weathering avoids repeating broad stains every two metres.
+      const shade =
+        0.92 + Math.sin(x * 0.19 + Math.sin(z * 0.11)) * 0.045 + Math.cos(z * 0.27 - x * 0.13) * 0.035;
+      colors.set([shade, shade, shade], i * 3);
+      uv.setXY(i, (x + size / 2) / 2, (z + size / 2) / 2);
+    }
+    road.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const asphalt = this.materials.get('asphalt')!;
+    asphalt.vertexColors = true;
+    this.add(road, asphalt, new THREE.Vector3(0, -0.005, 0));
     this.box(0, -0.005, 8, 28, 0.025, 25, 'pavement');
     for (const x of [-67, 67]) {
       for (const side of [-1, 1]) this.box(x + side * 10, -0.005, 0, 2.2, 0.04, 214, 'pavement');

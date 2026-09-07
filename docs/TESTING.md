@@ -1,5 +1,11 @@
 # Testing
 
+## Road wear scale correction
+
+Removed the broad sinusoidal wear from the repeating asphalt tile after review exposed its repetition. Broad color variation now uses vertex colors on a 48 × 48 subdivided ground plane at the former ground surface height, retaining the existing map extent and fine texture. Server collision rules are unchanged.
+
+Chrome review at the same crossing camera showed less obvious broad repetition. Draw calls stayed at 73; triangles increased from 100,206 to 104,802. Build and production HTTP smoke passed. Fine texture tiling and distant road views still warrant review; this is not a GPU benchmark. Local and undeployed.
+
 ## Asphalt aggregate pass
 
 Added fine light/dark aggregate and low-contrast periodic wear to the existing asphalt texture. Deterministic placement preserves city random values, and the existing material and geometry are reused. Chrome review at a road-level camera by the Union Square crossing showed grain in the foreground and legible crossing markings. Texture repetition remains visible across large road areas and needs a broader treatment.
