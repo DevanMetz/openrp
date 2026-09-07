@@ -1,5 +1,11 @@
 # Testing
 
+## Mayor broadcast — local implementation
+
+`/broadcast message` produces a distinct server-wide chat event, input channel hint and field-guide entry. Authority uses the actual Mayor job, excludes death/custody, and shares existing chat rate/text limits. Accepted messages are logged once and the observability channel filter accepts `broadcast`.
+
+The new Game test covers title-based impersonation, custody/death, case-insensitive command handling, global-event delivery, empty input, truncation and shared cooldown. `npm run check` passed with 110 tests, production build and HTTP smoke. Dedicated multiplayer network delivery, broadcast log-query and browser presentation checks remain pending. This feature is local and undeployed.
+
 ## Contract and notification layout follow-up
 
 The contract card and notices now occupy one vertical feed, with the card first. At 360 × 780, the feed starts below the voice control; a live connection notice was visibly separated from both controls. Opening a menu hides the card, and closing it restores the active assignment. Entry/disconnected screens also suppress the card. This supersedes the earlier narrow notification-overlap finding below. Large notice bursts and short-height viewports remain to be reviewed.

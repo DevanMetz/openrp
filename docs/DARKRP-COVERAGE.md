@@ -1,6 +1,6 @@
 # DarkRP coverage audit
 
-Reviewed September 7, 2026 against OpenRP `1e1a400` and upstream DarkRP `5abcf7abab9e489b2d882a55d95f84c206d9d05c`. This is a first system audit, not a parity certificate. Local changes after the deployed 0.5.1 release count as implemented below but remain unreleased.
+Reviewed September 7, 2026 against OpenRP `1e1a400` and upstream DarkRP `5abcf7abab9e489b2d882a55d95f84c206d9d05c`. This is a first system audit, not a parity certificate. Follow-up review covers local work through `33544d3` and the subsequent mayor-broadcast change. Production remains 0.5.2; police inspection/evidence, contracts and broadcasts described here are local additions.
 
 ## Evidence and scope
 
@@ -14,23 +14,23 @@ Common server addons and Source/Sandbox functionality remain part of the broader
 
 | Area                | Current evidence                                                                                      | Remaining work                                                                                |
 | ------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Jobs and elections  | Eleven catalog roles, salaries, equipment, role limits, majority ballots and persistent demotion bans | Audit upstream job configuration, agendas, role-specific permissions and additional roles     |
+| Jobs and elections  | Twelve catalog roles, salaries, equipment, role limits, majority ballots and persistent demotion bans | Audit upstream job configuration, agendas, role-specific permissions and additional roles     |
 | Identity            | Persistent accounts, roleplay names and custom titles; titles do not change job authority             | Additional identity/social tools and configurable restrictions                                |
-| Local chat          | Local, whisper, yell, actions, OOC, group and paid advertisements; authoritative delivery and logs    | Private messaging, tuned radio channels and mayor broadcasts                                  |
-| Police              | Wanted status, warrant issue/revoke, arrest/release, ram, civilian licenses and lockdown/laws         | Weapon searching/confiscation tools, stunstick behavior and a complete police-rule comparison |
+| Local chat          | Local, whisper, yell, actions, OOC, group, mayor broadcasts and paid advertisements; authoritative delivery and logs    | Private messaging and tuned radio channels; browser/network review of mayor broadcasts                                  |
+| Police              | Wanted/warrants, custody, ram, licenses, laws, targeted scanner inspection and timed confiscation with persistent evidence/returns         | Stunstick behavior, wider police-rule comparison and additional scanner animation review |
 | Property            | Purchasable doors, shared keys, lock/open, rename and resale; apartments and public stairs            | Upstream ownership groups, administration and additional door-policy options                  |
-| Trading             | Shipments, adjustable prices, direct money, loose firearms with ammunition and pocket storage         | Tip jars, recipient-bound cheques and additional shop types                                   |
+| Trading             | Shipments, adjustable prices, direct money, loose firearms with ammunition and pocket storage         | Recipient-bound cheques and additional shop types                                   |
 | Illegal economy     | Printer purchase, periodic income, collection, health and police confiscation                         | Printer lifecycle/fire behavior and other original illegal-production counterparts            |
 | Food and medicine   | Hunger, meals, microwave stock/production and medical-kit healing                                     | Food variety and fuller upstream medic/hunger behavior comparison                             |
-| Combat              | Three firearms, ammunition/reload, armor, damage and respawn                                          | Wider original weapon roster, better aiming/reload poses and weapon-search tools              |
-| Contracts           | No contract state, requests, acceptance, payout or dedicated role in types/catalog/game rules         | Hit-contract lifecycle and original hitman presentation                                       |
+| Combat              | Three firearms, ammunition/reload, armor, damage and respawn                                          | Wider original weapon roster and better aiming/reload poses              |
+| Contracts           | Funded offers, acceptance, expiry/cancellation refunds, assigned-kill payouts, cooldowns, atomic saves, private menus/HUD and original Hitman outfit         | Broader multiplayer browser scenarios, settlement history/presentation and upstream option comparison                                       |
 | Hobo activities     | Hobo job, ordinary prop building and basic tip jars with offline wallet payments                      | Further role activities and donation presentation                                             |
 | AFK and sleep       | No player AFK/sleep state or commands; physics sleeping is unrelated                                  | Player state, presentation, input restrictions and economy policy                             |
 | World communication | Laws menu and map signage                                                                             | Player-authored letters, notices and billboards                                               |
 | Administration      | Authenticated operator kick/ban/unban/cleanup and private observability                               | Broader permissions, in-game moderation workflow and upstream FAdmin/FPP comparison           |
 | Building            | Seven props, Physics Gun, Tool Gun, freeze, paint, fading and undo                                    | Wider construction tooling, constraints, precision placement and duplication workflows        |
 
-Specific upstream checks: [chat declarations](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/chat/sh_chatcommands.lua) include private messages, mayor broadcasts and radio selection/speech. [Money declarations](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/money/sh_commands.lua) include recipient-bound cheques. The [hit module](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/hitmenu/sh_init.lua) defines designated hitman jobs, requests, prices, active targets and cooldown constraints. [Tip-jar communication](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/tipjar/sv_communication.lua) checks donation distance, affordability and ownership and distributes donation updates. OpenRP now has a basic tip-jar counterpart; the other systems in this paragraph remain missing.
+Specific upstream checks: [chat declarations](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/chat/sh_chatcommands.lua) include private messages, mayor broadcasts and radio selection/speech. [Money declarations](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/money/sh_commands.lua) include recipient-bound cheques. The [hit module](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/hitmenu/sh_init.lua) defines designated hitman jobs, requests, prices, active targets and cooldown constraints. [Tip-jar communication](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules/tipjar/sv_communication.lua) checks donation distance, affordability and ownership and distributes donation updates. OpenRP now has tip-jar, hit-contract and mayor-broadcast counterparts. Private messages, radio and recipient-bound cheques remain missing.
 
 ## Visual findings
 
@@ -41,9 +41,9 @@ Outstanding work includes equipment grip/aim/reload motion; richer clothing and 
 ## Next implementation sequence
 
 1. Tip jars implemented for 0.5.2: original prop, amount form, authoritative payment checks and offline persistence. Continue donation presentation and narrow-screen review.
-2. Police weapon searching/confiscation: inspect upstream authority and tool rules, then implement targeted interactions with custody and inventory tests.
-3. Hit contracts: establish request, acceptance, cancellation, target exit/death, payout and cooldown rules before building the role/menu/model.
-4. Social systems: mayor broadcast, private messages and radio with explicit recipient handling and accurate log/privacy wording.
+2. Police weapon searching/confiscation implemented locally with custody/inventory tests, persistent evidence, scanner and menus; continue tool animation and broader scenario review.
+3. Hit contracts implemented locally with escrow, interruption settlement, persistence, private participant delivery, role/menu/model and active HUD; continue browser lifecycle coverage.
+4. Mayor broadcast now has authoritative commands, channel labels and logging; finish browser/network review, then implement private messages and radio with explicit recipient handling and accurate log/privacy wording.
 5. Continue the visual backlog in parallel across subsequent increments; verify each change in the actual game and retain performance baselines.
 
 For each system, completion requires server rules, usable UI, world/character representation where relevant, reconnect/persistence behavior, multiplayer verification and browser review. This sequence does not remove the other gaps from the active objective.

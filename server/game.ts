@@ -1678,7 +1678,7 @@ export class Game {
     r.lastChat = this.now();
     const [command, ...words] = text.split(/\s+/);
     const args = words.join(' ');
-    let channel: 'local' | 'whisper' | 'yell' | 'ooc' | 'advert' | 'me' | 'group' = 'local',
+    let channel: 'local' | 'whisper' | 'yell' | 'ooc' | 'advert' | 'broadcast' | 'me' | 'group' = 'local',
       message = text;
     if (command.startsWith('/')) {
       switch (command.toLowerCase()) {
@@ -1695,6 +1695,14 @@ export class Game {
         case '/ooc':
         case '//':
           channel = 'ooc';
+          message = args;
+          break;
+        case '/broadcast':
+          if (p.job !== 'mayor' || p.deadUntil || p.arrestedUntil) {
+            this.notice(p.id, 'Only a living mayor outside custody can broadcast.', 'error');
+            return;
+          }
+          channel = 'broadcast';
           message = args;
           break;
         case '/me':
@@ -1742,7 +1750,7 @@ export class Game {
     // Record one accepted message before fan-out, not one copy per recipient.
     this.onChat({ playerId: p.id, name: p.name, job: p.job, text: message, channel });
     const event: GameEvent = { type: 'chat', name: p.name, text: message, channel, color: JOBS[p.job].color };
-    if (channel === 'ooc' || channel === 'advert') this.onEvent(event);
+    if (channel === 'ooc' || channel === 'advert' || channel === 'broadcast') this.onEvent(event);
     else
       for (const other of this.players.values())
         if (
