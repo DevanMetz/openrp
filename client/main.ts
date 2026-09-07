@@ -289,7 +289,10 @@ ui.onConnect = (name, password, account = false) => {
     } else if (msg.type === 'state') receiveState(msg);
     else if (msg.type === 'delta' && state) receiveState(applyDelta(state, msg));
     else if (msg.type === 'pong') ping = Math.round(Date.now() - msg.time);
-    else if (msg.type === 'weapon-inspection') ui.showWeaponInspection(msg);
+    else if (msg.type === 'contract-state') {
+      ui.contracts = msg.entries;
+      if (ui.menu === 'contracts') ui.renderMenu();
+    } else if (msg.type === 'weapon-inspection') ui.showWeaponInspection(msg);
     else if (msg.type === 'notice') {
       if (!myId) rejection = msg.text;
       ui.notice(msg.text, msg.tone);

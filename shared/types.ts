@@ -1,3 +1,12 @@
+export interface HitContract {
+  id: string;
+  customer: string;
+  hitman: string;
+  target: string;
+  price: number;
+  expires: number;
+  status: 'offered' | 'active' | 'refund' | 'payout';
+}
 import type { Delta } from './replication.ts';
 export type Vec3 = { x: number; y: number; z: number };
 export type Quat = { x: number; y: number; z: number; w: number };
@@ -153,6 +162,10 @@ export interface WeaponInspection {
   }[];
 }
 export type GameEvent =
+  | {
+      type: 'contract-state';
+      entries: (HitContract & { customerName: string; hitmanName: string; targetName: string })[];
+    }
   | WeaponInspection
   | {
       type: 'chat';

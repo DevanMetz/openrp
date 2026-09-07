@@ -497,3 +497,52 @@ test('clients observe timed seizure and evidence return without duplicate firear
     await app.close();
   }
 });
+
+test('real clients fund, accept and cancel contracts while target and bystander receive no contract details', async () => {
+  let now = 100000;
+  const game = new Game({ now: () => now });
+  const app = await startServer({ game, port: 0, host: '127.0.0.1', production: true, persist: false });
+  const clients = [0, 1, 2, 3].map(() => new Client(`ws://127.0.0.1:${app.port}/ws`));
+  try {
+    await Promise.all(clients.map((c) => c.open()));
+    const joins = [];
+    for (const [i, c] of clients.entries()) joins.push(await c.join(`Contract ${i}`));
+    const [customer, hitman, target, other] = joins.map((j) => game.players.get(j.id)!);
+    game.applyJob(hitman, 'hitman');
+    Object.assign(customer, { x: 0, y: 0, z: 20 });
+    Object.assign(hitman, { x: 0, y: 0, z: 18 });
+    Object.assign(target, { x: 5, y: 0, z: 18 });
+    Object.assign(other, { x: 8, y: 0, z: 18 });
+    clients[0].send({
+      type: 'action',
+      action: 'contract-request',
+      target: hitman.id,
+      value: JSON.stringify({ target: target.id, price: 500 }),
+    });
+    const offered = await clients[1].wait(
+      (m): m is Extract<ServerMessage, { type: 'contract-state' }> =>
+        m.type === 'contract-state' && m.entries.some((c) => c.status === 'offered'),
+    );
+    const id = offered.entries[0].id;
+    assert.equal(customer.money, 1000);
+    now += 800;
+    clients[3].send({ type: 'action', action: 'contract-accept', target: id });
+    await clients[3].wait((m) => m.type === 'notice' && m.text.includes('no longer available'));
+    assert.equal(game.contracts.contracts.get(id)?.status, 'offered');
+    now += 800;
+    clients[1].send({ type: 'action', action: 'contract-accept', target: id });
+    await clients[0].wait((m) => m.type === 'contract-state' && m.entries.some((c) => c.status === 'active'));
+    now += 800;
+    clients[0].send({ type: 'action', action: 'contract-cancel', target: id });
+    await clients[0].wait((m) => m.type === 'notice' && m.text.includes('cancelled'));
+    assert.equal(customer.money, 1500);
+    for (const client of clients.slice(2))
+      assert.equal(
+        client.messages.some((m) => m.type === 'contract-state' && m.entries.length > 0),
+        false,
+      );
+  } finally {
+    for (const c of clients) c.ws.terminate();
+    await app.close();
+  }
+});

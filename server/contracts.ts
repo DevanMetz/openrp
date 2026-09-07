@@ -7,15 +7,8 @@ export interface ContractResident {
   available: boolean;
   hitman: boolean;
 }
-export interface HitContract {
-  id: string;
-  customer: string;
-  hitman: string;
-  target: string;
-  price: number;
-  expires: number;
-  status: 'offered' | 'active' | 'refund' | 'payout';
-}
+import type { HitContract } from '../shared/types.ts';
+export type { HitContract } from '../shared/types.ts';
 export interface ContractState {
   entries: HitContract[];
   cooldowns: [string, number][];

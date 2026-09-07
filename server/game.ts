@@ -79,6 +79,7 @@ type Runtime = {
   lastShot: number;
   lastChat: number;
   lastResidentAction: number;
+  contractKey?: string;
   lastJob: number;
   inputSeq: number;
   grabDistance: number;
@@ -190,6 +191,13 @@ export class Game {
       this.laws = [...options.world.laws];
       this.lockdown = options.world.lockdown;
     }
+  }
+  contractName(id: string): string {
+    return (
+      this.players.get(id)?.name ??
+      [...this.profiles.values()].find((p) => p.id === id)?.name ??
+      'Offline resident'
+    );
   }
   addStatic(b: Box): CANNON.Body {
     const body = new CANNON.Body({
@@ -515,6 +523,34 @@ export class Game {
       return;
     }
     switch (msg.action) {
+      case 'contract-request':
+      case 'contract-accept':
+      case 'contract-cancel':
+        try {
+          if (msg.action === 'contract-request') {
+            if (typeof msg.value !== 'string' || msg.value.length > 256)
+              throw new Error('Invalid contract request.');
+            const offer = JSON.parse(msg.value);
+            if (!offer || typeof offer.target !== 'string' || typeof offer.price !== 'number')
+              throw new Error('Choose a target and price.');
+            this.contracts.request(p.id, target, offer.target, offer.price);
+            this.notice(p.id, 'Contract offer funded. The hitman has 30 seconds to accept.', 'success');
+            this.notice(target, `${p.name} offered you a contract. Open F4 → Contracts.`);
+          } else if (msg.action === 'contract-accept') {
+            this.contracts.accept(p.id, target);
+            this.notice(p.id, 'Contract accepted. You have ten minutes. City laws still apply.', 'success');
+          } else {
+            this.contracts.cancel(p.id, target);
+            this.notice(p.id, 'Contract cancelled. The customer’s refund is being settled.');
+          }
+        } catch (error) {
+          this.notice(
+            p.id,
+            error instanceof SyntaxError ? 'Invalid contract request.' : (error as Error).message,
+            'error',
+          );
+        }
+        break;
       case 'tip':
         this.donate(p, target, msg.value);
         break;
@@ -650,6 +686,19 @@ export class Game {
     const colliders = [...BLOCKS, ...this.doors.filter((d) => !d.open).map(doorBox), ...this.solidEntities()];
     for (const p of this.players.values()) {
       const r = this.runtime.get(p.id)!;
+      const entries = [...this.contracts.contracts.values()]
+        .filter((c) => c.customer === p.id || c.hitman === p.id)
+        .map((c) => ({
+          ...c,
+          customerName: this.contractName(c.customer),
+          hitmanName: this.contractName(c.hitman),
+          targetName: this.contractName(c.target),
+        }));
+      const contractKey = JSON.stringify(entries);
+      if (r.contractKey !== contractKey) {
+        r.contractKey = contractKey;
+        this.onEvent({ type: 'contract-state', entries }, p.id);
+      }
       if (r.confiscation) {
         const target = this.players.get(r.confiscation.target);
         if (!target || !this.canConfiscate(p, target)) {

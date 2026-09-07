@@ -48,10 +48,12 @@ const icons: Record<string, string> = {
   context: '◇',
   account: '◈',
   pocket: '▱',
+  contracts: '◇',
 };
 export class UI {
   root: HTMLElement;
   menu = '';
+  contracts: Extract<GameEvent, { type: 'contract-state' }>['entries'] = [];
   state?: Snapshot;
   player?: Player;
   selectedJob: JobId = 'citizen';
@@ -144,6 +146,16 @@ export class UI {
     this.el('close-menu').addEventListener('click', () => this.close());
     this.root.addEventListener('submit', (event) => {
       const form = event.target;
+      if (form instanceof HTMLFormElement && form.dataset.contractRequest !== undefined) {
+        if (!form.reportValidity()) return;
+        const fields = new FormData(form);
+        this.onAction(
+          'contract-request',
+          String(fields.get('hitman')),
+          JSON.stringify({ target: fields.get('target'), price: Number(fields.get('price')) }),
+        );
+        return;
+      }
       if (!(form instanceof HTMLFormElement) || !form.dataset.account) return;
       event.preventDefault();
       if (this.accountBusy || !form.reportValidity()) return;
@@ -391,6 +403,9 @@ export class UI {
     const residentMenu = this.menu === 'context' && this.contextTarget?.kind === 'player';
     const resident = residentMenu ? state.players.find((v) => v.id === this.contextTarget?.id) : undefined;
     const giveNearby = resident && distance(eyes(p), eyes(resident)) <= GIVE_RANGE;
+    this.root.querySelectorAll<HTMLElement>('[data-contract-end]').forEach((el) => {
+      el.textContent = `${Math.max(0, Math.ceil((Number(el.dataset.contractEnd) - state.time) / 1000))}s`;
+    });
     const menuKey = JSON.stringify([
       p.job,
       p.jobTitle,
@@ -539,12 +554,12 @@ export class UI {
     const p = this.player,
       s = this.state;
     const pages = this.playing
-      ? ['jobs', 'shop', 'pocket', 'build', 'laws', 'players', 'account', 'help', 'settings']
+      ? ['jobs', 'shop', 'pocket', 'contracts', 'build', 'laws', 'players', 'account', 'help', 'settings']
       : ['help', 'settings'];
     this.el('menu-nav').innerHTML = pages
       .map(
         (page) =>
-          `<button data-menu="${page}" class="${this.menu === page ? 'active' : ''}"><span>${icons[page]}</span>${{ jobs: 'Jobs', shop: 'Shop', pocket: 'Pocket', build: 'Build', laws: 'City laws', players: 'Players', account: 'Account', help: 'Field guide', settings: 'Settings' }[page]}</button>`,
+          `<button data-menu="${page}" class="${this.menu === page ? 'active' : ''}"><span>${icons[page]}</span>${{ jobs: 'Jobs', shop: 'Shop', pocket: 'Pocket', contracts: 'Contracts', build: 'Build', laws: 'City laws', players: 'Players', account: 'Account', help: 'Field guide', settings: 'Settings' }[page]}</button>`,
       )
       .join('');
     this.text(
@@ -552,6 +567,16 @@ export class UI {
       p ? `${p.name} · ${JOBS[p.job].name} · ${money(p.money)}` : 'Keyboard & mouse required',
     );
     let html = '';
+    if (this.menu === 'contracts' && p && s) {
+      const options = (players: Player[]) =>
+        players
+          .map((v) => `<option value="${v.id}">${escape(v.name)} · ${JOBS[v.job].name}</option>`)
+          .join('');
+      const hitmen = s.players.filter(
+        (v) => v.id !== p.id && v.job === 'hitman' && !v.deadUntil && !v.arrestedUntil,
+      );
+      html = `<div class="section-heading"><span class="eyebrow">UNDERWORLD WORK</span><h2>Contracts.</h2><p>Fund an offer while standing within 3 metres of a hitman with a clear view. Offers expire after 30 seconds; accepted contracts last ten minutes. City laws still apply.</p></div><h3>Your offers and assignments</h3>${this.contracts.length ? this.contracts.map((c) => `<article class="catalog-card pocket-card"><h3>${escape(c.targetName)}</h3><p>Customer: ${escape(c.customerName)}<br>Hitman: ${escape(c.hitmanName)}</p><p>${money(c.price)} reserved · ${c.status === 'offered' ? 'Awaiting acceptance' : c.status === 'active' ? 'Active assignment' : c.status === 'refund' ? 'Refund waiting for wallet space' : 'Payout waiting for wallet space'}${['offered', 'active'].includes(c.status) ? ` · <span data-contract-end="${c.expires}">${Math.max(0, Math.ceil((c.expires - s.time) / 1000))}s</span>` : ''}</p><div class="context-actions">${c.hitman === p.id && c.status === 'offered' ? `<button data-action="contract-accept" data-target="${c.id}">Accept contract</button>` : ''}${['offered', 'active'].includes(c.status) ? `<button data-action="contract-cancel" data-target="${c.id}">Cancel and refund</button>` : ''}</div></article>`).join('') : '<p>No offers or assignments. Completed payments leave this list.</p>'}<section class="evidence-section"><h3>Request a contract</h3><p>Payment is reserved immediately. Cancellation, expiry or participant departure refunds the customer. Only the assigned hitman’s kill earns payment. Customer requests have a five-minute cooldown.</p>${hitmen.length ? `<form data-contract-request><label class="field-label" for="contract-hitman">HITMAN</label><select id="contract-hitman" name="hitman" required>${options(hitmen)}</select><label class="field-label" for="contract-target">TARGET</label><select id="contract-target" name="target" required><option value="" disabled selected>Choose a resident</option>${options(s.players.filter((v) => v.id !== p.id && !v.deadUntil && !v.arrestedUntil))}</select><label class="field-label" for="contract-price">PAYMENT IN DOLLARS</label><input id="contract-price" name="price" type="number" min="250" max="${Math.min(50000, p.money)}" value="500" step="1" required><p class="muted">The customer, hitman and target must be different residents.</p><button type="submit" ${p.deadUntil || p.arrestedUntil || p.money < 250 ? 'disabled' : ''}>Fund offer</button></form>` : '<p>No available hitmen. A resident can choose Hitman in Jobs.</p>'}</section>`;
+    }
     if (this.menu === 'pause')
       html = `<div class="section-heading"><span class="eyebrow">UNION DISTRICT</span><h2>You’re still in the city.</h2><p>Multiplayer continues while this menu is open.</p></div><button class="primary" data-action="resume">Return to the streets ↗</button><div class="pause-links"><button data-menu="jobs">Find a job</button><button data-menu="build">Build something</button><button data-menu="help">Read the field guide</button></div><p class="muted">Invite friends with this server address: <code>${escape(location.origin)}</code></p>${this.voiceControls()}`;
     if (this.menu === 'jobs' && p && s) {

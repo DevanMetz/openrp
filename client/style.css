@@ -1948,3 +1948,13 @@ small {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+[data-contract-request] {
+  display: grid;
+  gap: 0.65rem;
+  max-width: 36rem;
+}
+[data-contract-request] select,
+[data-contract-request] input {
+  width: 100%;
+  min-width: 0;
+}
