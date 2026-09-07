@@ -22,6 +22,7 @@ export const CONTRACT_COOLDOWN = 300_000;
 export class ContractBook {
   contracts = new Map<string, HitContract>();
   cooldowns = new Map<string, number>();
+  onSettlement: (contract: HitContract) => void = () => {};
   constructor(
     readonly resident: (id: string) => ContractResident | undefined,
     readonly now: () => number,
@@ -168,6 +169,7 @@ export class ContractBook {
     if (!wallet || wallet.money + c.price > 1e9) return;
     wallet.money += c.price;
     this.contracts.delete(c.id);
+    this.onSettlement({ ...c });
   }
 }
 

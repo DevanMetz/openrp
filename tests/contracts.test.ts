@@ -100,3 +100,26 @@ test('missing refund wallets retain escrow until they return; expired offers can
   assert.equal(customer.money, 1500);
   assert.equal(book.contracts.size, 0);
 });
+
+test('settlement receipts fire only after successful transfer and once despite repeated attempts', () => {
+  const { book, people } = fixture();
+  const receipts: { id: string; status: string; price: number }[] = [];
+  book.onSettlement = (c) => {
+    receipts.push(c);
+    c.price = 1;
+  };
+  const c = book.request('customer', 'hitman', 'target', 500);
+  book.accept('hitman', c.id);
+  people.get('hitman')!.money = 1e9;
+  book.death('target', 'hitman');
+  book.tick();
+  assert.equal(receipts.length, 0);
+  assert.equal(book.contracts.get(c.id)?.price, 500);
+  people.get('hitman')!.money -= 500;
+  book.tick();
+  book.tick();
+  book.death('target', 'hitman');
+  assert.equal(receipts.length, 1);
+  assert.equal(receipts[0].status, 'payout');
+  assert.equal(people.get('hitman')!.money, 1e9);
+});

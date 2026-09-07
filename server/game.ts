@@ -171,6 +171,28 @@ export class Game {
         return hit.kind === 'player' && hit.id === b.id;
       },
     );
+    this.contracts.onSettlement = (c) => {
+      const target = this.contractName(c.target);
+      if (c.status === 'payout') {
+        this.notice(
+          c.hitman,
+          `Contract completed: $${c.price} paid to your wallet for ${target}.`,
+          'success',
+        );
+        this.notice(
+          c.customer,
+          `Contract completed: $${c.price} paid to ${this.contractName(c.hitman)} for ${target}.`,
+          'success',
+        );
+      } else {
+        this.notice(
+          c.customer,
+          `Contract closed: $${c.price} refunded to your wallet for ${target}.`,
+          'success',
+        );
+        this.notice(c.hitman, `Contract closed: ${target}. The customer received a $${c.price} refund.`);
+      }
+    };
     if (options.world?.contracts) this.contracts.restore(options.world.contracts);
     this.physics.broadphase = new CANNON.SAPBroadphase(this.physics);
     this.physics.defaultContactMaterial.friction = 0.55;

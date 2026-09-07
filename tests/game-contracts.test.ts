@@ -91,3 +91,19 @@ test('customer custody cancels funded contracts and refunds the customer', () =>
   assert.equal(f.customer.player.money, 1500);
   assert.equal(f.game.contracts.contracts.size, 0);
 });
+
+test('Game settlement receipts reach only the customer and hitman after refund or payout', () => {
+  for (const payout of [false, true]) {
+    const f = fixture();
+    const events: { event: import('../shared/types.ts').GameEvent; to?: string }[] = [];
+    f.game.onEvent = (event, to) => events.push({ event, to });
+    const c = f.game.contracts.request(f.customer.player.id, f.hitman.player.id, f.target.player.id, 500);
+    f.game.contracts.accept(f.hitman.player.id, c.id);
+    if (payout) f.game.damage(f.target.player, 200, f.hitman.player);
+    else f.game.contracts.cancel(f.customer.player.id, c.id);
+    const receipts = events.filter((v) => v.event.type === 'notice' && v.event.text.startsWith('Contract '));
+    assert.equal(receipts.length, 2);
+    assert.deepEqual(new Set(receipts.map((v) => v.to)), new Set([f.customer.player.id, f.hitman.player.id]));
+    assert.ok(receipts.every((v) => v.event.type === 'notice' && v.event.text.includes('$500')));
+  }
+});
