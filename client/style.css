@@ -1958,3 +1958,34 @@ small {
   width: 100%;
   min-width: 0;
 }
+
+.contract-hud {
+  position: absolute;
+  top: 9rem;
+  right: 1.5rem;
+  width: 16rem;
+  max-width: calc(100vw - 3rem);
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.85rem 1rem;
+  text-align: left;
+  background: #18261feb;
+  border-left: 3px solid var(--accent);
+  pointer-events: auto;
+}
+.contract-hud strong {
+  overflow-wrap: anywhere;
+}
+.contract-hud small {
+  color: var(--muted);
+}
+@media (max-width: 700px) {
+  .contract-hud {
+    right: 0.8rem;
+    top: 7.5rem;
+    width: 14rem;
+    padding: 0.65rem 0.8rem;
+    font-size: 0.8rem;
+  }
+}
+

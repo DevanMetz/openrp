@@ -111,3 +111,8 @@ Contract UI increment: full check passed all 107 tests. Real four-client tests v
 Contract settlement receipts: successful refunds and payouts now notify the customer and hitman with target and amount. Full/missing wallets do not emit receipts until transfer succeeds. Receipts are online notices, not persistent transaction history; offline wallet settlement remains correct but offline notice delivery is not queued. All 109 tests, typecheck/build and production smoke passed, including delayed payout exactly-once receipt checks and recipient scoping for refund/payout.
 
 Original Hitman outfit: charcoal short jacket, high-neck knit, lapels/pockets/buttons, dark glasses and earpiece. Chrome visual lab reviewed standing and crouched poses at pitch 0/0.7 on two appearance variants. Build/typecheck and production smoke passed. Reused lab captions are not valid model-count or performance evidence; no GPU performance claim is made. Extreme motion/weapon combinations remain unreviewed.
+# Active contract HUD — local follow-up
+
+The assigned hitman now sees a compact target, escrow amount and remaining-time card during play. It opens Contracts and disappears after cancellation. Reviewed in isolated, nonpersistent browser sessions at desktop size and in a 360 × 780 iframe; the narrow menu opened from the card and cancellation cleared both views. Temporary connection notices can overlap the card on narrow screens; notification stacking remains a layout follow-up. No production game state was used.
+
+Validation: `npm run check` passed after the final HUD styling change, including the existing 109 tests, production build and HTTP smoke. This UI increment adds no server protocol or payment behavior. It is local and has not been deployed.

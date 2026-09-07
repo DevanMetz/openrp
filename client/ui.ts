@@ -113,6 +113,7 @@ export class UI {
         <footer class="entry-footer"><span>JOBS. PROPERTY. PHYSICS. POSSIBILITIES.</span><span>DESKTOP · KEYBOARD & MOUSE</span></footer>
       </section>
       <div id="hud" hidden>
+        <button id="contract-hud" class="contract-hud" data-menu="contracts" hidden aria-label="Open active contract"><span class="eyebrow">ACTIVE CONTRACT</span><strong id="contract-hud-target"></strong><span id="contract-hud-detail"></span><small>F4 → Contracts for details</small></button>
         <div class="hud-top"><div class="district-label"><span class="status-dot"></span><span id="district">Union Square</span><small>UNION DISTRICT</small></div><div class="server-chip"><span id="online">ONLINE</span><i></i><span id="ping">— ms</span></div></div>
         <div id="voice-hud" class="voice-hud"><button data-menu="settings" aria-label="Voice settings"><kbd>V</kbd><span id="voice-hint">Enable microphone</span><span class="voice-meter"><i id="voice-level"></i></span></button><div id="voice-speakers" hidden></div></div>
         <div id="lockdown" hidden>⚠ CITY LOCKDOWN <span>Return to your property. Follow Civil Protection instructions.</span></div>
@@ -338,6 +339,17 @@ export class UI {
   update(state: Snapshot, p: Player, ping: number): void {
     this.state = state;
     this.player = p;
+    const assignment = this.contracts.find((c) => c.hitman === p.id && c.status === 'active');
+    this.el('contract-hud').hidden = !assignment;
+    if (assignment) {
+      this.text('contract-hud-target', assignment.targetName);
+      const seconds = Math.max(0, Math.ceil((assignment.expires - state.time) / 1000));
+      this.text(
+        'contract-hud-detail',
+        `${money(assignment.price)} · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} remaining`,
+      );
+    }
+
     const job = JOBS[p.job];
     this.text('district', districtAt(p.x, p.z, p.y));
     this.text('online', `${state.players.length} ONLINE`);
