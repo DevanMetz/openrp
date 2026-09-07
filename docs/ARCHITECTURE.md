@@ -17,7 +17,15 @@ flowchart LR
     S --> D[Atomic wallet file]
 ```
 
-All messages are defined in `shared/types.ts`. The connection begins with `join`, followed by `welcome` (including a fresh or resumed bearer token) and a snapshot. A protocol number prevents a stale frontend from silently joining an incompatible server. Chat, notices, sound, lockpicking progress and bullet traces are transient events.
+Game messages are defined in `shared/types.ts`. The connection begins with `join`, followed by `welcome` (including a fresh or resumed bearer token and a separate ephemeral voice ticket) and a snapshot. A protocol number prevents a stale frontend from silently joining an incompatible server. Chat, notices, sound, lockpicking progress and bullet traces are transient events.
+
+## Proximity voice
+
+`server/voice.ts` handles a separate `/voice` WebSocket so audio congestion cannot block gameplay updates. A random ticket binds one voice socket to an active, admitted game identity. The server stamps the sender ID and forwards valid audio only to living, listening, unmuted residents inside a 28 metre sphere. Clients never choose recipients or report authoritative voice positions. Game disconnect and operator removal revoke the ticket and close audio. Origin checks, pending-join limits, a capture-rate allowance, hard flood limits, strict frame shape, sequence checks and backpressure apply independently of gameplay admission.
+
+`client/voice-worklet.ts` resamples the microphone's native sample rate into 320-sample mono frames at 16 kHz. `shared/voice.ts` defines the versioned PCM16 packet format. `client/voice.ts` schedules short audio buffers with an initial 60 ms cushion and at most about 180 ms queued playback. Late bursts are discarded, not accumulated. Each active remote speaker gets a PannerNode with HRTF direction and linear distance attenuation, followed by a shared volume gain and compressor. Speaking indicators reflect recently received audio. Stale players, mute changes, death and disconnect cancel queued sources.
+
+Microphone capture requires an explicit button press. Both the media track and worklet gate are disabled outside push-to-talk; disabling the mic stops all tracks. A generation counter also cancels permission requests that resolve after disconnect or cancellation. Menus, chat, key release, blur and hidden tabs stop transmission. Browser echo cancellation, noise suppression and automatic gain control are requested. Voice is not persisted or transcribed, has no wall occlusion, and is not end-to-end encrypted. PCM is broadly compatible but uses more egress than Opus; bandwidth limits still apply to crowded voice activity.
 
 ## Prediction and collision
 
@@ -49,4 +57,4 @@ The DOM layer in `client/ui.ts` renders HUD and game menus. Player-controlled te
 - Add tests around transactions, timers, permissions, visibility and reconnect behavior.
 - Preserve protocol compatibility intentionally, or increment the protocol number on both sides.
 
-Potential later work includes original richer art, multiple floors, player pushing/contacts, constraint tools, a map editor, verified accounts, spatial networking, voice, vehicles and persistent properties. None of those are represented as implemented systems in this release.
+Potential later work includes original richer art, multiple floors, player pushing/contacts, constraint tools, a map editor, verified accounts, spatial game-state networking, vehicles and persistent properties. None of those are represented as implemented systems in this release.

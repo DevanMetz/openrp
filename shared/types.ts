@@ -148,6 +148,7 @@ export type ServerMessage =
       name: string;
       serverName: string;
       protocol: number;
+      voiceTicket: string;
     }
   | { type: 'pong'; time: number };
 export interface Box {

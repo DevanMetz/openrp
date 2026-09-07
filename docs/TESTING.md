@@ -18,6 +18,10 @@ Coverage includes:
 - Real WebSocket clients sharing players, props, jobs and chat; cleanup on disconnect.
 - Invalid JSON, origin restrictions, flooding, optional passwords and server status.
 - Atomic wallet round-trip and refusal to load corrupt economy data.
+- Voice frame validation and quantization; capture at 44.1/48 kHz with no packets outside push-to-talk.
+- Real voice sockets: server-enforced range, dead-player suppression, individual mute, deafen and no self echo.
+- Voice ticket admission/revocation, duplicate sockets, origin rejection, replayed frames, flood isolation and operator removal.
+- Production worklet asset, same-origin microphone policy, and exclusion of the development voice lab.
 
 ## Browser checklist
 
@@ -31,5 +35,12 @@ Coverage includes:
 8. Test firearm ammo/reload and wall occlusion. Mark a suspect wanted, arrest them, verify jail constraints, then release them. Issue a warrant and ram the appropriate door.
 9. Verify local/OOC/group chat and mayor laws. Names containing `<`, `>` or quotes must display as text.
 10. Disconnect/reconnect and reload the page. Check wallet continuity, cleanup, readable errors, graphics settings and no console exceptions.
+11. Voice: Settings → Enable microphone → allow the browser permission → return to play → hold V. Another nearby resident should hear directional audio that fades with distance and stops at 28 metres. Test V release, menus, chat, blur, tab visibility, death, mute/unmute in Tab, mute all, volume and microphone off. Permission denial or a missing device must leave text/gameplay working and show a useful retry message.
+
+### Reproducible browser voice lab
+
+Run `node --import tsx scripts/voice-lab.ts`, then open `http://localhost:3175/voice-lab.html` and click **Run synthetic voice checks**. It uses disposable residents and a synthesized MediaStream, never `getUserMedia`, so it exercises the actual AudioWorklet → voice relay → PannerNode → output graph without accessing a person's microphone. It checks silence before PTT, received audio energy, individual mute, deafen, PTT release and track release. The loopback-only lab and its client are excluded from the production build/container. This does not replace testing two real microphones and devices for echo or network quality.
+
+Chrome on Windows, September 7, 2026: the synthetic run captured 108 frames and played 108, with measured nonzero output (peak RMS 0.01757). The device context ran at 48 kHz and the transport at 16 kHz. All six browser audio checks passed. Automated voice tests also exercise 44.1 kHz capture. Voice crowd capacity and other browsers have not been measured.
 
 Browser checks use the real browser. Automated tests additionally cover 80 concurrent connections, delta reconstruction, trusted proxy headers and operator authorization. Run `npx tsx scripts/load.ts 100 15` for an isolated local synthetic movement load check; it never targets production. A local September 2026 run held 100 connections for 15 seconds, delivered 12.93 updates/client/second, used 10.49 MiB/s total outbound traffic and measured 21.45 ms p99 event-loop delay. This is a reproducible diagnostic, not a real-player or production capacity guarantee. CI validates Node 22 and 24; graphical rendering depends on a WebGL2-capable browser and GPU.

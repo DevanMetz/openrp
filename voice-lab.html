@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>OpenRP voice lab</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font: 16px system-ui;
+        background: #12231b;
+        color: #deead4;
+        max-width: 850px;
+        margin: 55px auto;
+        padding: 24px;
+      }
+      button {
+        background: #ceeaa1;
+        color: #192718;
+        border: 0;
+        border-radius: 5px;
+        padding: 14px 20px;
+        margin: 5px;
+        cursor: pointer;
+      }
+      pre {
+        white-space: pre-wrap;
+        line-height: 1.8;
+        padding: 24px;
+        background: #1d3325;
+        border: 1px solid #527344;
+      }
+      h1 {
+        font-size: 35px;
+      }
+      p {
+        color: #b7c6ac;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Proximity voice · browser lab</h1>
+    <p>
+      Two isolated residents. A synthetic tone exercises capture, resampling, relay and spatial playback. This
+      page never requests your microphone. Audio is quiet and stops automatically.
+    </p>
+    <button id="run">Run synthetic voice checks</button><button id="stop">Stop audio and disconnect</button>
+    <pre id="results" role="status">Ready. No microphone access or audio recording.</pre>
+    <script type="module" src="/client/voice-lab.ts"></script>
+  </body>
+</html>

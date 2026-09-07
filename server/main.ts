@@ -8,6 +8,7 @@ import { Game, cleanText } from './game.ts';
 import { loadProfiles, saveProfiles } from './persistence.ts';
 import { clientIP, JoinRate } from './network.ts';
 import { Moderation } from './moderation.ts';
+import { VoiceRelay } from './voice.ts';
 import { PROTOCOL, SNAPSHOT_RATE, TICK_RATE, VERSION } from '../shared/catalog.ts';
 import type { ClientMessage, Snapshot } from '../shared/types.ts';
 import { makeDelta } from '../shared/replication.ts';
@@ -50,6 +51,7 @@ export async function startServer(
   const name = cleanText(process.env.SERVER_NAME, 80) || 'OpenRP | Union District';
   const password = options.password ?? process.env.SERVER_PASSWORD ?? '';
   const moderation = new Moderation(dataDir, persist, options.adminKey);
+  const voice = new VoiceRelay(game);
   const dist = resolve('dist');
   const mime: Record<string, string> = {
     '.html': 'text/html; charset=utf-8',
@@ -69,12 +71,14 @@ export async function startServer(
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'same-origin');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Permissions-Policy', 'microphone=(self), camera=()');
     if (req.url?.split('?')[0] === '/api/admin') {
       await moderation.handle(req, res, game, (id, reason) => {
         for (const [ws, session] of sessions)
           if (session.id === id) {
             send(ws, { type: 'notice', text: `Removed by an operator: ${reason}`, tone: 'error' });
             game.disconnect(id);
+            voice.remove(id);
             session.id = undefined;
             ws.close(1008, 'Removed by an operator');
           }
@@ -160,7 +164,8 @@ export async function startServer(
   const joinRate = new JoinRate();
   const proxy = process.env.TRUST_PROXY ?? 'none';
   server.on('upgrade', (req, socket, head) => {
-    if (req.url?.split('?')[0] !== '/ws') {
+    const path = req.url?.split('?')[0];
+    if (path !== '/ws' && path !== '/voice') {
       if (production) socket.destroy();
       return;
     }
@@ -177,6 +182,10 @@ export async function startServer(
       return;
     }
     const ip = clientIP(req, proxy);
+    if (path === '/voice') {
+      voice.upgrade(req, socket, head, ip);
+      return;
+    }
     if ([...sessions.values()].filter((s) => !s.id && s.ip === ip).length >= 8 || !joinRate.allow(ip)) {
       socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n');
       socket.destroy();
@@ -253,6 +262,7 @@ export async function startServer(
             name: joined.player.name,
             serverName: name,
             protocol: PROTOCOL,
+            voiceTicket: voice.register(session.id),
           });
         } catch (error) {
           send(ws, { type: 'notice', text: (error as Error).message, tone: 'error' });
@@ -269,7 +279,10 @@ export async function startServer(
     });
     ws.on('close', () => {
       clearTimeout(joinTimeout);
-      if (session.id) game.disconnect(session.id);
+      if (session.id) {
+        voice.remove(session.id);
+        game.disconnect(session.id);
+      }
       sessions.delete(ws);
     });
   });
@@ -335,6 +348,7 @@ export async function startServer(
     clearInterval(saving);
     flush();
     for (const ws of sessions.keys()) ws.terminate();
+    await voice.close();
     await new Promise<void>((ok) => wss.close(() => ok()));
     await vite?.close();
     await new Promise<void>((ok) => server.close(() => ok()));

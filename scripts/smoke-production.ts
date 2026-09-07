@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readdir } from 'node:fs/promises';
 import { startServer } from '../server/main.ts';
 
 const app = await startServer({ port: 0, host: '127.0.0.1', production: true, persist: false });
@@ -8,6 +9,7 @@ try {
   assert.equal(home.status, 200, 'production index exists; run npm run build first');
   const html = await home.text();
   assert.ok(html.includes('OpenRP'));
+  assert.equal(home.headers.get('permissions-policy'), 'microphone=(self), camera=()');
   const assets = [...html.matchAll(/(?:src|href)="(\/assets\/[^"\s]+)"/g)].map((match) => match[1]);
   assert.ok(assets.some((asset) => asset.endsWith('.js')));
   assert.ok(assets.some((asset) => asset.endsWith('.css')));
@@ -19,12 +21,20 @@ try {
     if (asset.endsWith('.css')) assert.ok(response.headers.get('content-type')?.includes('text/css'));
   }
   assert.equal((await fetch(`${base}/.env`)).status, 404);
+  assert.equal((await fetch(`${base}/voice-lab.html`)).status, 404);
+  assert.equal((await fetch(`${base}/client/voice-lab.ts`)).status, 404);
+  const worklet = (await readdir('dist/assets')).find((name) => /^voice-worklet-.*\.js$/.test(name));
+  assert.ok(worklet, 'capture worklet is emitted as a production asset');
+  const capture = await fetch(`${base}/assets/${worklet}`);
+  assert.equal(capture.status, 200);
+  assert.ok(capture.headers.get('content-type')?.includes('javascript'));
+  assert.ok((await capture.text()).includes('registerProcessor'));
   assert.equal((await fetch(`${base}/..%2f..%2fpackage.json`)).status, 403);
   assert.equal(await (await fetch(`${base}/health`)).text(), 'ok');
   const status = await (await fetch(`${base}/api/status`)).json();
   assert.equal(status.players, 0);
   console.log(
-    `Production smoke passed: index, ${assets.length} built assets, MIME/cache headers, private-file boundaries and health.`,
+    `Production smoke passed: index, ${assets.length} built assets, voice worklet, microphone policy, excluded lab, MIME/cache headers, private-file boundaries and health.`,
   );
 } finally {
   await app.close();

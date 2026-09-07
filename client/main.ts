@@ -17,6 +17,7 @@ import {
   type Avatar,
 } from './entities.ts';
 import { GameAudio } from './audio.ts';
+import { ProximityVoice } from './voice.ts';
 import { UI, type AimTarget } from './ui.ts';
 import { EYE_HEIGHT, JOBS, PROPS, PROTOCOL, TICK_RATE, WEAPONS, entitySize } from '../shared/catalog.ts';
 import { BLOCKS, doorBox } from '../shared/map.ts';
@@ -36,6 +37,16 @@ import type {
 
 const ui = new UI();
 const audio = new GameAudio();
+const voice = new ProximityVoice();
+voice.onChange = (status) => ui.updateVoice(status);
+voice.onNotice = (message) => ui.notice(message);
+ui.onVoice = (command, id) => {
+  if (command === 'mic') {
+    if (['ready', 'requesting'].includes(voice.status.microphone)) voice.disableMicrophone();
+    else void voice.enableMicrophone();
+  } else if (command === 'deafen') voice.toggleDeafened();
+  else if (command === 'mute' && id) voice.toggleMute(id);
+};
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(ui.settings.fov, innerWidth / innerHeight, 0.06, 420);
 camera.rotation.order = 'YXZ';
@@ -122,6 +133,7 @@ function lock(): void {
   }
 }
 function releaseControls(): void {
+  voice.setTalking(false);
   keys.clear();
   mouseDown = false;
   fallbackActive = fallbackDrag = false;
@@ -138,6 +150,7 @@ ui.onAction = (name, target, value) => {
 ui.onChat = (text) => send({ type: 'chat', text });
 ui.onSettings = () => {
   audio.setVolume(ui.settings.volume);
+  voice.setVolume(ui.settings.voiceVolume);
   camera.fov = ui.settings.fov;
   camera.updateProjectionMatrix();
   renderer.shadowMap.enabled = ui.settings.quality === 'high';
@@ -162,6 +175,7 @@ void refreshStatus();
 ui.onConnect = (name, password) => {
   if (socket?.readyState === WebSocket.CONNECTING || socket?.readyState === WebSocket.OPEN) return;
   audio.init();
+  void voice.prepare();
   audio.setVolume(ui.settings.volume);
   ui.status('Joining the district…', true);
   localStorage.setItem('openrp-name', name);
@@ -193,6 +207,7 @@ ui.onConnect = (name, password) => {
         return;
       }
       myId = msg.id;
+      voice.connect(msg.id, msg.voiceTicket);
       localStorage.setItem('openrp-token', msg.token);
       localStorage.setItem('openrp-name', msg.name);
       ui.serverName = msg.serverName;
@@ -239,6 +254,7 @@ ui.onConnect = (name, password) => {
   ws.addEventListener('close', (event) => {
     if (socket !== ws) return;
     releaseControls();
+    voice.disconnect();
     ui.disconnected(
       rejection ||
         (event.code === 1008
@@ -285,6 +301,7 @@ function receiveState(snapshot: Snapshot): void {
   const first = !me;
   state = snapshot;
   me = p;
+  voice.updateWorld(p, snapshot.players);
   clockOffset = snapshot.time - Date.now() + ping / 2;
   pending = pending.filter((i) => i.seq > p.seq);
   predicted = { x: p.x, y: p.y, z: p.z, vy: p.vy, grounded: p.grounded };
@@ -426,7 +443,7 @@ function aim(): AimTarget | undefined {
       id: p.id,
       title: p.name,
       detail: `${JOBS[p.job].name}${p.wantedUntil ? ` · WANTED: ${p.wantedReason}` : ''}`,
-      hint: 'Y  Talk     /give amount  Give money',
+      hint: 'V  Voice     Y  Text     /give amount  Give money',
     };
   }
   return target;
@@ -465,6 +482,14 @@ document.addEventListener('keydown', (event) => {
   if (!controlsActive()) return;
   if (['Space', 'ControlLeft', 'ControlRight'].includes(event.code)) event.preventDefault();
   keys.add(event.code);
+  if (event.code === 'KeyV') {
+    event.preventDefault();
+    if (voice.status.microphone === 'ready') voice.setTalking(true);
+    else {
+      ui.open('settings');
+      ui.notice('Enable your microphone, return to the streets, then hold V to talk.');
+    }
+  }
   if (/^Digit[1-9]$/.test(event.code)) {
     const w = me.weapons[Number(event.code.slice(-1)) - 1];
     if (w) action('equip', w);
@@ -477,7 +502,10 @@ document.addEventListener('keydown', (event) => {
   if (event.code === 'KeyF') action('fade');
   if (event.code === 'KeyZ') action('undo');
 });
-document.addEventListener('keyup', (event) => keys.delete(event.code));
+document.addEventListener('keyup', (event) => {
+  keys.delete(event.code);
+  if (event.code === 'KeyV') voice.setTalking(false);
+});
 document.addEventListener('mousemove', (event) => {
   if (!(locked() || (fallbackActive && fallbackDrag)) || ui.menu || ui.chatOpen) return;
   yaw = (yaw - event.movementX * 0.002 * ui.settings.sensitivity) % (Math.PI * 2);
@@ -488,6 +516,7 @@ document.addEventListener('pointerlockchange', () => {
     fallbackActive = false;
   } else {
     keys.clear();
+    voice.setTalking(false);
     mouseDown = false;
     action('release');
     setTimeout(() => {
@@ -540,6 +569,7 @@ document.addEventListener(
   { passive: false },
 );
 window.addEventListener('blur', releaseControls);
+window.addEventListener('pagehide', () => voice.disconnect());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) releaseControls();
 });
@@ -619,6 +649,11 @@ function frame(now: number): void {
         ping,
       );
       ui.target(aim());
+      voice.updateListener(
+        cameraPos,
+        direction(yaw, pitch),
+        new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion),
+      );
     }
     let model = models.get(me.weapon);
     if (!model) {

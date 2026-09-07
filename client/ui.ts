@@ -1,6 +1,7 @@
 import { GOVERNMENT, JOBS, MAX_PROPS, PROPS, SHOP, VERSION, WEAPONS } from '../shared/catalog.ts';
 import { BUILDINGS, districtAt } from '../shared/map.ts';
 import type { GameEvent, JobId, Player, Snapshot } from '../shared/types.ts';
+import type { VoiceStatus } from './voice.ts';
 
 export const escape = (text: unknown): string =>
   String(text ?? '').replace(
@@ -17,6 +18,7 @@ export interface AimTarget {
 }
 export interface Settings {
   volume: number;
+  voiceVolume: number;
   sensitivity: number;
   fov: number;
   quality: 'low' | 'high';
@@ -44,6 +46,17 @@ export class UI {
   settings: Settings;
   serverName = 'OpenRP | Union District';
   lastMenuKey = '';
+  voice: VoiceStatus = {
+    connected: false,
+    microphone: 'off',
+    talking: false,
+    deafened: false,
+    level: 0,
+    speakers: [],
+    muted: new Set(),
+  };
+  private lastVoiceKey = '';
+  onVoice: (command: 'mic' | 'deafen' | 'mute', id?: string) => void = () => {};
   onConnect: (name: string, password: string) => void = () => {};
   onAction: (action: string, target?: string, value?: string | number | boolean) => void = () => {};
   onChat: (text: string) => void = () => {};
@@ -54,13 +67,14 @@ export class UI {
     try {
       this.settings = {
         volume: 0.45,
+        voiceVolume: 0.8,
         sensitivity: 1,
         fov: 80,
         quality: 'high',
         ...JSON.parse(localStorage.getItem('openrp-settings') ?? '{}'),
       };
     } catch {
-      this.settings = { volume: 0.45, sensitivity: 1, fov: 80, quality: 'high' };
+      this.settings = { volume: 0.45, voiceVolume: 0.8, sensitivity: 1, fov: 80, quality: 'high' };
     }
     this.root = document.getElementById('app')!;
     this.root.innerHTML = `
@@ -77,6 +91,7 @@ export class UI {
       </section>
       <div id="hud" hidden>
         <div class="hud-top"><div class="district-label"><span class="status-dot"></span><span id="district">Union Square</span><small>UNION DISTRICT</small></div><div class="server-chip"><span id="online">ONLINE</span><i></i><span id="ping">— ms</span></div></div>
+        <div id="voice-hud" class="voice-hud"><button data-menu="settings" aria-label="Voice settings"><kbd>V</kbd><span id="voice-hint">Enable microphone</span><span class="voice-meter"><i id="voice-level"></i></span></button><div id="voice-speakers" hidden></div></div>
         <div id="lockdown" hidden>⚠ CITY LOCKDOWN <span>Return to your property. Follow Civil Protection instructions.</span></div>
         <div id="vote-banner" hidden></div>
         <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div><div id="hitmarker" hidden>×</div>
@@ -130,7 +145,9 @@ export class UI {
       const out = input.parentElement?.querySelector('output');
       if (out)
         out.textContent =
-          key === 'volume' ? `${Math.round(this.settings.volume * 100)}%` : String(this.settings[key]);
+          key === 'volume' || key === 'voiceVolume'
+            ? `${Math.round(this.settings[key] * 100)}%`
+            : String(this.settings[key]);
     });
   }
   el(id: string): HTMLElement {
@@ -292,6 +309,84 @@ export class UI {
     this.text('target-detail', target.detail);
     this.text('target-hint', target.hint);
   }
+  updateVoice(voice: VoiceStatus): void {
+    this.voice = voice;
+    const key = `${this.playing}:${voice.connected}:${voice.microphone}:${voice.talking}:${voice.deafened}:${voice.speakers.map((p) => p.id + p.name).join(',')}:${[...voice.muted].join(',')}`;
+    const meter = document.getElementById('voice-level');
+    if (meter) meter.style.transform = `scaleX(${voice.level})`;
+    if (key === this.lastVoiceKey) return;
+    this.lastVoiceKey = key;
+    this.refreshVoiceControls();
+  }
+  private refreshVoiceControls(): void {
+    const v = this.voice;
+    const hint = !v.connected
+      ? 'Voice connecting…'
+      : v.deafened
+        ? 'Voice muted'
+        : v.talking
+          ? 'Talking to nearby players'
+          : v.microphone === 'ready'
+            ? 'Hold V to talk'
+            : v.microphone === 'requesting'
+              ? 'Allow microphone in browser'
+              : v.microphone === 'unsupported'
+                ? 'Voice needs HTTPS'
+                : 'Enable microphone';
+    const label = !this.playing
+      ? 'Join to enable microphone'
+      : v.microphone === 'ready'
+        ? 'Turn microphone off'
+        : v.microphone === 'requesting'
+          ? 'Cancel microphone request'
+          : v.microphone === 'blocked'
+            ? 'Retry microphone'
+            : 'Enable microphone';
+    if (document.getElementById('voice-hint')) this.text('voice-hint', hint);
+    document.getElementById('voice-hud')?.classList.toggle('transmitting', v.talking);
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-action="voice-mic"]')) {
+      button.textContent = label;
+      button.disabled = !this.playing || !v.connected || v.microphone === 'unsupported';
+      button.setAttribute('aria-pressed', String(v.microphone === 'ready'));
+    }
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('[data-action="voice-deafen"]')) {
+      button.textContent = v.deafened ? 'Unmute all voice' : 'Mute all voice';
+      button.disabled = !this.playing;
+      button.setAttribute('aria-pressed', String(v.deafened));
+    }
+    const speakers = document.getElementById('voice-speakers');
+    if (speakers) {
+      speakers.hidden = !v.speakers.length;
+      speakers.innerHTML =
+        v.speakers
+          .slice(0, 4)
+          .map(
+            (p) =>
+              `<button data-action="voice-mute" data-target="${p.id}" aria-label="Mute ${escape(p.name)}"><span class="voice-wave">ııı</span>${escape(p.name)}<small>MUTE</small></button>`,
+          )
+          .join('') +
+        (v.speakers.length > 4
+          ? `<small>+${v.speakers.length - 4} nearby speakers · Tab for players</small>`
+          : '');
+    }
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>(
+      '.scoreboard [data-action="voice-mute"]',
+    )) {
+      const id = button.dataset.target!;
+      const name = this.state?.players.find((p) => p.id === id)?.name ?? 'resident';
+      button.textContent = v.muted.has(id) ? 'Unmute' : 'Mute';
+      button.setAttribute('aria-label', `${v.muted.has(id) ? 'Unmute' : 'Mute'} ${name}`);
+      button.setAttribute('aria-pressed', String(v.muted.has(id)));
+    }
+    for (const indicator of this.root.querySelectorAll<HTMLElement>('[data-voice-speaker]')) {
+      const id = indicator.dataset.voiceSpeaker!;
+      const talking = id === this.player?.id ? v.talking : v.speakers.some((p) => p.id === id);
+      indicator.textContent = v.muted.has(id) ? 'Voice muted' : talking ? 'Speaking nearby' : '';
+    }
+  }
+  private voiceControls(): string {
+    return `<section class="voice-settings"><h3>Proximity voice</h3><p>Enable your microphone, return to the streets, then <kbd>hold V</kbd> to talk. Players within 28 metres can hear you. Release V to stop. Sound follows their position and fades with distance.</p><div class="voice-actions"><button data-action="voice-mic">Enable microphone</button><button data-action="voice-deafen">Mute all voice</button></div><p class="muted">Your mic starts off. Menus, chat, losing focus and respawning stop transmission. Mute individual players in Tab. Headphones help prevent echo.</p></section>`;
+  }
   renderMenu(): void {
     const p = this.player,
       s = this.state;
@@ -310,7 +405,7 @@ export class UI {
     );
     let html = '';
     if (this.menu === 'pause')
-      html = `<div class="section-heading"><span class="eyebrow">UNION DISTRICT</span><h2>You’re still in the city.</h2><p>Multiplayer continues while this menu is open.</p></div><button class="primary" data-action="resume">Return to the streets ↗</button><div class="pause-links"><button data-menu="jobs">Find a job</button><button data-menu="build">Build something</button><button data-menu="help">Read the field guide</button></div><p class="muted">Invite friends with this server address: <code>${escape(location.origin)}</code></p>`;
+      html = `<div class="section-heading"><span class="eyebrow">UNION DISTRICT</span><h2>You’re still in the city.</h2><p>Multiplayer continues while this menu is open.</p></div><button class="primary" data-action="resume">Return to the streets ↗</button><div class="pause-links"><button data-menu="jobs">Find a job</button><button data-menu="build">Build something</button><button data-menu="help">Read the field guide</button></div><p class="muted">Invite friends with this server address: <code>${escape(location.origin)}</code></p>${this.voiceControls()}`;
     if (this.menu === 'jobs' && p && s) {
       const job = JOBS[this.selectedJob],
         count = s.players.filter((v) => v.job === this.selectedJob).length;
@@ -357,7 +452,7 @@ export class UI {
     if (this.menu === 'laws' && s && p)
       html = `<div class="section-heading"><span class="eyebrow">MUNICIPAL NOTICEBOARD</span><h2>The law of the district.</h2><p>Mayor: ${escape(s.players.find((v) => v.job === 'mayor')?.name ?? 'Office vacant')}</p></div><div class="laws-list">${s.laws.map((law, i) => `<div><span>${String(i + 1).padStart(2, '0')}</span><p>${escape(law)}</p></div>`).join('')}</div><p class="muted">${s.lockdown ? 'A citywide lockdown is in effect.' : 'The district is open. No lockdown is in effect.'}</p>${p.job === 'mayor' ? '<div class="command-field"><input id="new-law" maxlength="120" placeholder="Write a new city law" aria-label="New city law"><button data-action="add-law">Add law</button></div><div class="tool-buttons"><button data-action="lockdown">Toggle lockdown</button><button data-action="reset-laws">Restore default laws</button></div>' : ''}${this.voteHtml()}`;
     if (this.menu === 'players' && s)
-      html = `<div class="section-heading"><span class="eyebrow">${escape(this.serverName)}</span><h2>The people make the city.</h2><p>${s.players.length} residents connected</p></div><div class="scoreboard"><div class="score-head"><span>RESIDENT</span><span>OCCUPATION</span><span>STATUS</span></div>${s.players.map((v) => `<div class="score-row"><span><i style="background:${JOBS[v.job].color}"></i>${escape(v.name)}${v.id === p?.id ? ' <small>YOU</small>' : ''}</span><span style="color:${JOBS[v.job].color}">${JOBS[v.job].name}</span><span>${v.deadUntil ? 'Respawning' : v.arrestedUntil ? 'In custody' : v.wantedUntil ? 'Wanted' : 'In the district'}</span></div>`).join('')}</div><p class="muted">Chat nearby with Y. Use /ooc to reach everyone and /g to talk to your job group.</p>`;
+      html = `<div class="section-heading"><span class="eyebrow">${escape(this.serverName)}</span><h2>The people make the city.</h2><p>${s.players.length} residents connected</p></div><div class="scoreboard"><div class="score-head"><span>RESIDENT</span><span>OCCUPATION</span><span>STATUS</span><span>VOICE</span></div>${s.players.map((v) => `<div class="score-row"><span><i style="background:${JOBS[v.job].color}"></i>${escape(v.name)}${v.id === p?.id ? ' <small>YOU</small>' : ''}</span><span style="color:${JOBS[v.job].color}">${JOBS[v.job].name}</span><span>${v.deadUntil ? 'Respawning' : v.arrestedUntil ? 'In custody' : v.wantedUntil ? 'Wanted' : 'In the district'}<small class="voice-speaking-label" data-voice-speaker="${v.id}"></small></span><span>${v.id === p?.id ? '<small>YOU</small>' : `<button class="voice-mute" data-action="voice-mute" data-target="${v.id}">Mute</button>`}</span></div>`).join('')}</div><p class="muted">Hold V for proximity voice after enabling your microphone in Settings. Mute controls only affect what you hear. Text chat: Y, /ooc for everyone, /g for your job group.</p>`;
     if (this.menu === 'context') html = this.contextHtml();
     if (this.menu === 'help')
       html = `<div class="section-heading"><span class="eyebrow">THE FIELD GUIDE</span><h2>Welcome to the district.</h2><p>DarkRP is a social sandbox. The other players are the story.</p></div><div class="guide-start"><b>Your first five minutes</b><p>Choose a job in F4. Approach a door and press C to buy the property. Furnish your base with Q and the Physics Gun. A printer earns cash; a gun shop or kitchen earns customers. Use Y to introduce yourself.</p></div><div class="help-columns"><div><h3>On the streets</h3>${[
@@ -371,17 +466,19 @@ export class UI {
         ['1–9 / SCROLL', 'Select equipment'],
         ['LMB / RMB', 'Use / alternate use'],
         ['R', 'Reload / rotate held prop'],
-        ['Y / ENTER', 'Chat'],
+        ['Y / ENTER', 'Text chat'],
+        ['HOLD V', 'Proximity voice (enable mic in Settings)'],
         ['TAB', 'Player list'],
         ['ESC', 'Release mouse / pause'],
       ]
         .map(([key, desc]) => `<div class="control-row"><kbd>${key}</kbd><span>${desc}</span></div>`)
         .join(
           '',
-        )}<h3>Building</h3><p>Q opens props and tools. Hold LMB with the Physics Gun to grab your object, then RMB to freeze it. Scroll changes reach. R rotates. F activates fading doors. Z undoes your most recent prop.</p></div><div><h3>Talk & trade</h3><div class="commands"><code>/ooc message</code><p>Talk to the whole server.</p><code>/me action</code><p>Describe an action to nearby players.</p><code>/advert message</code><p>Advertise your business for $50.</p><code>/give 100</code><p>Give money to the player you’re looking at.</p><code>/dropmoney 100</code><p>Drop cash for someone to collect.</p><code>/g message</code><p>Speak to your job group.</p><code>/rpname First Last</code><p>Change your roleplay name.</p></div><h3>Law & order</h3><div class="commands"><code>/wanted Full Name reason</code><p>Government: mark a suspect wanted, then use the arrest baton.</p><code>/unwanted Full Name</code><p>Clear a suspect’s wanted status.</p><code>/warrant Full Name reason</code><p>Mayor or Chief: authorize a search. Officers can then ram the owner’s door.</p><code>/license Full Name</code><p>Mayor: grant a gun license.</p><code>/addlaw text · /removelaw 1</code><p>Mayor: edit city laws.</p><code>/lockdown · /unlockdown</code><p>Mayor: start or end a city curfew.</p></div></div></div><div class="guide-start"><b>Play with friends</b><p>Everyone connects to the same server address. On a LAN, share the host computer’s IP and port. A private browser window creates a separate test identity. This is an early browser implementation: maps, characters and sounds are original; Source engine assets, vehicles and voice chat are not included.</p></div>`;
+        )}<h3>Building</h3><p>Q opens props and tools. Hold LMB with the Physics Gun to grab your object, then RMB to freeze it. Scroll changes reach. R rotates. F activates fading doors. Z undoes your most recent prop.</p></div><div><h3>Talk & trade</h3><div class="commands"><code>/ooc message</code><p>Talk to the whole server.</p><code>/me action</code><p>Describe an action to nearby players.</p><code>/advert message</code><p>Advertise your business for $50.</p><code>/give 100</code><p>Give money to the player you’re looking at.</p><code>/dropmoney 100</code><p>Drop cash for someone to collect.</p><code>/g message</code><p>Speak to your job group.</p><code>/rpname First Last</code><p>Change your roleplay name.</p></div><h3>Law & order</h3><div class="commands"><code>/wanted Full Name reason</code><p>Government: mark a suspect wanted, then use the arrest baton.</p><code>/unwanted Full Name</code><p>Clear a suspect’s wanted status.</p><code>/warrant Full Name reason</code><p>Mayor or Chief: authorize a search. Officers can then ram the owner’s door.</p><code>/license Full Name</code><p>Mayor: grant a gun license.</p><code>/addlaw text · /removelaw 1</code><p>Mayor: edit city laws.</p><code>/lockdown · /unlockdown</code><p>Mayor: start or end a city curfew.</p></div></div></div><div class="guide-start"><b>Play with friends</b><p>Everyone connects to the same server address. On a LAN, share the host computer’s IP and port. A private browser window creates a separate test identity. This is an early browser implementation: maps, characters and sounds are original; Source engine assets and vehicles are not included. Proximity voice is optional and requires HTTPS (or localhost).</p></div>`;
     if (this.menu === 'settings')
-      html = `<div class="section-heading"><span class="eyebrow">MAKE IT YOURS</span><h2>Settings.</h2><p>Saved on this browser.</p></div><div class="settings-list"><label>Sound volume<output>${Math.round(this.settings.volume * 100)}%</output><input aria-label="Sound volume" data-setting="volume" type="range" min="0" max="1" step="0.05" value="${this.settings.volume}"></label><label>Mouse sensitivity<output>${this.settings.sensitivity}</output><input aria-label="Mouse sensitivity" data-setting="sensitivity" type="range" min="0.2" max="2.5" step="0.1" value="${this.settings.sensitivity}"></label><label>Field of view<output>${this.settings.fov}</output><input aria-label="Field of view" data-setting="fov" type="range" min="65" max="105" step="1" value="${this.settings.fov}"></label><label>Graphics quality<select aria-label="Graphics quality" data-setting="quality"><option value="high" ${this.settings.quality === 'high' ? 'selected' : ''}>High · soft shadows</option><option value="low" ${this.settings.quality === 'low' ? 'selected' : ''}>Low · better performance</option></select></label></div><p class="muted">For smoother play on integrated graphics, choose Low. A mouse and keyboard are required.</p>`;
+      html = `<div class="section-heading"><span class="eyebrow">MAKE IT YOURS</span><h2>Settings.</h2><p>Saved on this browser.</p></div><div class="settings-list"><label>Sound volume<output>${Math.round(this.settings.volume * 100)}%</output><input aria-label="Sound volume" data-setting="volume" type="range" min="0" max="1" step="0.05" value="${this.settings.volume}"></label><label>Voice volume<output>${Math.round(this.settings.voiceVolume * 100)}%</output><input aria-label="Voice volume" data-setting="voiceVolume" type="range" min="0" max="1" step="0.05" value="${this.settings.voiceVolume}"></label><label>Mouse sensitivity<output>${this.settings.sensitivity}</output><input aria-label="Mouse sensitivity" data-setting="sensitivity" type="range" min="0.2" max="2.5" step="0.1" value="${this.settings.sensitivity}"></label><label>Field of view<output>${this.settings.fov}</output><input aria-label="Field of view" data-setting="fov" type="range" min="65" max="105" step="1" value="${this.settings.fov}"></label><label>Graphics quality<select aria-label="Graphics quality" data-setting="quality"><option value="high" ${this.settings.quality === 'high' ? 'selected' : ''}>High · soft shadows</option><option value="low" ${this.settings.quality === 'low' ? 'selected' : ''}>Low · better performance</option></select></label></div><p class="muted">For smoother play on integrated graphics, choose Low. A mouse and keyboard are required.</p>${this.voiceControls()}`;
     this.el('menu-content').innerHTML = html;
+    this.refreshVoiceControls();
   }
   voteHtml(): string {
     const v = this.state?.vote;
@@ -424,6 +521,18 @@ export class UI {
   clickAction(action: string, target: string, value?: string): void {
     if (action === 'resume') {
       this.close();
+      return;
+    }
+    if (action === 'voice-mic') {
+      this.onVoice('mic');
+      return;
+    }
+    if (action === 'voice-deafen') {
+      this.onVoice('deafen');
+      return;
+    }
+    if (action === 'voice-mute') {
+      this.onVoice('mute', target);
       return;
     }
     if (action === 'vote') this.onAction('vote', undefined, value === 'yes');

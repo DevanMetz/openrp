@@ -1,6 +1,6 @@
 # Hosting OpenRP
 
-Run `npm ci`, `npm run build`, then `npm start`. The Node process serves the client and `/ws` on one port. `/health` is the deployment health check. `/api/status` reports the live population; `maxPlayers: null` means no slot cap. A static website host cannot run the simulation.
+Run `npm ci`, `npm run build`, then `npm start`. The Node process serves the client, `/ws` for gameplay and `/voice` for proximity audio on one port. Forward both WebSocket paths through your reverse proxy. `/health` is the deployment health check. `/api/status` reports the live population; `maxPlayers: null` means no slot cap. A static website host cannot run the simulation.
 
 ## Railway
 
@@ -19,7 +19,15 @@ Connect the GitHub repository, attach a volume at `/app/data`, keep one replica 
 | `TRUST_PROXY`     | `none`                  | Use `railway` only behind Railway ingress to trust its `X-Real-IP` |
 | `SERVER_PASSWORD` | empty                   | Optional shared join password                                      |
 
-There is no `MAX_PLAYERS` setting or fixed total admission limit. Job limits, 20 props/player, 240 world entities, and abuse protections still apply. Active residents do not count toward the eight pending, unjoined sockets/IP. Connection churn is limited to 120 attempts/IP/minute. Messages are limited to 8 KiB and 120/second per socket. Heartbeats remove dead sockets; slow consumers cannot accumulate unbounded buffers.
+There is no `MAX_PLAYERS` setting or fixed total admission limit. Job limits, 20 props/player, 240 world entities, and abuse protections still apply. Active residents do not count toward the eight pending, unjoined sockets/IP. Connection churn is limited to 120 attempts/IP/minute for each socket path. Gameplay messages are limited to 8 KiB and 120/second per socket. Heartbeats remove dead sockets; slow consumers cannot accumulate unbounded buffers.
+
+## Voice hosting
+
+Proximity voice runs on the same host and needs no TURN service, extra ports, API key or subscription. Browsers require HTTPS or localhost for microphone access and AudioWorklet. Railway with the existing Cloudflare HTTPS/WSS proxy supports both paths. Deploy the client and server together: protocol 3 adds a private voice ticket to the welcome message.
+
+Voice uses mono 16 kHz PCM in 20 ms frames, about **32 KB/s per active talker per nearby listener**, plus framing. It is deliberately independent of game snapshots. Relaying only within 28 metres, per-player mute, no self echo, dead-player suppression and tight audio backpressure reduce traffic, but simultaneous talkers in a crowded square still multiply egress. There is no player slot cap; this does not promise unlimited audio capacity. Monitor bandwidth as well as CPU. Opus/SFU transport is a future scaling option.
+
+The server checks each audio recipient against current authoritative positions. Session-specific voice tickets are revoked when the game session ends or an operator removes a resident. Malformed audio and voice floods close the voice socket without disrupting that player's game connection. Voice media is not written to disk. Transport encryption terminates at the host/proxy; do not describe this as end-to-end encrypted.
 
 ## Domain and TLS
 
