@@ -2,6 +2,8 @@
 
 ## Direct messages — local implementation
 
+Draft browser recheck: in an isolated 360 × 780 session, typed `Unfinished local message`, closed chat, opened Players → Morgan Vale → Message Morgan Vale. Chat reopened with the exact original text, LOCAL channel hint and preservation notice; selection did not send the draft. This resolves the pending browser recheck for the local-draft guard below. Cross-recipient PM drafts and disconnect/rejoin draft policy remain separate checks.
+
 Draft preservation follow-up: clicking a resident's Message button now reopens a nonempty chat draft unchanged and explains that it must be sent or cleared before selecting a new recipient. This preserves both local text and an already-addressed direct message. Whitespace-only drafts can be replaced. Build and production smoke passed; this guard was inspected in code but its browser interaction has not yet been rechecked.
 
 Recipient-selection follow-up: resident panels now provide a Message button outside the distance/custody-limited action fieldset. It opens chat with the resident's stable-ID address and a name-based `TO … · LOGGED` hint. An isolated 360 × 780 browser session selected Morgan Vale from Players, opened the addressed draft and sent a message; the sender copy named Morgan correctly. This was a functional browser check, not a comprehensive layout audit. The command/ID remains visible in the input; a dedicated composer and draft-preservation review remain UX work. Build and production smoke passed. Changes are local and undeployed.
