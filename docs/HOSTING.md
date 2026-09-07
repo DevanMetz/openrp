@@ -6,6 +6,8 @@ Run `npm ci`, `npm run build`, then `npm start`. The Node process serves the cli
 
 Connect the GitHub repository, attach a volume at `/app/data`, keep one replica and serverless sleeping disabled, and set the health-check path to `/health`. Enable **Wait for CI**. Dockerfile detection supplies build/start commands. The entrypoint gives the mounted directory to `node` and drops root privileges before starting the game. New Railway services use dashboard settings because first-time legacy config-as-code adoption closed in August 2026.
 
+Set **Teardown → Draining** to **30 seconds** and deployment overlap to **0 seconds**. The equivalent service variables are `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=30` and `RAILWAY_DEPLOYMENT_OVERLAP_SECONDS=0`. Railway's default draining window is zero; the explicit window gives the server time to finish its world checkpoint and pending logs after SIGTERM. Keep the existing volume attached during every release. See [Railway deployment teardown](https://docs.railway.com/deployments/deployment-teardown).
+
 | Variable               | Default                 | Purpose                                                             |
 | ---------------------- | ----------------------- | ------------------------------------------------------------------- |
 | `PORT`                 | `3000`                  | HTTP and WebSocket port                                             |
