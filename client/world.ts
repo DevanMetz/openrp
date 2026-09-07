@@ -147,6 +147,31 @@ function surfaceTexture(kind: string, color: string): THREE.CanvasTexture {
       ctx.fillRect(0, rand() * 256, 256, rand() * 4 + 1);
     }
   }
+  if (kind === 'wood') {
+    // Fine, continuous grain uses deterministic waves without changing the city random sequence.
+    for (let line = 0; line < 75; line++) {
+      ctx.strokeStyle = line % 4 === 0 ? 'rgba(202,173,119,0.22)' : 'rgba(45,29,16,0.19)';
+      ctx.lineWidth = line % 3 === 0 ? 0.8 : 0.45;
+      ctx.beginPath();
+      for (let x = 0; x <= 256; x += 4) {
+        const y = line * 3.5 + Math.sin((x * Math.PI) / 128 + line * 0.7) * 1.7;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+    for (const [x, y] of [
+      [73, 81],
+      [192, 189],
+    ]) {
+      for (let ring = 1; ring <= 5; ring++) {
+        ctx.strokeStyle = `rgba(46,28,12,${0.2 - ring * 0.025})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, ring * 6, ring * 1.4, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
   const pixels = ctx.getImageData(0, 0, 256, 256);
   for (let i = 0; i < pixels.data.length; i += 4) {
     const noise = (rand() - 0.5) * (kind === 'asphalt' ? 35 : 20);
@@ -580,10 +605,18 @@ export class City {
       this.box(x, 0.3, 9, 2.3, 0.6, 7, 'concrete');
       this.box(x, 0.61, 9, 2.05, 0.05, 6.7, '#484936');
       for (const z of [7, 11]) this.tree(x, z);
-      const bx = x < 0 ? x + 1.8 : x - 1.8;
+      const bx = x < 0 ? x + 2.4 : x - 2.4;
       for (let slat = 0; slat < 4; slat++) this.box(bx, 0.48, 8 + slat * 0.14, 2.1, 0.07, 0.1, 'wood');
       for (let slat = 0; slat < 3; slat++) this.box(bx, 0.77 + slat * 0.15, 8.62, 2.1, 0.1, 0.065, 'wood');
-      for (const dx of [-0.8, 0.8]) this.box(bx + dx, 0.25, 8.3, 0.08, 0.5, 0.6, 'metal');
+      for (const dx of [-0.8, 0.8]) {
+        this.box(bx + dx, 0.25, 8.3, 0.08, 0.5, 0.6, 'metal');
+        this.box(bx + dx, 0.055, 8.3, 0.18, 0.08, 0.72, 'metal');
+        this.box(bx + dx, 0.77, 8.67, 0.06, 0.74, 0.07, 'metal');
+        this.box(bx + dx, 0.65, 8.04, 0.045, 0.28, 0.045, 'metal');
+        this.box(bx + dx, 0.8, 8.31, 0.085, 0.055, 0.66, 'metal');
+        for (let slat = 0; slat < 4; slat++)
+          this.cylinder(bx + dx, 0.519, 8 + slat * 0.14, 0.014, 0.014, 0.009, '#777e77', 8);
+      }
     }
     for (const [x, z] of [
       [-14, 32],

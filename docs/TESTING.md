@@ -1,5 +1,11 @@
 # Testing
 
+## Bench and wood visual pass
+
+Added finer procedural grain and knots to the shared wood texture without consuming additional city random values. Union Square benches now have back supports, armrests, wider feet and seat fasteners using existing static geometry batching. Close-up review exposed the pre-existing seat/planter overlap; both benches moved 0.6 metres toward the square, leaving their frames clear of the planter.
+
+Reviewed the actual City renderer in an isolated 1100 × 760 close-up before and after repositioning. Final build and production HTTP smoke passed. The shared wood texture also affects interiors and trees; those uses have not yet received a dedicated visual check. No server collision rules changed, and this work remains local and undeployed.
+
 ## Fountain visual pass
 
 The Union Square fountain now has eight arcing spillways, 128 moving droplets, sixteen expanding impact rings and water normals updated with the surface waves. Spillways share merged geometry; droplets share one Points object and rings use instancing. Animation and droplet/ripple visibility stop beyond 60 metres. Explicit bounds preserve frustum culling for animated geometry.
