@@ -72,6 +72,7 @@ export interface Door {
   id: string;
   name: string;
   x: number;
+  y?: number;
   z: number;
   width: number;
   height: number;
@@ -82,6 +83,7 @@ export interface Door {
   locked: boolean;
   open: boolean;
   group?: 'government';
+  public?: boolean;
 }
 export interface Entity extends Vec3 {
   id: string;
@@ -133,7 +135,7 @@ export type GameEvent =
   | { type: 'sound'; sound: 'cash' | 'door' | 'arrest' | 'heal' | 'break'; position: Vec3 }
   | { type: 'progress'; label: string; end: number };
 export type ClientMessage =
-  | { type: 'join'; name: string; token?: string; password?: string }
+  | { type: 'join'; name: string; token?: string; password?: string; account?: boolean }
   | { type: 'input'; input: Input }
   | { type: 'chat'; text: string }
   | { type: 'action'; action: string; target?: string; value?: string | number | boolean }
@@ -150,6 +152,7 @@ export type ServerMessage =
       serverName: string;
       protocol: number;
       voiceTicket: string;
+      username?: string;
     }
   | { type: 'pong'; time: number };
 export interface Box {

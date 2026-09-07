@@ -18,6 +18,7 @@ import {
 import { BLOCKS, INITIAL_DOORS, JAIL, MAP_BOUND, SPAWNS, doorBox } from '../shared/map.ts';
 import { direction, distance, eyes, idleInput, movePlayer, overlaps, rayBox } from '../shared/movement.ts';
 import type { Activity, ChatRecord } from './observability.ts';
+import type { Account } from './accounts.ts';
 import type {
   Box,
   ClientMessage,
@@ -40,6 +41,7 @@ export interface Profile {
   name: string;
   money: number;
   tokenHash: string;
+  account?: Account;
   character?: SavedCharacter;
 }
 export type SavedCharacter = Omit<
@@ -581,7 +583,7 @@ export class Game {
         if (
           p.weapon !== 'lockpick' ||
           distance(p, r.lockpick.start) > 0.7 ||
-          !this.reachable(p, { x: d.x, y: 1.4, z: d.z }, 3.5, undefined, d.id)
+          !this.reachable(p, { x: d.x, y: (d.y ?? 0) + 1.4, z: d.z }, 3.5, undefined, d.id)
         ) {
           r.lockpick = undefined;
           this.notice(p.id, 'Lockpicking interrupted.');
@@ -899,7 +901,7 @@ export class Game {
       return;
     d.open = open;
     this.doorBodies.get(d.id)!.collisionResponse = !open;
-    this.sound('door', { x: d.x, y: 1, z: d.z });
+    this.sound('door', { x: d.x, y: (d.y ?? 0) + 1, z: d.z });
   }
   ownsDoor(p: Player, d: Door): boolean {
     return (
@@ -910,7 +912,12 @@ export class Game {
   }
   doorAction(p: Player, action: string, target: string, value: unknown): void {
     const d = this.doors.find((v) => v.id === target);
-    if (!d || !this.reachable(p, { x: d.x, y: 1.4, z: d.z }, INTERACT_RANGE, undefined, d.id)) return;
+    if (!d || !this.reachable(p, { x: d.x, y: (d.y ?? 0) + 1.4, z: d.z }, INTERACT_RANGE, undefined, d.id))
+      return;
+    if (d.public) {
+      this.notice(p.id, 'This shared entrance stays available to everyone.', 'error');
+      return;
+    }
     if (action === 'door-buy') {
       if (d.owner || d.group || p.job === 'hobo') {
         this.notice(p.id, 'This door is not available to you.', 'error');
@@ -962,7 +969,8 @@ export class Game {
   interact(p: Player, target: string): void {
     const d = this.doors.find((v) => v.id === target);
     if (d) {
-      if (!this.reachable(p, { x: d.x, y: 1.4, z: d.z }, INTERACT_RANGE, undefined, d.id)) return;
+      if (!this.reachable(p, { x: d.x, y: (d.y ?? 0) + 1.4, z: d.z }, INTERACT_RANGE, undefined, d.id))
+        return;
       if (d.locked && !this.ownsDoor(p, d)) {
         this.notice(p.id, 'Locked. You need keys or a lockpick.', 'error');
         return;

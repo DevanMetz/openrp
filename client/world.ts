@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { BLOCKS, BUILDINGS, toWorld, type Building } from '../shared/map.ts';
-import type { Door } from '../shared/types.ts';
+import { BLOCKS, BUILDINGS, FLOOR_HEIGHT, MAP_BOUND, ROOMS, toWorld, type Building } from '../shared/map.ts';
+import type { Door, Vec3 } from '../shared/types.ts';
 
 let seed = 731;
 const rand = () => {
@@ -129,7 +129,7 @@ export class City {
     Object.assign(this.sun.shadow.camera, { left: -62, right: 62, top: 62, bottom: -62, near: 1, far: 160 });
     this.sun.shadow.bias = -0.00025;
     this.sun.shadow.normalBias = 0.025;
-    scene.add(this.sun);
+    scene.add(this.sun, this.sun.target);
     for (const [key, color] of Object.entries(palette))
       this.materials.set(
         key,
@@ -153,6 +153,18 @@ export class City {
       } else this.box(b.x, b.y, b.z, b.w, b.h, b.d, b.material);
     }
     for (const building of BUILDINGS) this.building(building);
+    for (const room of ROOMS) {
+      const b = room.box;
+      this.box(
+        b.x,
+        b.y - 1.61,
+        b.z,
+        b.w,
+        0.01,
+        b.d,
+        room.name === 'Bathroom' ? '#8d9b91' : room.name === 'Bedroom' ? 'wood' : 'floor',
+      );
+    }
     this.street();
     this.fountain();
     this.skyline();
@@ -261,8 +273,16 @@ export class City {
     return mesh;
   }
   ground(): void {
-    this.box(0, -0.08, 0, 150, 0.15, 150, 'asphalt');
+    this.box(0, -0.08, 0, MAP_BOUND * 2 + 2, 0.15, MAP_BOUND * 2 + 2, 'asphalt');
     this.box(0, -0.005, 8, 28, 0.025, 25, 'pavement');
+    for (const x of [-67, 67]) {
+      for (const side of [-1, 1]) this.box(x + side * 10, -0.005, 0, 2.2, 0.04, 214, 'pavement');
+      for (let z = -104; z <= 104; z += 7) this.box(x, 0.012, z, 0.14, 0.02, 3.2, '#b7ad88');
+    }
+    for (const z of [-66, 66]) {
+      for (const side of [-1, 1]) this.box(0, -0.005, z + side * 10, 214, 0.04, 2.2, 'pavement');
+      for (let x = -104; x <= 104; x += 7) this.box(x, 0.013, z, 3.2, 0.02, 0.14, '#b7ad88');
+    }
     for (const b of BUILDINGS) {
       const s = Math.abs(Math.sin(b.rotation)) > 0.5;
       const w = s ? b.d : b.w,
@@ -287,6 +307,7 @@ export class City {
     for (const x of [-2.1, 2.1]) this.box(x, 0.022, 50, 0.09, 0.04, 37, 'metal');
   }
   building(b: Building): void {
+    const floorHeight = b.layout === 'apartments' ? FLOOR_HEIGHT : 3.2;
     const local = (x: number, y: number, z: number, w: number, h: number, d: number, m: string) => {
       const p = toWorld(b, x, y, z);
       this.box(p.x, p.y, p.z, w, h, d, m, b.rotation);
@@ -305,7 +326,7 @@ export class City {
       this.sign(text, p.x, p.y, p.z, w, h, bg, b.rotation, font);
     };
     for (let floor = 1; floor < b.floors; floor++) {
-      const y = floor * 3.2 + 1.7;
+      const y = floor * floorHeight + 1.7;
       for (let x = -b.w / 2 + 2.2; x < b.w / 2 - 1; x += 3.3) {
         for (const back of [false, true]) {
           const z = (back ? -1 : 1) * (b.d / 2 + 0.015);
@@ -334,7 +355,7 @@ export class City {
           local(side * (b.w / 2 + 0.15), y + 0.14, z, 0.05, 0.065, 1.42, 'trim');
           local(side * (b.w / 2 + 0.1), y - 1.1, z, 0.42, 0.15, 1.85, 'concrete');
         }
-      local(0, floor * 3.2 + 0.33, b.d / 2 + 0.04, b.w + 0.25, 0.13, 0.2, 'concrete');
+      local(0, floor * floorHeight + 0.33, b.d / 2 + 0.04, b.w + 0.25, 0.13, 0.2, 'concrete');
     }
     local(0, 0.24, b.d / 2 + 0.04, b.w, 0.48, 0.13, 'concrete');
     // Shop windows and surrounds retain the collision of real glazing.
@@ -357,14 +378,58 @@ export class City {
     signage(b.sign, 0, 3.12, b.d / 2 + 0.24, Math.min(12, b.w - 1.2), 0.52, b.accent, 'bold 62px Georgia');
     local(-0.91, 1.36, b.d / 2 + 0.06, 0.16, 2.72, 0.24, 'concrete');
     local(0.91, 1.36, b.d / 2 + 0.06, 0.16, 2.72, 0.24, 'concrete');
-    const top = b.floors * 3.2 + 0.6;
+    const top = b.floors * floorHeight + 0.6;
     local(0, top, b.d / 2, b.w + 0.25, 0.55, 0.3, b.material);
     local(0, top, -b.d / 2, b.w + 0.25, 0.55, 0.3, b.material);
     local(2, top + 0.45, -2, 3.1, 0.95, 2.1, 'metal');
     for (let k = 0; k < 7; k++) local(0.7 + k * 0.41, top + 0.97, -2, 0.055, 0.09, 1.8, '#252e2e');
     local(-b.w / 2 + 0.3, top / 2, b.d / 2 + 0.25, 0.1, top, 0.1, 'metal');
     // Interior detailing, deliberately clear enough to furnish with spawned props.
-    local(0, 3.25, 0, b.w - 0.5, 0.1, b.d - 0.5, '#bcb9a6');
+    if (b.layout !== 'apartments') local(0, 3.25, 0, b.w - 0.5, 0.1, b.d - 0.5, '#bcb9a6');
+    else {
+      for (let level = 0; level < b.floors; level++) {
+        if (level < b.floors - 1)
+          for (const side of [-1, 1]) {
+            const start = toWorld(b, side * 1.035, level * FLOOR_HEIGHT + 1.21, -1.19);
+            const end = toWorld(b, side * 1.035, (level + 1) * FLOOR_HEIGHT + 1.04, -8.41);
+            const a = new THREE.Vector3(start.x, start.y, start.z);
+            const delta = new THREE.Vector3(end.x, end.y, end.z).sub(a);
+            this.add(
+              new THREE.CylinderGeometry(0.035, 0.035, delta.length(), 8),
+              this.material('metal'),
+              a.addScaledVector(delta, 0.5),
+              new THREE.Euler().setFromQuaternion(
+                new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize()),
+              ),
+            );
+          }
+        signage(
+          `FLOOR ${level + 1} · ${level + 1}01 / ${level + 1}02`,
+          0,
+          level * FLOOR_HEIGHT + 2.35,
+          -b.d / 2 + 0.25,
+          3.5,
+          0.45,
+          b.accent,
+          'bold 48px sans-serif',
+        );
+        local(0, level * FLOOR_HEIGHT + 3.16, 5, 1.3, 0.08, 0.3, '#e4e2bc');
+        for (const side of [-1, 1]) {
+          const label = toWorld(b, side * 2.19, level * FLOOR_HEIGHT + 2.97, 4.5);
+          this.sign(
+            `${level + 1}0${side < 0 ? 1 : 2}`,
+            label.x,
+            label.y,
+            label.z,
+            0.75,
+            0.22,
+            b.accent,
+            b.rotation + (side < 0 ? Math.PI / 2 : -Math.PI / 2),
+            'bold 48px sans-serif',
+          );
+        }
+      }
+    }
     for (const x of [-4, 4]) {
       local(x, 3.15, 0, 1.3, 0.09, 0.24, '#e4e2bc');
     }
@@ -400,6 +465,18 @@ export class City {
       }
   }
   street(): void {
+    for (const x of [-77, 77])
+      for (const z of [-49, 7, 55]) {
+        this.cylinder(x, 2.6, z, 0.07, 0.12, 5.2, 'metal');
+        this.box(x, 5.2, z, 0.7, 0.18, 0.45, '#e2d4a4');
+      }
+    for (const [text, x, z] of [
+      ['WEST ALDER', -67, 61],
+      ['CANAL QUARTER', 67, 61],
+      ['FOUNDRY WARD', 0, -64],
+      ['SOUTHBANK', 0, 70],
+    ] as const)
+      this.sign(text, x, 3.4, z, 4.5, 0.65, '#425e54', z > 0 ? Math.PI : 0, 'bold 56px sans-serif');
     for (const x of [-12.5, 12.5])
       for (const z of [-21, 0, 25, 46]) {
         this.cylinder(x, 2.65, z, 0.055, 0.1, 5.3, 'metal');
@@ -538,7 +615,7 @@ export class City {
   skyline(): void {
     for (let i = 0; i < 33; i++) {
       const a = (i / 33) * Math.PI * 2,
-        r = 94 + rand() * 28,
+        r = MAP_BOUND * 1.5 + rand() * 28,
         x = Math.sin(a) * r,
         z = Math.cos(a) * r;
       const h = 13 + rand() * 28,
@@ -604,7 +681,7 @@ export class City {
       let visual = this.doors.get(d.id);
       if (!visual) {
         const root = new THREE.Group();
-        root.position.set(d.x, 0, d.z);
+        root.position.set(d.x, d.y ?? 0, d.z);
         root.rotation.y = d.rotation;
         const pivot = new THREE.Group();
         pivot.position.x = -d.width / 2;
@@ -633,11 +710,21 @@ export class City {
         );
         label.position.set(d.width / 2, 1.3, 0.102);
         pivot.add(label);
+        const insideLabel = label.clone();
+        insideLabel.position.z = -0.102;
+        insideLabel.rotation.y = Math.PI;
+        pivot.add(insideLabel);
         this.scene.add(root);
         visual = { pivot, label, textureKey: '', angle: 0 };
         this.doors.set(d.id, visual);
       }
-      const text = d.group ? 'AUTHORIZED PERSONNEL' : d.owner ? d.name : `FOR SALE · $${d.price}`;
+      const text = d.group
+        ? 'AUTHORIZED PERSONNEL'
+        : d.public
+          ? 'SHARED ENTRANCE'
+          : d.owner
+            ? d.name
+            : `FOR SALE · $${d.price}`;
       if (visual.textureKey !== text) {
         const mat = visual.label.material as THREE.MeshStandardMaterial;
         mat.map?.dispose();
@@ -655,7 +742,12 @@ export class City {
       visual.angle = d.open ? -Math.PI * 0.48 : 0;
     }
   }
-  update(time: number, dt: number): void {
+  update(time: number, dt: number, focus: Vec3): void {
+    // Keep detailed shadows around the viewer as they enter the outer neighborhoods.
+    const x = Math.round(focus.x / 8) * 8,
+      z = Math.round(focus.z / 8) * 8;
+    this.sun.position.set(x - 32, 52, z + 28);
+    this.sun.target.position.set(x, 0, z);
     for (const visual of this.doors.values())
       visual.pivot.rotation.y = THREE.MathUtils.damp(visual.pivot.rotation.y, visual.angle, 12, dt);
     const pos = this.water.geometry.attributes.position;

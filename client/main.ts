@@ -165,20 +165,76 @@ async function refreshStatus(): Promise<void> {
     const status = await response.json();
     ui.serverName = status.name;
     ui.el('password-row').hidden = !status.password;
-    if (!ui.playing && socket?.readyState !== WebSocket.CONNECTING)
+    if (!ui.playing && !ui.accountBusy && socket?.readyState !== WebSocket.CONNECTING)
       ui.status(`${status.players} residents online · Join the city`);
   } catch {
     if (!ui.playing) ui.status('Server unavailable. Check that the OpenRP server is running.');
   }
 }
 void refreshStatus();
-ui.onConnect = (name, password) => {
+async function leaveSession(): Promise<void> {
+  if (!socket || socket.readyState === WebSocket.CLOSED) return;
+  const ws = socket;
+  const closed = new Promise<void>((done) => ws.addEventListener('close', () => done(), { once: true }));
+  ws.close();
+  await closed;
+}
+ui.onAccount = async (action, username, password) => {
+  if (ui.accountBusy) return;
+  ui.status(action === 'register' ? 'Saving your account…' : 'Signing in…', true);
+  try {
+    const guestToken =
+      action === 'register' ? (localStorage.getItem('openrp-token') ?? undefined) : undefined;
+    const response = await fetch('/api/account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, username, password, token: guestToken }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Could not sign in.');
+    await leaveSession();
+    localStorage.setItem('openrp-account-token', result.token);
+    localStorage.setItem('openrp-account', result.username);
+    if (action === 'register' && guestToken) localStorage.removeItem('openrp-token');
+    ui.onConnect(result.name, ui.input('server-password').value, true);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not reach the server.';
+    ui.status(message);
+    ui.notice(message, 'error');
+  }
+};
+ui.onSignOut = async () => {
+  if (ui.accountBusy) return;
+  ui.setAccountBusy(true);
+  try {
+    if (ui.username) {
+      const response = await fetch('/api/account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout', token: localStorage.getItem('openrp-account-token') }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not sign out.');
+      localStorage.removeItem('openrp-account-token');
+      localStorage.removeItem('openrp-account');
+    }
+    await leaveSession();
+    ui.username = undefined;
+    ui.entryMode('login');
+    ui.status('Signed out. Your belongings are saved.');
+  } catch (error) {
+    ui.notice((error as Error).message, 'error');
+  } finally {
+    ui.setAccountBusy(false);
+  }
+};
+ui.onConnect = (name, password, account = false) => {
   if (socket?.readyState === WebSocket.CONNECTING || socket?.readyState === WebSocket.OPEN) return;
   audio.init();
   void voice.prepare();
   audio.setVolume(ui.settings.volume);
   ui.status('Joining the district…', true);
-  localStorage.setItem('openrp-name', name);
+  if (!account) localStorage.setItem('openrp-name', name);
   seq = 0;
   pending = [];
   myId = '';
@@ -191,7 +247,13 @@ ui.onConnect = (name, password) => {
   ));
   let rejection = '';
   ws.addEventListener('open', () =>
-    send({ type: 'join', name, password, token: localStorage.getItem('openrp-token') ?? undefined }),
+    send({
+      type: 'join',
+      name,
+      password,
+      account,
+      token: localStorage.getItem(account ? 'openrp-account-token' : 'openrp-token') ?? undefined,
+    }),
   );
   ws.addEventListener('message', (event) => {
     let msg: ServerMessage;
@@ -208,8 +270,15 @@ ui.onConnect = (name, password) => {
       }
       myId = msg.id;
       voice.connect(msg.id, msg.voiceTicket);
-      localStorage.setItem('openrp-token', msg.token);
-      localStorage.setItem('openrp-name', msg.name);
+      ui.username = msg.username;
+      if (msg.username) {
+        localStorage.setItem('openrp-account-token', msg.token);
+        localStorage.setItem('openrp-account', msg.username);
+      } else {
+        localStorage.setItem('openrp-token', msg.token);
+        localStorage.setItem('openrp-name', msg.name);
+      }
+      ui.setAccountBusy(false);
       ui.serverName = msg.serverName;
       ui.connected();
       connectedAt = performance.now();
@@ -394,12 +463,14 @@ function aim(): AimTarget | undefined {
       kind: 'door',
       id: d.id,
       title: d.name,
-      detail: d.group
-        ? 'Civil Protection property'
-        : d.owner
-          ? `Owned by ${owner?.name ?? 'an offline resident'}${d.locked ? ' · Locked' : ''}`
-          : `Unowned · $${d.price}`,
-      hint: `E  ${d.open ? 'Close' : 'Open'} door     C  ${d.owner || d.group ? 'Manage' : 'Buy property'}`,
+      detail: d.public
+        ? 'Shared entrance · open to everyone'
+        : d.group
+          ? 'Civil Protection property'
+          : d.owner
+            ? `Owned by ${owner?.name ?? 'an offline resident'}${d.locked ? ' · Locked' : ''}`
+            : `Unowned · $${d.price}`,
+      hint: `E  ${d.open ? 'Close' : 'Open'} door     C  ${d.owner || d.group || d.public ? 'Manage' : 'Buy property'}`,
     };
   }
   for (const e of state.entities) {
@@ -702,7 +773,7 @@ function frame(now: number): void {
       (object.material as THREE.Material).dispose();
       object.removeFromParent();
     }
-  city.update(elapsed, dt);
+  city.update(elapsed, dt, camera.position);
   renderer.autoClear = true;
   renderer.render(scene, camera);
   if (ui.playing && me && !me.deadUntil && !ui.menu && !ui.chatOpen) {

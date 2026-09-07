@@ -175,6 +175,9 @@ small {
   position: fixed;
   inset: 0;
   z-index: 5;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
   padding: 2.5rem 3.6rem;
   background:
     linear-gradient(90deg, #152421f5 0%, #152421da 25%, #15242150 53%, #15242100 78%),
@@ -182,6 +185,7 @@ small {
 }
 .entry-header {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 1rem;
 }
@@ -219,10 +223,8 @@ small {
   padding: 0.65rem 1rem;
 }
 .entry-panel {
-  position: absolute;
-  top: 50%;
-  left: 3.6rem;
-  transform: translateY(-46%);
+  position: relative;
+  margin: 2rem 0;
   width: 350px;
 }
 .entry h1 {
@@ -312,11 +314,9 @@ small {
   margin-top: 5px;
 }
 .entry-footer {
-  position: absolute;
-  bottom: 2.5rem;
-  left: 3.6rem;
-  right: 3.6rem;
+  margin-top: auto;
   display: flex;
+  flex-shrink: 0;
   justify-content: space-between;
   color: #a2b1a4;
   font-size: 0.65rem;
@@ -1315,6 +1315,35 @@ small {
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
+.entry-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 1.2rem;
+}
+.entry-tabs button {
+  padding: 0.55rem 0.7rem;
+  font-size: 0.8rem;
+}
+.entry-tabs button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.account-form {
+  max-width: 480px;
+}
+.account-form .field-label:not(:first-child) {
+  margin-top: 1rem;
+}
+.account-help {
+  color: #aeb8aa;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin: 0.8rem 0;
+}
+.account-resume {
+  width: 100%;
+  margin-bottom: 1rem;
+}
 .resident-link span {
   color: var(--accent);
 }
@@ -1567,7 +1596,6 @@ small {
     padding: 2rem;
   }
   .entry-panel {
-    left: 2rem;
     width: 315px;
   }
   .entry h1 {
@@ -1622,8 +1650,7 @@ small {
     padding: 1.5rem;
   }
   .entry-panel {
-    left: 1.5rem;
-    width: min(330px, calc(100% - 3rem));
+    width: min(350px, 100%);
   }
   .entry-location {
     display: none;
@@ -1808,4 +1835,36 @@ small {
 .entry-consent a {
   color: #c6c8b6;
   text-underline-offset: 3px;
+}
+
+@media (max-height: 850px) {
+  .entry {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+  .entry-panel {
+    margin: 1.1rem 0;
+  }
+  .entry h1 {
+    font-size: 4.8rem;
+    margin: 0.5rem 0;
+  }
+  .entry-tagline {
+    margin: 0.5rem 0;
+  }
+  .entry-free {
+    display: none;
+  }
+  .entry-rule {
+    margin: 1rem 0;
+  }
+  .entry input {
+    padding: 0.7rem 0.9rem;
+  }
+  .entry .join-button {
+    padding: 0.85rem 1rem;
+  }
+  .entry-status {
+    margin: 0.65rem 0;
+  }
 }
