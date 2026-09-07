@@ -51,6 +51,35 @@ class Client {
   }
 }
 
+test('real direct messages reach sender and recipient without leaking to a nearby bystander', async () => {
+  let now = 100_000;
+  const game = new Game({ now: () => now });
+  const app = await startServer({ game, port: 0, host: '127.0.0.1', production: true, persist: false });
+  const clients = Array.from({ length: 3 }, () => new Client(`ws://127.0.0.1:${app.port}/ws`));
+  try {
+    await Promise.all(clients.map((c) => c.open()));
+    const names = ['Message Sender', 'Message Recipient', 'Nearby Bystander'];
+    const ids = await Promise.all(clients.map((c, i) => c.join(names[i])));
+    for (const id of ids) Object.assign(game.players.get(id.id)!, { x: 0, z: 20 });
+    clients[0].send({ type: 'chat', text: '/pm "Message Recipient" Meet at the workshop' });
+    await Promise.all(clients.slice(0, 2).map((c) => c.wait((m) =>
+      m.type === 'chat' && m.channel === 'pm' && m.recipientName === names[1] && m.text === 'Meet at the workshop',
+    )));
+    now += 800;
+    clients[1].send({ type: 'chat', text: `/pm ${ids[0].id} On my way` });
+    await Promise.all(clients.slice(0, 2).map((c) => c.wait((m) =>
+      m.type === 'chat' && m.channel === 'pm' && m.recipientName === names[0] && m.text === 'On my way',
+    )));
+    now += 800;
+    clients[0].send({ type: 'chat', text: '/ooc Direct message delivery barrier' });
+    await Promise.all(clients.map((c) => c.wait((m) => m.type === 'chat' && m.text === 'Direct message delivery barrier')));
+    assert.deepEqual(clients.map((c) => c.messages.filter((m) => m.type === 'chat' && m.channel === 'pm').length), [2, 2, 0]);
+  } finally {
+    clients.forEach((c) => c.ws.terminate());
+    await app.close();
+  }
+});
+
 test('real radio clients receive only their tuned channel and switching off stops delivery', async () => {
   let now = 100_000;
   const game = new Game({ now: () => now });

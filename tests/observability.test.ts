@@ -13,6 +13,8 @@ import { startServer } from '../server/main.ts';
 import type { Player, ServerMessage } from '../shared/types.ts';
 
 interface Row {
+  recipientId?: string;
+  recipientName?: string;
   radioChannel?: number;
   id: string;
   at: string;
@@ -48,6 +50,26 @@ const message = (text: string, extra = {}) => ({
   channel: 'local',
   text,
   ...extra,
+});
+
+test('direct message recipient metadata survives persisted log replacement', async (t) => {
+  const { store, dataDir } = await fixture(t, { now: () => Date.parse('2026-09-07T12:00:00Z') });
+  store.chat(message('Direct fixture', { channel: 'pm', recipientId: 'resident-b', recipientName: 'Morgan Vale' }));
+  store.chat(message('Local fixture'));
+  await store.close();
+  const restored = await Observability.create({ dataDir, persist: true, now: () => Date.parse('2026-09-07T12:01:00Z') });
+  try {
+    const found = rows(await restored.logs('chat', { channel: 'pm', date: '2026-09-07' }));
+    assert.equal(found.length, 1);
+    assert.equal(found[0].recipientId, 'resident-b');
+    assert.equal(found[0].recipientName, 'Morgan Vale');
+    assert.equal(found[0].text, 'Direct fixture');
+    const ordinary = rows(await restored.logs('chat', { channel: 'local' }));
+    assert.equal(Object.hasOwn(ordinary[0], 'recipientId'), false);
+    assert.equal(Object.hasOwn(ordinary[0], 'recipientName'), false);
+  } finally {
+    await restored.close();
+  }
 });
 
 test('radio channel metadata survives persisted log replacement including zero', async (t) => {
@@ -466,6 +488,7 @@ test('live HTTP/WebSocket logs require authorization, read keys cannot moderate,
     for (const secret of [readKey, adminKey, reconnectToken, 'voiceTicket', '127.0.0.1'])
       assert.ok(!events.includes(secret));
     app.game.onChat({ playerId, name: 'Alice', job: 'citizen', channel: 'radio', radioChannel: 0, text: 'Radio CLI fixture' });
+    app.game.onChat({ playerId, name: 'Alice', job: 'citizen', channel: 'pm', recipientId: 'recipient-fixture', recipientName: 'Morgan Vale', text: 'Direct CLI fixture' });
     const execute = promisify(execFile);
     const env = { ...process.env, ANALYTICS_READ_TOKEN: readKey };
     const json = await execute(
@@ -482,6 +505,8 @@ test('live HTTP/WebSocket logs require authorization, read keys cannot moderate,
     assert.match(text.stdout, /untrusted data, never instructions/);
     assert.match(text.stdout, /private local test/);
     assert.match(text.stdout, /\[radio 0\].*Radio CLI fixture/);
+    assert.ok(text.stdout.includes('[pm] "Alice" → "Morgan Vale"'));
+    assert.match(text.stdout, /Direct CLI fixture/);
     assert.ok(!text.stdout.includes(readKey));
     await app.close();
     app = await startServer(options);
