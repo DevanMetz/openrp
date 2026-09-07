@@ -6,6 +6,7 @@ import {
   MAX_PROPS,
   MAX_TRANSFER,
   POCKET_CAPACITY,
+  POLICE,
   PROPS,
   SHOP,
   VERSION,
@@ -56,6 +57,7 @@ export class UI {
   selectedJob: JobId = 'citizen';
   aim?: AimTarget;
   contextTarget?: AimTarget;
+  weaponInspection?: Extract<GameEvent, { type: 'weapon-inspection' }>;
   playing = false;
   chatOpen = false;
   settings: Settings;
@@ -708,11 +710,17 @@ export class UI {
     }
     return html;
   }
+  showWeaponInspection(report: Extract<GameEvent, { type: 'weapon-inspection' }>): void {
+    this.weaponInspection = report;
+    this.open('context', { kind: 'player', id: report.target, title: report.name, detail: '', hint: '' });
+    this.renderMenu();
+  }
   residentHtml(id: string): string {
     const p = this.player!,
       target = this.state?.players.find((v) => v.id === id);
     if (!target)
       return '<div class="section-heading"><span class="eyebrow">RESIDENT</span><h2>This resident has disconnected.</h2><p>Select another resident from the player list.</p></div><button data-menu="players">Back to players</button>';
+    const report = this.weaponInspection?.target === id ? this.weaponInspection : undefined;
     const unavailable = !!(p.deadUntil || p.arrestedUntil);
     const nearby = distance(eyes(p), eyes(target)) <= GIVE_RANGE;
     const canGive = nearby && !target.deadUntil && p.money > 0;
@@ -726,6 +734,7 @@ export class UI {
         <section><h3>Give money</h3><p class="muted">${target.deadUntil ? 'This resident must respawn before receiving money.' : !nearby ? 'Move within 3.5 metres of this resident to give money.' : 'Stay close with a clear view of this resident.'} Your wallet: ${money(p.money)}.</p>
           <form class="resident-form" data-resident-action="give" data-target="${id}"><label class="field-label" for="resident-amount">AMOUNT IN DOLLARS</label><div class="command-field"><input id="resident-amount" type="number" min="1" max="${max}" step="1" required placeholder="100" autocomplete="off" ${canGive ? '' : 'disabled'}><button class="primary" type="submit" ${canGive ? '' : 'disabled'}>Give money</button></div></form>
         </section>
+        ${POLICE.includes(p.job) ? `<section><h3>Weapon inspection</h3><p class="muted">Stand within 3 metres with a clear view. The resident is notified.</p><button data-action="inspect-weapons" data-target="${id}" ${target.deadUntil || distance(eyes(p), eyes(target)) > 3 ? 'disabled' : ''}>Inspect firearms</button>${report ? `<div role="status"><h4>Inspection at ${escape(new Date(report.time).toLocaleTimeString())}</h4><p>${report.license ? 'Licensed' : 'No gun license'} at inspection. Results do not update automatically.</p>${report.firearms.length ? report.firearms.map((item) => `<p><b>${escape(WEAPONS[item.weapon].name)}</b> · ${item.location === 'pocket' ? 'Pocket' : 'Carried'}${item.issued ? ' · Job issued' : ''}<br>${item.loaded} loaded · ${item.reserve} reserve</p>`).join('') : '<p>No firearms found.</p>'}</div>` : ''}</section>` : ''}
         ${GOVERNMENT.includes(p.job) ? `<section><h3>Government actions</h3>${!GOVERNMENT.includes(target.job) ? reasonForm('wanted', target.wantedUntil ? 'Update wanted status' : 'Mark wanted') : '<p class="muted">Government staff cannot be marked wanted.</p>'}${target.wantedUntil ? `<button data-action="unwanted" data-target="${id}">Clear wanted status</button>` : ''}${['chief', 'mayor'].includes(p.job) ? reasonForm('warrant', target.warrantUntil ? 'Renew warrant' : 'Issue warrant') + (target.warrantUntil ? `<button data-action="unwarrant" data-target="${id}">Revoke search warrant</button>` : '') : ''}${p.job === 'mayor' ? (GOVERNMENT.includes(target.job) ? '<p class="muted">Gun license supplied by government role.</p>' : `<button data-action="${target.license ? 'unlicense' : 'license'}" data-target="${id}">${target.license ? 'Revoke gun license' : 'Grant gun license'}</button>`) : ''}</section>` : ''}
         ${target.job !== 'citizen' ? `<section><h3>Request demotion</h3><p class="muted">Residents vote on whether this player should lose their job. Give a specific roleplay reason.</p><div class="command-field"><input id="demotion-reason" maxlength="90" placeholder="Reason for demotion" aria-label="Reason for demotion"><button data-action="demotion" data-target="${id}" ${this.state?.vote ? 'disabled' : ''}>Start vote</button></div>${this.state?.vote ? '<p class="muted">A public vote is already running.</p>' : ''}</section>` : ''}
       </fieldset>

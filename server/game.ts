@@ -484,6 +484,9 @@ export class Game {
       case 'demote':
         this.requestDemotion(p, target, cleanText(msg.value, 90));
         break;
+      case 'inspect-weapons':
+        this.inspectWeapons(p, target);
+        break;
       case 'give':
       case 'wanted':
       case 'unwanted':
@@ -1597,6 +1600,64 @@ export class Game {
               CHAT_RANGES[channel === 'whisper' || channel === 'yell' ? channel : 'local']
         )
           this.onEvent(event, other.id);
+  }
+  inspectWeapons(p: Player, targetId: string): void {
+    const runtime = this.runtime.get(p.id),
+      target = this.players.get(targetId);
+    if (!runtime || this.players.get(p.id) !== p || p.deadUntil || p.arrestedUntil) return;
+    if (!POLICE.includes(p.job)) {
+      this.notice(p.id, 'Only Police and Chief can inspect firearms.', 'error');
+      return;
+    }
+    if (this.now() - runtime.lastResidentAction < 700) return;
+    runtime.lastResidentAction = this.now();
+    if (!target || target === p || target.deadUntil) return;
+    const from = eyes(p),
+      to = eyes(target),
+      range = distance(from, to);
+    const hit =
+      range > 0.001 && range <= 3
+        ? this.trace(
+            from,
+            { x: (to.x - from.x) / range, y: (to.y - from.y) / range, z: (to.z - from.z) / range },
+            range,
+            p.id,
+          )
+        : undefined;
+    if (!hit || hit.kind !== 'player' || hit.id !== target.id) {
+      this.notice(p.id, 'Stand within 3 metres with a clear view to inspect firearms.', 'error');
+      return;
+    }
+    const firearms = target.weapons
+      .filter((w) => WEAPONS[w].damage)
+      .map((weapon) => ({
+        weapon,
+        location: 'carried' as const,
+        loaded: target.ammo[weapon] ?? 0,
+        reserve: target.reserve[weapon] ?? 0,
+        issued: JOBS[target.job].loadout.includes(weapon),
+      }));
+    const pocket = (target.pocket ?? [])
+      .filter((item) => item.kind === 'weapon' && item.item && WEAPONS[item.item].damage)
+      .map((item) => ({
+        weapon: item.item!,
+        location: 'pocket' as const,
+        loaded: item.loadedAmmo ?? 0,
+        reserve: item.reserveAmmo ?? 0,
+        issued: false,
+      }));
+    this.onEvent(
+      {
+        type: 'weapon-inspection',
+        target: target.id,
+        name: target.name,
+        time: this.now(),
+        license: target.license,
+        firearms: [...firearms, ...pocket],
+      },
+      p.id,
+    );
+    this.notice(target.id, `${p.name} inspected your carried and pocketed firearms.`, 'info');
   }
   residentAction(p: Player, action: ResidentAction, targetId: string, value?: unknown): void {
     const runtime = this.runtime.get(p.id);

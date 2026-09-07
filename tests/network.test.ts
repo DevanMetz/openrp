@@ -429,3 +429,29 @@ test('real clients receive both sides of a tip jar payment', async () => {
     await app.close();
   }
 });
+
+test('weapon inspection reports are delivered to the inspecting client only', async () => {
+  const game = new Game();
+  const app = await startServer({ game, port: 0, host: '127.0.0.1', production: true, persist: false });
+  const clients = [0, 1, 2].map(() => new Client(`ws://127.0.0.1:${app.port}/ws`));
+  try {
+    await Promise.all(clients.map((c) => c.open()));
+    const joins = [];
+    for (const [i, c] of clients.entries()) joins.push(await c.join(`Inspection ${i}`));
+    Object.assign(game.players.get(joins[0].id)!, { job: 'police', x: 0, y: 0, z: 20 });
+    Object.assign(game.players.get(joins[1].id)!, { x: 0, y: 0, z: 18 });
+    Object.assign(game.players.get(joins[2].id)!, { x: 5, y: 0, z: 20 });
+    clients[0].send({ type: 'action', action: 'inspect-weapons', target: joins[1].id });
+    await clients[0].wait((m) => m.type === 'weapon-inspection');
+    await clients[1].wait((m) => m.type === 'notice' && m.text.includes('inspected your'));
+    await new Promise((ok) => setTimeout(ok, 150));
+    for (const c of clients.slice(1))
+      assert.equal(
+        c.messages.some((m) => m.type === 'weapon-inspection'),
+        false,
+      );
+  } finally {
+    for (const c of clients) c.ws.terminate();
+    await app.close();
+  }
+});

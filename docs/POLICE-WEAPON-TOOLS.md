@@ -18,3 +18,5 @@ The upstream [weapon checker](https://github.com/FPtje/DarkRP/blob/5abcf7abab9e4
 Start with inspection and its resident-context button, permission/range/occlusion tests and a real-client private-result test. Then add timed confiscation and saved evidence, with cancellation and exact conservation tests. Finish return/partial return, original tool presentation, browser review and migration validation. Advance the coverage table only for shipped behavior.
 
 The current public snapshots include inventory fields for all residents. Private inspection results improve presentation but do not make inventories secret from modified clients. A separate replication/privacy change would be necessary before claiming that protection.
+
+Inspection implemented locally after 0.5.2, including server authority/reach checks, exact carried/pocketed reporting, resident notification and timestamped context report. All 90 tests and browser report review passed. Timed confiscation, evidence persistence and return are still unimplemented; the remaining rules above remain the next scope.

@@ -135,7 +135,22 @@ export interface Snapshot {
   vote: Vote | null;
   nextSalary: number;
 }
+export interface WeaponInspection {
+  type: 'weapon-inspection';
+  target: string;
+  name: string;
+  time: number;
+  license: boolean;
+  firearms: {
+    weapon: WeaponId;
+    location: 'carried' | 'pocket';
+    loaded: number;
+    reserve: number;
+    issued: boolean;
+  }[];
+}
 export type GameEvent =
+  | WeaponInspection
   | {
       type: 'chat';
       name: string;

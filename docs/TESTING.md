@@ -87,3 +87,5 @@ Browser checks use the real browser. Automated tests additionally cover 80 concu
 0.5.2 tip jars: server tests cover exact wallet conservation, invalid input, self tipping, overflow, reach/occlusion, custody/death, purchase limits, offline payment and world replacement. A real two-client WebSocket test checks replicated donor/owner balances. Chrome review covers opening the amount form with E; narrow form and wider performance review remain outstanding.
 
 Release validation: all 87 tests passed, typecheck/build and production HTTP smoke passed. Chrome verified the ceramic jar, E donation form, $25 debit ($1,520 to $1,495) and receipt naming the offline owner.
+
+Weapon inspection increment: npm run check passed all 90 tests, typecheck, build and production smoke. Tests cover permission, role-title spoofing, reach, obstruction, death/custody, shared cooldown, exact carried/pocketed ammunition and three-client report delivery. Chrome verified the resident button and timestamped report with a carried pistol (3/17) and pocketed SMG (12/40). Narrow report review and timed confiscation remain outstanding.
