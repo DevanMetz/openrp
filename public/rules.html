@@ -112,18 +112,23 @@
         load. Vehicles and Source-engine assets are not included.
       </p>
       <p>
-        Your wallet, inventory, ammunition, props, shops and property return with the same browser identity,
-        including after server updates. Props stay in the shared world while you are offline. Jobs resume when
-        a slot is available, and normal gameplay or operator cleanup can still remove items. Updates can
-        briefly interrupt play. Clearing browser data loses your anonymous identity; there is no account
-        recovery yet.
+        Your wallet, inventory, ammunition, props, shops and property return when you sign into your account
+        or reconnect with the same guest browser identity, including after server updates. Props stay in the
+        shared world while you are offline. Jobs resume when a slot is available, and normal gameplay or
+        operator cleanup can still remove items. Updates can briefly interrupt play. Create an account before
+        clearing guest browser data to keep access to that character across browsers. There is no automated
+        forgotten-password recovery.
       </p>
       <h2 id="privacy">Privacy</h2>
       <p>
-        No email, password, or payment is needed. Your browser stores a randomly generated reconnect
-        credential, name and settings. The server stores your character, inventory, wallet, owned world
-        objects, an internal ID and a hash of that credential so you can return after a refresh or update.
-        Bans store an identity ID and operator reason.
+        Guest play needs no password, email or payment. Optional accounts need only a username and password.
+        Your browser stores a randomly generated reconnect credential, username or roleplay name, and
+        settings. The server stores your character, inventory, wallet, owned world objects, an internal ID and
+        a hash of that credential so you can return after a refresh or update. Accounts also store a username
+        and salted password hash; plaintext passwords are not stored. Passwords and credential hashes are
+        excluded from public game state and analytics. New accounts initially use their username as their
+        public roleplay name; you can change that name with /rpname. Bans store an identity ID and operator
+        reason.
       </p>
       <p>
         <b>Text chat is logged for 30 days for moderation and troubleshooting.</b> This includes nearby, OOC,
@@ -132,7 +137,7 @@
         operators. Keep personal information and passwords out of all chat channels.
       </p>
       <p>
-        First-party analytics count visits to the home page, joins, anonymous returning identities, connected
+        First-party analytics count visits to the home page, joins, returning character identities, connected
         playtime, jobs, in-game purchases, deaths and moderation actions. The game also records server
         performance and traffic totals, including voice traffic counts. Referrers retain only the source
         hostname, not the full URL. These analytics and text logs are automatically removed after 30 UTC

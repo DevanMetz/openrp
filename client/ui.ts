@@ -1,5 +1,16 @@
-import { GOVERNMENT, JOBS, MAX_PROPS, PROPS, SHOP, VERSION, WEAPONS } from '../shared/catalog.ts';
+import {
+  GIVE_RANGE,
+  GOVERNMENT,
+  JOBS,
+  MAX_PROPS,
+  MAX_TRANSFER,
+  PROPS,
+  SHOP,
+  VERSION,
+  WEAPONS,
+} from '../shared/catalog.ts';
 import { BUILDINGS, districtAt } from '../shared/map.ts';
+import { distance, eyes } from '../shared/movement.ts';
 import type { GameEvent, JobId, Player, Snapshot } from '../shared/types.ts';
 import type { VoiceStatus } from './voice.ts';
 
@@ -32,6 +43,7 @@ const icons: Record<string, string> = {
   settings: '⚙',
   build: '⊞',
   context: '◇',
+  account: '◈',
 };
 export class UI {
   root: HTMLElement;
@@ -46,6 +58,8 @@ export class UI {
   settings: Settings;
   serverName = 'OpenRP | Union District';
   lastMenuKey = '';
+  username?: string;
+  accountBusy = false;
   voice: VoiceStatus = {
     connected: false,
     microphone: 'off',
@@ -57,7 +71,9 @@ export class UI {
   };
   private lastVoiceKey = '';
   onVoice: (command: 'mic' | 'deafen' | 'mute', id?: string) => void = () => {};
-  onConnect: (name: string, password: string) => void = () => {};
+  onConnect: (name: string, password: string, account?: boolean) => void = () => {};
+  onAccount: (action: 'login' | 'register', username: string, password: string) => void = () => {};
+  onSignOut: () => void = () => {};
   onAction: (action: string, target?: string, value?: string | number | boolean) => void = () => {};
   onChat: (text: string) => void = () => {};
   onResume: () => void = () => {};
@@ -83,7 +99,7 @@ export class UI {
       <section id="entry" class="entry">
         <header class="entry-header"><div class="brandmark">R<span>●</span></div><div class="entry-edition">OPEN SOURCE<br><b>CITY ROLEPLAY</b></div><div class="version">ALPHA ${VERSION}</div></header>
         <div class="entry-panel"><div class="eyebrow"><span class="status-dot"></span> UNION DISTRICT / MULTIPLAYER</div><h1>OPEN<span>RP</span><span class="title-period">.</span></h1><p class="entry-tagline">Another city. Your own story.</p><p class="entry-free">FREE TO PLAY · NO DOWNLOAD · PUBLIC ALPHA</p>
-          <div class="entry-rule"></div><form id="join-form"><label class="field-label" for="player-name">YOUR ROLEPLAY NAME</label><input id="player-name" name="name" minlength="2" maxlength="24" required autocomplete="nickname" placeholder="Choose a name" value="${escape(localStorage.getItem('openrp-name') ?? '')}"><div id="password-row" hidden><label class="field-label" for="server-password">SERVER PASSWORD</label><input id="server-password" type="password" autocomplete="current-password"></div><button id="join-button" class="primary join-button" type="submit"><span>Enter the district</span><span>↗</span></button></form>
+          <div class="entry-rule"></div><div class="entry-tabs"><button data-action="entry-login" aria-pressed="true">Sign in</button><button data-action="entry-register" aria-pressed="false">Create account</button><button data-action="entry-guest" aria-pressed="false">Guest</button></div><div id="password-row" hidden><label class="field-label" for="server-password">SERVER PASSWORD</label><input id="server-password" type="password" autocomplete="current-password"></div><div id="account-content">${this.accountForm('login', 'entry')}</div><form id="join-form" hidden><label class="field-label" for="player-name">YOUR ROLEPLAY NAME</label><input id="player-name" name="name" minlength="2" maxlength="24" required autocomplete="nickname" placeholder="Choose a name" value="${escape(localStorage.getItem('openrp-name') ?? '')}"><button id="join-button" class="primary join-button" type="submit"><span>Enter as guest</span><span>↗</span></button><p class="account-help">Create an account later to keep this guest's belongings across browsers.</p></form>
           <p class="entry-consent">By joining, follow the <a href="/rules.html" target="_blank" rel="noopener">community rules</a>. Text chat is logged. <a href="/rules.html#privacy" target="_blank" rel="noopener">Privacy</a> · <a href="https://github.com/DevanMetz/openrp" target="_blank" rel="noopener">Source</a></p><p id="join-status" class="entry-status" role="status">Connecting to the district…</p><div class="entry-options"><button data-menu="help">How to play <span>↗</span></button><button data-menu="settings">Settings <span>⚙</span></button></div>
         </div>
         <div class="entry-location"><span class="location-line"></span><span>01 / UNION SQUARE<small>A city with room for you.</small></span></div>
@@ -121,6 +137,16 @@ export class UI {
         this.clickAction(button.dataset.action, button.dataset.target ?? '', button.dataset.value);
     });
     this.el('close-menu').addEventListener('click', () => this.close());
+    this.root.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement) || !form.dataset.account) return;
+      event.preventDefault();
+      if (this.accountBusy || !form.reportValidity()) return;
+      const username = (form.elements.namedItem('username') as HTMLInputElement).value;
+      const password = form.elements.namedItem('password') as HTMLInputElement;
+      this.onAccount(form.dataset.account as 'login' | 'register', username, password.value);
+      password.value = '';
+    });
     this.el('join-form').addEventListener('submit', (event) => {
       event.preventDefault();
       const name = this.input('player-name').value.trim();
@@ -149,9 +175,42 @@ export class UI {
             ? `${Math.round(this.settings[key] * 100)}%`
             : String(this.settings[key]);
     });
+    this.el('menu-content').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement) || !form.dataset.residentAction) return;
+      const target = this.state?.players.find((p) => p.id === form.dataset.target);
+      if (!target || !this.player || this.player.deadUntil || this.player.arrestedUntil) {
+        this.notice('This resident action is no longer available.', 'error');
+        this.renderMenu();
+        return;
+      }
+      if (!form.reportValidity()) return;
+      const input = form.querySelector<HTMLInputElement>('input')!;
+      const action = form.dataset.residentAction;
+      this.onAction(action, target.id, action === 'give' ? Number(input.value) : input.value.trim());
+    });
   }
   el(id: string): HTMLElement {
     return document.getElementById(id)!;
+  }
+  accountForm(action: 'login' | 'register', scope: string): string {
+    const saved = localStorage.getItem('openrp-account');
+    return `${action === 'login' && saved && localStorage.getItem('openrp-account-token') ? `<button class="account-resume" data-action="account-resume">Continue as ${escape(saved)} ↗</button>` : ''}<form class="account-form" data-account="${action}"><label class="field-label" for="account-${scope}-username">USERNAME</label><input id="account-${scope}-username" name="username" autocomplete="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9][A-Za-z0-9_.\\-]{2,23}" required placeholder="Your username" value="${escape(action === 'login' ? (saved ?? '') : '')}"><label class="field-label" for="account-${scope}-password">PASSWORD</label><input id="account-${scope}-password" name="password" type="password" autocomplete="${action === 'register' ? 'new-password' : 'current-password'}" minlength="15" maxlength="128" required placeholder="${action === 'register' ? 'A passphrase of 15+ characters' : 'Your password'}"><p class="account-help">${action === 'register' ? 'Only a username and password. Your current guest’s belongings come with you.' : 'Restore your inventory, props and properties on any browser.'}</p><button class="primary join-button" type="submit" ${this.accountBusy ? 'disabled' : ''}>${action === 'register' ? 'Create account & enter' : 'Sign in'} <span>↗</span></button></form>`;
+  }
+  entryMode(mode: 'login' | 'register' | 'guest'): void {
+    this.el('join-form').hidden = mode !== 'guest';
+    this.el('account-content').hidden = mode === 'guest';
+    if (mode !== 'guest') this.el('account-content').innerHTML = this.accountForm(mode, 'entry');
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>('.entry-tabs button'))
+      button.setAttribute('aria-pressed', String(button.dataset.action === `entry-${mode}`));
+  }
+  setAccountBusy(busy: boolean): void {
+    this.accountBusy = busy;
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>(
+      '.account-form button, .entry-tabs button, .account-resume',
+    ))
+      button.disabled = busy;
   }
   input(id: string): HTMLInputElement {
     return document.getElementById(id) as HTMLInputElement;
@@ -162,6 +221,7 @@ export class UI {
   status(text: string, busy = false): void {
     this.text('join-status', text);
     (this.el('join-button') as HTMLButtonElement).disabled = busy;
+    this.setAccountBusy(busy);
   }
   connected(): void {
     this.playing = true;
@@ -178,14 +238,14 @@ export class UI {
     this.close(false);
     this.status(reason);
   }
-  open(menu: string): void {
-    if (this.menu === menu) {
+  open(menu: string, target?: AimTarget): void {
+    if (this.menu === menu && !target) {
       this.close();
       return;
     }
     this.closeChat(false);
     this.menu = menu;
-    if (menu === 'context') this.contextTarget = this.aim;
+    if (menu === 'context') this.contextTarget = target ?? this.aim;
     this.el('overlay').hidden = false;
     this.onMenu();
     this.renderMenu();
@@ -234,7 +294,7 @@ export class UI {
     this.state = state;
     this.player = p;
     const job = JOBS[p.job];
-    this.text('district', districtAt(p.x, p.z));
+    this.text('district', districtAt(p.x, p.z, p.y));
     this.text('online', `${state.players.length} ONLINE`);
     this.text('ping', `${ping} ms`);
     this.text('hud-name', p.name);
@@ -290,14 +350,57 @@ export class UI {
       )
       .join('');
     if (this.el('weapon-strip').innerHTML !== strip) this.el('weapon-strip').innerHTML = strip;
-    const menuKey = `${p.job}:${p.money}:${p.weapons.join(',')}:${state.players.map((v) => v.id + v.job).join(',')}:${state.vote?.id}:${state.vote?.yes}:${state.vote?.no}:${state.entities.length}:${JSON.stringify(state.doors)}:${state.laws.join('|')}`;
+    const residentMenu = this.menu === 'context' && this.contextTarget?.kind === 'player';
+    const resident = residentMenu ? state.players.find((v) => v.id === this.contextTarget?.id) : undefined;
+    const giveNearby = resident && distance(eyes(p), eyes(resident)) <= GIVE_RANGE;
+    const menuKey = JSON.stringify([
+      p.job,
+      p.money,
+      p.weapons,
+      giveNearby,
+      state.players.map((v) => [
+        v.id,
+        v.name,
+        v.job,
+        v.deadUntil,
+        v.arrestedUntil,
+        v.wantedUntil,
+        v.wantedReason,
+        v.warrantUntil,
+        v.license,
+      ]),
+      state.vote,
+      state.entities.length,
+      state.doors,
+      state.laws,
+      state.lockdown,
+    ]);
     if (
       this.menu &&
       this.lastMenuKey !== menuKey &&
-      !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '')
+      (residentMenu || !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? ''))
     ) {
       this.lastMenuKey = menuKey;
+      // Keep resident details and permissions live without discarding a typed amount or reason.
+      const focused = document.activeElement;
+      const fields = residentMenu
+        ? [...this.el('menu-content').querySelectorAll('input')].map((input) => ({
+            id: input.id,
+            value: input.value,
+            start: input.selectionStart,
+            end: input.selectionEnd,
+          }))
+        : [];
       this.renderMenu();
+      for (const field of fields) {
+        const input = document.getElementById(field.id) as HTMLInputElement | null;
+        if (!input) continue;
+        input.value = field.value;
+        if (focused?.id === field.id && !input.disabled) {
+          input.focus({ preventScroll: true });
+          if (field.start !== null && field.end !== null) input.setSelectionRange(field.start, field.end);
+        }
+      }
     }
     this.drawMap();
   }
@@ -370,7 +473,7 @@ export class UI {
           : '');
     }
     for (const button of this.root.querySelectorAll<HTMLButtonElement>(
-      '.scoreboard [data-action="voice-mute"]',
+      '#menu-content [data-action="voice-mute"]',
     )) {
       const id = button.dataset.target!;
       const name = this.state?.players.find((p) => p.id === id)?.name ?? 'resident';
@@ -391,12 +494,12 @@ export class UI {
     const p = this.player,
       s = this.state;
     const pages = this.playing
-      ? ['jobs', 'shop', 'build', 'laws', 'players', 'help', 'settings']
+      ? ['jobs', 'shop', 'build', 'laws', 'players', 'account', 'help', 'settings']
       : ['help', 'settings'];
     this.el('menu-nav').innerHTML = pages
       .map(
         (page) =>
-          `<button data-menu="${page}" class="${this.menu === page ? 'active' : ''}"><span>${icons[page]}</span>${{ jobs: 'Jobs', shop: 'Shop', build: 'Build', laws: 'City laws', players: 'Players', help: 'Field guide', settings: 'Settings' }[page]}</button>`,
+          `<button data-menu="${page}" class="${this.menu === page ? 'active' : ''}"><span>${icons[page]}</span>${{ jobs: 'Jobs', shop: 'Shop', build: 'Build', laws: 'City laws', players: 'Players', account: 'Account', help: 'Field guide', settings: 'Settings' }[page]}</button>`,
       )
       .join('');
     this.text(
@@ -452,17 +555,21 @@ export class UI {
     if (this.menu === 'laws' && s && p)
       html = `<div class="section-heading"><span class="eyebrow">MUNICIPAL NOTICEBOARD</span><h2>The law of the district.</h2><p>Mayor: ${escape(s.players.find((v) => v.job === 'mayor')?.name ?? 'Office vacant')}</p></div><div class="laws-list">${s.laws.map((law, i) => `<div><span>${String(i + 1).padStart(2, '0')}</span><p>${escape(law)}</p></div>`).join('')}</div><p class="muted">${s.lockdown ? 'A citywide lockdown is in effect.' : 'The district is open. No lockdown is in effect.'}</p>${p.job === 'mayor' ? '<div class="command-field"><input id="new-law" maxlength="120" placeholder="Write a new city law" aria-label="New city law"><button data-action="add-law">Add law</button></div><div class="tool-buttons"><button data-action="lockdown">Toggle lockdown</button><button data-action="reset-laws">Restore default laws</button></div>' : ''}${this.voteHtml()}`;
     if (this.menu === 'players' && s)
-      html = `<div class="section-heading"><span class="eyebrow">${escape(this.serverName)}</span><h2>The people make the city.</h2><p>${s.players.length} residents connected</p></div><div class="scoreboard"><div class="score-head"><span>RESIDENT</span><span>OCCUPATION</span><span>STATUS</span><span>VOICE</span></div>${s.players.map((v) => `<div class="score-row"><span><i style="background:${JOBS[v.job].color}"></i>${escape(v.name)}${v.id === p?.id ? ' <small>YOU</small>' : ''}</span><span style="color:${JOBS[v.job].color}">${JOBS[v.job].name}</span><span>${v.deadUntil ? 'Respawning' : v.arrestedUntil ? 'In custody' : v.wantedUntil ? 'Wanted' : 'In the district'}<small class="voice-speaking-label" data-voice-speaker="${v.id}"></small></span><span>${v.id === p?.id ? '<small>YOU</small>' : `<button class="voice-mute" data-action="voice-mute" data-target="${v.id}">Mute</button>`}</span></div>`).join('')}</div><p class="muted">Hold V for proximity voice after enabling your microphone in Settings. Mute controls only affect what you hear. Text chat: Y, /ooc for everyone, /g for your job group.</p>`;
+      html = `<div class="section-heading"><span class="eyebrow">${escape(this.serverName)}</span><h2>The people make the city.</h2><p>${s.players.length} residents connected · Select a name to interact.</p></div><div class="scoreboard"><div class="score-head"><span>RESIDENT</span><span>OCCUPATION</span><span>STATUS</span><span>VOICE</span></div>${s.players.map((v) => `<div class="score-row"><span><i style="background:${JOBS[v.job].color}"></i>${v.id === p?.id ? `${escape(v.name)} <small>YOU</small>` : `<button class="resident-link" data-action="resident" data-target="${v.id}" aria-label="View ${escape(v.name)}">${escape(v.name)} <span aria-hidden="true">↗</span></button>`}</span><span style="color:${JOBS[v.job].color}">${JOBS[v.job].name}</span><span>${v.deadUntil ? 'Respawning' : v.arrestedUntil ? 'In custody' : v.wantedUntil ? 'Wanted' : 'In the district'}<small class="voice-speaking-label" data-voice-speaker="${v.id}"></small></span><span>${v.id === p?.id ? '<small>YOU</small>' : `<button class="voice-mute" data-action="voice-mute" data-target="${v.id}">Mute</button>`}</span></div>`).join('')}</div><p class="muted">Hold V for proximity voice after enabling your microphone in Settings. Mute controls only affect what you hear. Text chat: Y, /ooc for everyone, /g for your job group.</p>`;
     if (this.menu === 'context') html = this.contextHtml();
+    if (this.menu === 'account')
+      html = this.username
+        ? `<div class="section-heading"><span class="eyebrow">YOUR ACCOUNT</span><h2>${escape(this.username)}</h2><p>Your inventory, props and property belong to this account. Sign in with this username and password on another browser to continue.</p></div><button data-action="account-signout">Sign out</button>`
+        : `<div class="section-heading"><span class="eyebrow">SAVE YOUR RESIDENT</span><h2>Make yourself at home.</h2><p>Create an account to keep this guest’s inventory, props and property across browsers.</p></div>${this.accountForm('register', 'menu')}<button class="subtle" data-action="account-signout">Return to sign in</button>`;
     if (this.menu === 'help')
-      html = `<div class="section-heading"><span class="eyebrow">THE FIELD GUIDE</span><h2>Welcome to the district.</h2><p>DarkRP is a social sandbox. The other players are the story.</p></div><div class="guide-start"><b>Your first five minutes</b><p>Choose a job in F4. Approach a door and press C to buy the property. Furnish your base with Q and the Physics Gun. A printer earns cash; a gun shop or kitchen earns customers. Use Y to introduce yourself.</p></div><div class="help-columns"><div><h3>On the streets</h3>${[
+      html = `<div class="section-heading"><span class="eyebrow">THE FIELD GUIDE</span><h2>Welcome to the district.</h2><p>DarkRP is a social sandbox. The other players are the story.</p></div><div class="guide-start"><b>Your first five minutes</b><p>Choose a job in F4. Approach a door and press C to buy the property. Furnish your base with Q and the Physics Gun. A printer earns cash; a gun shop or kitchen earns customers. Use Y to introduce yourself.</p></div><div class="guide-start"><b>Find a home</b><p>West Alder has Alder Court and Mercer Court; Canal Quarter has Linden House and Canal House. Each has three walkable floors, two apartments per floor, and a living room/kitchen, bedroom and bathroom in every unit. Lobbies and stairs are shared. Approach a private unit door and press C to buy it. Foundry Ward and Southbank have four new businesses with connected rooms.</p><p>F4 → Account creates a username/password account and keeps your current guest’s belongings. Sign in on another browser to recover your inventory, props and property. Guests can still return using their saved browser identity.</p></div><div class="help-columns"><div><h3>On the streets</h3>${[
         ['W A S D', 'Move'],
         ['MOUSE', 'Look around'],
         ['SPACE', 'Jump'],
         ['SHIFT', 'Sprint'],
         ['CTRL', 'Crouch'],
         ['E', 'Use door, printer or shipment'],
-        ['C', 'Property & entity actions'],
+        ['C', 'Resident, property & entity actions'],
         ['1–9 / SCROLL', 'Select equipment'],
         ['LMB / RMB', 'Use / alternate use'],
         ['R', 'Reload / rotate held prop'],
@@ -492,11 +599,12 @@ export class UI {
       s = this.state;
     if (!t || !p || !s)
       return '<div class="section-heading"><h2>Look at something first.</h2><p>Stand near a door, player, or shop entity and press C.</p></div>';
+    if (t.kind === 'player') return this.residentHtml(t.id);
     let html = `<div class="section-heading"><span class="eyebrow">CONTEXT MENU</span><h2>${escape(t.title)}</h2><p>${escape(t.detail)}</p></div>`;
     if (t.kind === 'door') {
       const d = s.doors.find((v) => v.id === t.id)!;
       const owns = d.owner === p.id || d.coowners.includes(p.id) || (d.group && GOVERNMENT.includes(p.job));
-      html += `<div class="context-actions"><button data-action="interact" data-target="${d.id}">${d.open ? 'Close' : 'Open'} door</button>${!d.owner && !d.group ? `<button class="primary" data-action="door-buy" data-target="${d.id}" ${p.money < d.price ? 'disabled' : ''}>Buy property · ${money(d.price)}</button>` : ''}${owns ? `<button data-action="door-lock" data-target="${d.id}">${d.locked ? 'Unlock' : 'Lock'} door</button>` : ''}</div>`;
+      html += `<div class="context-actions"><button data-action="interact" data-target="${d.id}">${d.open ? 'Close' : 'Open'} door</button>${!d.owner && !d.group && !d.public ? `<button class="primary" data-action="door-buy" data-target="${d.id}" ${p.money < d.price ? 'disabled' : ''}>Buy property · ${money(d.price)}</button>` : ''}${owns && !d.public ? `<button data-action="door-lock" data-target="${d.id}">${d.locked ? 'Unlock' : 'Lock'} door</button>` : ''}</div>`;
       if (d.owner === p.id)
         html += `<div class="command-field"><input id="door-title" maxlength="40" value="${escape(d.name)}" aria-label="Property name"><button data-action="title" data-target="${d.id}">Rename</button></div><h3>Share keys</h3><div class="tool-buttons">${
           [
@@ -517,12 +625,50 @@ export class UI {
       html += `<div class="context-actions"><button class="primary" data-action="interact" data-target="${e.id}">${e.kind === 'shipment' ? `Take weapon${e.owner === p.id ? '' : ` · ${money(e.price)}`}` : e.kind === 'microwave' ? `Buy meal · ${money(e.price)}` : e.kind === 'printer' ? 'Collect earnings / confiscate' : 'Use entity'}</button></div>`;
       if (e.owner === p.id && ['shipment', 'microwave'].includes(e.kind))
         html += `<div class="command-field"><input id="entity-price" type="number" min="1" max="50000" value="${e.price}" aria-label="Shop selling price"><button data-action="price" data-target="${e.id}">Set price</button></div>`;
-    } else
-      html +=
-        '<p>Use /give with this player in your crosshair to transfer cash. Government commands use the full name shown above.</p>';
+    }
     return html;
   }
+  residentHtml(id: string): string {
+    const p = this.player!,
+      target = this.state?.players.find((v) => v.id === id);
+    if (!target)
+      return '<div class="section-heading"><span class="eyebrow">RESIDENT</span><h2>This resident has disconnected.</h2><p>Select another resident from the player list.</p></div><button data-menu="players">Back to players</button>';
+    const unavailable = !!(p.deadUntil || p.arrestedUntil);
+    const nearby = distance(eyes(p), eyes(target)) <= GIVE_RANGE;
+    const canGive = nearby && !target.deadUntil && p.money > 0;
+    const max = Math.min(MAX_TRANSFER, p.money);
+    const reasonForm = (action: 'wanted' | 'warrant', label: string) =>
+      `<form class="resident-form" data-resident-action="${action}" data-target="${id}"><label class="field-label" for="resident-${action}">${action === 'wanted' ? 'WANTED' : 'SEARCH WARRANT'} REASON</label><div class="command-field"><input id="resident-${action}" maxlength="90" required pattern=".*\\S.*" placeholder="Describe the roleplay reason" autocomplete="off"><button type="submit">${label}</button></div></form>`;
+    return `<div class="section-heading"><span class="eyebrow">RESIDENT</span><h2>${escape(target.name)}</h2><p><span style="color:${JOBS[target.job].color}">${JOBS[target.job].name}</span> · ${target.deadUntil ? 'Respawning' : target.arrestedUntil ? 'In custody' : 'In the district'}</p></div>
+      <div class="resident-status" aria-live="polite">${target.wantedUntil ? `<p>Wanted · ${escape(target.wantedReason)}</p>` : ''}${target.warrantUntil ? '<p>Search warrant active</p>' : ''}<p>${target.license ? 'Gun license granted' : 'No gun license'}</p></div>
+      ${unavailable ? `<p class="muted">${p.deadUntil ? 'Wait until you respawn' : 'Wait until you leave custody'} to use resident actions.</p>` : ''}
+      <fieldset class="resident-actions" ${unavailable || target.id === p.id ? 'disabled' : ''}>
+        <section><h3>Give money</h3><p class="muted">${target.deadUntil ? 'This resident must respawn before receiving money.' : !nearby ? 'Move within 3.5 metres of this resident to give money.' : 'Stay close with a clear view of this resident.'} Your wallet: ${money(p.money)}.</p>
+          <form class="resident-form" data-resident-action="give" data-target="${id}"><label class="field-label" for="resident-amount">AMOUNT IN DOLLARS</label><div class="command-field"><input id="resident-amount" type="number" min="1" max="${max}" step="1" required placeholder="100" autocomplete="off" ${canGive ? '' : 'disabled'}><button class="primary" type="submit" ${canGive ? '' : 'disabled'}>Give money</button></div></form>
+        </section>
+        ${GOVERNMENT.includes(p.job) ? `<section><h3>Government actions</h3>${!GOVERNMENT.includes(target.job) ? reasonForm('wanted', target.wantedUntil ? 'Update wanted status' : 'Mark wanted') : '<p class="muted">Government staff cannot be marked wanted.</p>'}${target.wantedUntil ? `<button data-action="unwanted" data-target="${id}">Clear wanted status</button>` : ''}${['chief', 'mayor'].includes(p.job) ? reasonForm('warrant', target.warrantUntil ? 'Renew warrant' : 'Issue warrant') : ''}${p.job === 'mayor' ? `<button data-action="license" data-target="${id}" ${target.license ? 'disabled' : ''}>${target.license ? 'Gun license granted' : 'Grant gun license'}</button>` : ''}</section>` : ''}
+      </fieldset>
+      <div class="context-actions"><button data-menu="players">Back to players</button><button class="voice-mute" data-action="voice-mute" data-target="${id}">Mute</button><small data-voice-speaker="${id}"></small></div>`;
+  }
   clickAction(action: string, target: string, value?: string): void {
+    if (action === 'entry-login' || action === 'entry-register' || action === 'entry-guest') {
+      this.entryMode(action.slice(6) as 'login' | 'register' | 'guest');
+      return;
+    }
+    if (action === 'account-resume') {
+      this.onConnect('', this.input('server-password').value, true);
+      return;
+    }
+    if (action === 'account-signout') {
+      this.onSignOut();
+      return;
+    }
+    if (action === 'resident') {
+      const resident = this.state?.players.find((p) => p.id === target);
+      if (resident)
+        this.open('context', { kind: 'player', id: target, title: resident.name, detail: '', hint: '' });
+      return;
+    }
     if (action === 'resume') {
       this.close();
       return;

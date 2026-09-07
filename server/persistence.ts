@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import type { Profile, SavedWorld } from './game.ts';
 import { JOBS, MAX_ENTITIES, PROPS, WEAPONS } from '../shared/catalog.ts';
 import { MAP_BOUND } from '../shared/map.ts';
+import { validAccount } from './accounts.ts';
 
 const object = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -99,10 +100,12 @@ function validProfiles(value: unknown): value is Profile[] {
         typeof p.tokenHash === 'string' &&
         /^[a-f0-9]{64}$/.test(p.tokenHash) &&
         integer(p.money, 0, 1e9) &&
+        (p.account === undefined || validAccount(p.account)) &&
         (p.character === undefined || validCharacter(p.character)),
     ) &&
     unique(value.map((p) => p.id)) &&
-    unique(value.map((p) => p.tokenHash))
+    unique(value.map((p) => p.tokenHash)) &&
+    unique(value.filter((p) => p.account).map((p) => p.account!.username))
   );
 }
 

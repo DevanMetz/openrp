@@ -93,6 +93,60 @@ test('two real clients share player, prop, job and chat state; reconnect preserv
     await app.close();
   }
 });
+test('resident menu actions use exact identities and replicate cash and government status to real clients', async () => {
+  let now = Date.now();
+  const game = new Game({ now: () => now });
+  const app = await startServer({ port: 0, host: '127.0.0.1', production: true, persist: false, game });
+  const a = new Client(`ws://127.0.0.1:${app.port}/ws`),
+    b = new Client(`ws://127.0.0.1:${app.port}/ws`);
+  try {
+    await Promise.all([a.open(), b.open()]);
+    const wa = await a.join('Resident Sender'),
+      wb = await b.join('Resident Recipient');
+    const sender = game.players.get(wa.id)!,
+      recipient = game.players.get(wb.id)!;
+    Object.assign(sender, { x: 0, y: 0.08, z: 23 });
+    Object.assign(recipient, { x: 0, y: 0.08, z: 21, name: 'Renamed Recipient' });
+    a.send({ type: 'action', action: 'give', target: wb.id, value: 125 });
+    await b.wait((m) => m.type === 'notice' && m.text === 'Resident Sender gave you $125.');
+    for (const client of [a, b]) {
+      await client.wait(
+        (m) =>
+          m.type === 'state' &&
+          m.players.some((p) => p.id === wa.id && p.money === 1375) &&
+          m.players.some((p) => p.id === wb.id && p.money === 1625 && p.name === 'Renamed Recipient'),
+      );
+    }
+    now += 800;
+    a.send({ type: 'action', action: 'give', target: wb.id, value: '125' });
+    await a.wait((m) => m.type === 'notice' && m.text.startsWith('Enter a whole dollar amount'));
+    assert.equal(sender.money, 1375);
+    assert.equal(recipient.money, 1625);
+    now += 800;
+    a.send({ type: 'action', action: 'wanted', target: wb.id, value: 'Impersonation' });
+    await a.wait((m) => m.type === 'notice' && m.text === 'Only government jobs can use this action.');
+    assert.equal(recipient.wantedUntil, 0);
+    game.applyJob(sender, 'chief');
+    now += 800;
+    a.send({ type: 'action', action: 'wanted', target: wb.id, value: 'Armed robbery' });
+    await b.wait(
+      (m) =>
+        m.type === 'state' && m.players.some((p) => p.id === wb.id && p.wantedReason === 'Armed robbery'),
+    );
+    now += 800;
+    a.send({ type: 'action', action: 'warrant', target: wb.id, value: 'Stolen equipment' });
+    await b.wait((m) => m.type === 'state' && m.players.some((p) => p.id === wb.id && !!p.warrantUntil));
+    now += 800;
+    a.send({ type: 'chat', text: '/unwanted Renamed Recipient' });
+    await b.wait((m) => m.type === 'chat' && m.text === 'Renamed Recipient is no longer wanted.');
+    assert.equal(recipient.wantedUntil, 0);
+  } finally {
+    a.ws.terminate();
+    b.ws.terminate();
+    await app.close();
+  }
+});
+
 test('real client purchases survive a page refresh and a server replacement using the same data directory', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'openrp-network-world-'));
   const options = { port: 0, host: '127.0.0.1', production: true, dataDir: dir };
@@ -139,6 +193,9 @@ test('real client purchases survive a page refresh and a server replacement usin
   const prop = built.entities.find((e) => e.kind === 'crate')!;
   app.game.freeze(prop.id, true);
   await act('equip', 'pistol');
+  await client.wait(
+    (m) => m.type === 'state' && m.players.some((p) => p.id === welcome.id && p.weapon === 'pistol'),
+  );
   await act('primary');
   await client.wait((m) => m.type === 'state' && m.players.some((p) => p.ammo.pistol === 11));
   const door = app.game.doors.find((d) => d.id === 'cafe')!;
