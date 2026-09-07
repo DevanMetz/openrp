@@ -706,6 +706,8 @@ small {
 }
 .chat-line {
   color: #e4e7d1;
+  background: #18261fe8;
+  padding: 0.2rem 0.4rem;
   margin-top: 2px;
   overflow-wrap: anywhere;
 }
@@ -1847,7 +1849,7 @@ small {
     left: 0.8rem;
     bottom: 14rem;
     width: calc(100% - 1.6rem);
-    font-size: 0.65rem;
+    font-size: 0.75rem;
   }
   #chat-form {
     display: grid;
