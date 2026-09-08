@@ -1,5 +1,11 @@
 # Testing
 
+## Cafe counter detail
+
+Cafe counters now have stone caps, front-panel strips, a metal kick plate and decorative two-group espresso equipment with handles, controls and a slotted drip tray. Equipment sits within the existing counter footprint. It is scenery, with no new interaction or collision rules.
+
+Chrome reviewed the Union Cafe counter and caught coplanar stone/wood surfaces; the final cap sits 3mm above the original top and was rechecked without visible overlap. Build and production HTTP smoke passed. The shared cafe treatment also applies to Southbank Bakery; its layout-specific counter position has not yet been visually reviewed. Local and undeployed.
+
 ## Pendant GPU diagnostic
 
 At commit 6093c80, a local Chrome WebGL2 timer-query fixture measured the fixed cafe camera at 1100 × 760, pixel ratio 1, with both pendant spotlights forced off/on and other renderer settings unchanged. Queries bracketed `renderer.render`, including shadow rendering. The scene had no players or spawned props and animation time was fixed. Disjoint GPU queries would abort the run.

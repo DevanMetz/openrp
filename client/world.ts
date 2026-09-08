@@ -856,6 +856,22 @@ export class City {
             local(x, 0.67 + slat * 0.15, z + back * 0.24, 0.6, 0.105, 0.065, 'wood');
         }
       }
+      const counterZ = b.layout ? 4 : -2.5;
+      local(-3.3, 1.188, counterZ, 4.58, 0.03, 0.98, 'stone');
+      local(-3.3, 0.17, counterZ + 0.456, 4.45, 0.14, 0.025, 'metal');
+      for (const x of [-5.4, -4.35, -3.3, -2.25, -1.2])
+        local(x, 0.67, counterZ + 0.456, 0.045, 0.84, 0.025, 'wood');
+      // Decorative espresso equipment stays on the existing counter footprint.
+      local(-4.5, 1.44, counterZ - 0.08, 0.92, 0.48, 0.54, 'metal');
+      local(-4.5, 1.64, counterZ + 0.205, 0.86, 0.13, 0.045, 'trim');
+      local(-4.5, 1.245, counterZ + 0.3, 0.94, 0.055, 0.22, 'metal');
+      for (const x of [-4.72, -4.28]) {
+        local(x, 1.49, counterZ + 0.23, 0.1, 0.13, 0.1, 'trim');
+        local(x, 1.51, counterZ + 0.32, 0.06, 0.04, 0.2, 'metal');
+        local(x, 1.65, counterZ + 0.233, 0.045, 0.045, 0.02, '#acc9a0');
+      }
+      for (let slot = 0; slot < 8; slot++)
+        local(-4.85 + slot * 0.1, 1.276, counterZ + 0.3, 0.025, 0.006, 0.17, '#202b2c');
       signage(
         'COFFEE  ·  HOT MEALS  ·  GOOD COMPANY',
         -3.4,
