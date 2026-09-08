@@ -872,8 +872,35 @@ export class City {
       }
       for (let slot = 0; slot < 8; slot++)
         local(-4.85 + slot * 0.1, 1.276, counterZ + 0.3, 0.025, 0.006, 0.17, '#202b2c');
+      if (b.id === 'south-bakery') {
+        local(-2.65, 1.225, counterZ, 1.5, 0.04, 0.65, 'wood');
+        for (const x of [-3.15, -2.65, -2.15]) {
+          const loaf = toWorld(b, x, 1.25, counterZ);
+          this.add(
+            new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.2, 0.17, 0.25),
+            this.material('#bd8447'),
+            new THREE.Vector3(loaf.x, loaf.y, loaf.z),
+            new THREE.Euler(0, b.rotation, 0),
+          );
+          for (const dx of [-0.075, 0.075]) {
+            const points = Array.from({ length: 9 }, (_, i) => {
+              const z = -0.14 + i * 0.035;
+              const x = dx + z * 0.2;
+              return new THREE.Vector3(x, 0.17 * Math.sqrt(1 - (x / 0.2) ** 2 - (z / 0.25) ** 2) + 0.003, z);
+            });
+            this.add(
+              new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 8, 0.008, 4, false),
+              this.material('#ead0a0'),
+              new THREE.Vector3(loaf.x, loaf.y, loaf.z),
+              new THREE.Euler(0, b.rotation, 0),
+            );
+          }
+        }
+      }
       signage(
-        'COFFEE  ·  HOT MEALS  ·  GOOD COMPANY',
+        b.id === 'south-bakery'
+          ? 'FRESH BREAD  ·  PASTRIES  ·  COFFEE'
+          : 'COFFEE  ·  HOT MEALS  ·  GOOD COMPANY',
         -3.4,
         2.2,
         -b.d / 2 + 0.23,

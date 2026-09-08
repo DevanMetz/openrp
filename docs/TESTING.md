@@ -1,5 +1,9 @@
 # Testing
 
+## Bakery display
+
+Southbank Bakery now has three scored bread loaves on a wooden counter board and bakery-specific menu copy. Decorative geometry stays within the existing counter footprint. Chrome reviewed the actual City renderer from the customer side; the shared espresso equipment and cap fit this room. Initial scoring intersected the rounded tops and was replaced with curved surface marks, then visually rechecked. Build and production HTTP smoke passed. Local and undeployed.
+
 ## Cafe counter detail
 
 Cafe counters now have stone caps, front-panel strips, a metal kick plate and decorative two-group espresso equipment with handles, controls and a slotted drip tray. Equipment sits within the existing counter footprint. It is scenery, with no new interaction or collision rules.
@@ -8,7 +12,7 @@ Chrome reviewed the Union Cafe counter and caught coplanar stone/wood surfaces; 
 
 ## Pendant GPU diagnostic
 
-At commit 6093c80, a local Chrome WebGL2 timer-query fixture measured the fixed cafe camera at 1100 × 760, pixel ratio 1, with both pendant spotlights forced off/on and other renderer settings unchanged. Queries bracketed `renderer.render`, including shadow rendering. The scene had no players or spawned props and animation time was fixed. Disjoint GPU queries would abort the run.
+At commit 6093c80, a local Chrome WebGL2 timer-query fixture measured the fixed cafe camera at 1100 × 760, pixel ratio 1, with scene spotlight visibility forced off/on (four fixtures across two cafes; distance-based intensity still applied) and other renderer settings unchanged. Queries bracketed `renderer.render`, including shadow rendering. The scene had no players or spawned props and animation time was fixed. Disjoint GPU queries would abort the run.
 
 An initial 15-frame warmup/30-sample run reported off median/p95 0.169/0.187 ms and on 3.294/94.057 ms. A repeat with 90 warmup frames and 60 samples per mode reported off 0.182/0.879 ms and on 0.312/0.722 ms. The divergent first run is inconclusive; do not attribute its spikes to steady-state pendant cost. The warmed-up median difference was 0.130 ms in this static scene, not a full-game frame-rate guarantee. Existing shadow settings were retained.
 
