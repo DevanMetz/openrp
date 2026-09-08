@@ -620,8 +620,13 @@ export class City {
     for (let x = -63; x <= 63; x += 7) if (Math.abs(x) > 15) this.roadMark(x, -29, 3, 0.13, 'road-line');
     for (const x of [-14.8, 15.2])
       for (let z = -23; z < 48; z += 20) {
-        this.box(x, 0.025, z, 0.55, 0.035, 0.85, 'metal');
-        for (let k = 0; k < 6; k++) this.box(x, 0.048, z - 0.3 + k * 0.12, 0.46, 0.025, 0.025, '#171e1e');
+        this.box(x, 0.017, z, 0.55, 0.012, 0.85, '#171e1e');
+        for (const side of [-1, 1]) {
+          this.box(x + side * 0.255, 0.029, z, 0.04, 0.012, 0.85, 'metal');
+          this.box(x, 0.029, z + side * 0.405, 0.47, 0.012, 0.04, 'metal');
+        }
+        for (let k = 0; k < 6; k++)
+          this.box(x, 0.029, z - 0.3 + k * 0.12, 0.47, 0.012, 0.035, 'metal');
       }
     // Tram rails lead toward the old station at the south end of the district.
     for (const x of [-2.1, 2.1]) this.box(x, 0.022, 50, 0.09, 0.04, 37, 'metal');

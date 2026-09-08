@@ -1,5 +1,9 @@
 # Testing
 
+## Drain grate detail and street composition
+
+Chrome reviewed the main street from (3,1.7,48) toward the square: the clock tower remains legible above the foreground buildings with the denser skyline behind it. Existing drain placeholders were corrected from raised dark stripes on solid metal to metal frames and bars above a dark backing. Chrome close-up at (-13.6,1.2,18) confirmed visible dark slots and a low profile; existing placement straddles the pavement edge. No collision changes. Build and production HTTP smoke passed. Local and undeployed.
+
 ## Perimeter street review and coping
 
 Chrome inspected the skyline from player-height positions (0,1.7,-110) and (0,1.7,110), facing outward. The 5m boundary wall hides most background facades at these positions, leaving roof silhouettes visible. Added a concrete coping strip to all four perimeter walls; north-facing preview confirmed its visible edge above the brick. The four boxes add 48 triangles using the existing concrete batch. Corner joints and inner-city landmark compositions remain unreviewed. Build and production HTTP smoke passed. Local and undeployed.
