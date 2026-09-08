@@ -1,5 +1,9 @@
 # Testing
 
+## Street bin openings and drain clearance
+
+Street bins now have rolled rims and recessed dark liners instead of solid lids. Chrome close-up caught a missing inner surface in the initial open shell; a back-facing liner was added and rechecked with no pavement showing through the rear opening. Decorative only. Build and production HTTP smoke passed. An independent map geometry check also found no building-pavement or plaza overlap for any of the six revised drains. Local and undeployed.
+
 ## Drain placement correction
 
 Replaced eight fixed drain positions with six placements derived from the main street building frontages. Each grate sits 0.4m toward the street from the sidewalk edge, leaving 0.125m clearance with its 0.55m width; the top is lowered to 0.019m. Chrome rechecked the cafe drain and confirmed it sits entirely in the asphalt gutter instead of crossing onto the paving. Other five placements derive from their building dimensions but have not been individually photographed. Build and production HTTP smoke passed. Local and undeployed.

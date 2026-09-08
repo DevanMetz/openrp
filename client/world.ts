@@ -1031,8 +1031,28 @@ export class City {
       [47, 15],
       [-46, -16],
     ]) {
-      this.cylinder(x, 0.52, z, 0.3, 0.27, 1.04, 'metal');
-      this.cylinder(x, 1.05, z, 0.32, 0.32, 0.06, 'metal');
+      this.add(
+        new THREE.CylinderGeometry(0.3, 0.27, 1.04, 20, 1, true),
+        this.material('metal'),
+        new THREE.Vector3(x, 0.52, z),
+      );
+      if (!this.materials.has('bin-liner'))
+        this.materials.set(
+          'bin-liner',
+          new THREE.MeshStandardMaterial({ color: '#171e1e', roughness: 1, side: THREE.BackSide }),
+        );
+      this.add(
+        new THREE.CylinderGeometry(0.296, 0.287, 0.16, 20, 1, true),
+        this.material('bin-liner'),
+        new THREE.Vector3(x, 0.96, z),
+      );
+      this.cylinder(x, 0.88, z, 0.292, 0.292, 0.01, '#171e1e');
+      this.add(
+        new THREE.TorusGeometry(0.295, 0.025, 8, 24),
+        this.material('metal'),
+        new THREE.Vector3(x, 1.04, z),
+        new THREE.Euler(Math.PI / 2, 0, 0),
+      );
       for (let k = 0; k < 8; k++) {
         const a = (k / 8) * Math.PI * 2;
         this.box(x + Math.sin(a) * 0.305, 0.55, z + Math.cos(a) * 0.305, 0.035, 0.8, 0.035, '#272f2d');
