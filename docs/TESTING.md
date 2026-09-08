@@ -1,5 +1,9 @@
 # Testing
 
+## Clinic reception desk
+
+The clinic counter now has a pale worktop, muted green front panels, a metal toe plate and a reception plaque. Existing counter geometry and collision remain in place beneath the decorative finish. Chrome reviewed the District Clinic desk from the customer side: the sign is readable and the surfaces are visibly distinct without flicker in that view. Build and production HTTP smoke passed. Local and undeployed.
+
 ## Ceiling fixture detail
 
 The generic non-cafe ceiling strips now have metal housings, inset emissive diffusers and end caps. These remain batched decorative meshes without additional scene lights. Chrome reviewed the hardware-shop fixture from below: the diffuser and casing are distinct and meet the ceiling without visible overlap. Build and production HTTP smoke passed. Other building layouts have not yet been individually reviewed. Local and undeployed.

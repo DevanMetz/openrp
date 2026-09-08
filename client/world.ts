@@ -924,6 +924,12 @@ export class City {
       );
     }
     if (b.use === 'clinic') {
+      const counterZ = b.layout ? 4 : -2.5;
+      local(-3.3, 1.208, counterZ, 4.58, 0.025, 0.98, '#c9d0c6');
+      local(-3.3, 0.68, counterZ + 0.462, 4.46, 0.94, 0.03, '#b5c4bb');
+      local(-3.3, 0.18, counterZ + 0.465, 4.46, 0.12, 0.035, 'metal');
+      for (const x of [-4.78, -3.3, -1.82]) local(x, 0.68, counterZ + 0.482, 0.018, 0.9, 0.012, '#819b8f');
+      signage('RECEPTION', -3.3, 0.79, counterZ + 0.495, 1.8, 0.3, '#54776d', 'bold 56px sans-serif');
       local(-3.3, 1.65, -b.d / 2 + 0.24, 0.25, 1.3, 0.09, '#bdcfbf');
       local(-3.3, 1.65, -b.d / 2 + 0.25, 1.25, 0.25, 0.1, '#bdcfbf');
     }
