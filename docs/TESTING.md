@@ -1,5 +1,9 @@
 # Testing
 
+## Drain placement correction
+
+Replaced eight fixed drain positions with six placements derived from the main street building frontages. Each grate sits 0.4m toward the street from the sidewalk edge, leaving 0.125m clearance with its 0.55m width; the top is lowered to 0.019m. Chrome rechecked the cafe drain and confirmed it sits entirely in the asphalt gutter instead of crossing onto the paving. Other five placements derive from their building dimensions but have not been individually photographed. Build and production HTTP smoke passed. Local and undeployed.
+
 ## Drain grate detail and street composition
 
 Chrome reviewed the main street from (3,1.7,48) toward the square: the clock tower remains legible above the foreground buildings with the denser skyline behind it. Existing drain placeholders were corrected from raised dark stripes on solid metal to metal frames and bars above a dark backing. Chrome close-up at (-13.6,1.2,18) confirmed visible dark slots and a low profile; existing placement straddles the pavement edge. No collision changes. Build and production HTTP smoke passed. Local and undeployed.
