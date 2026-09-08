@@ -228,8 +228,27 @@ function surfaceTexture(kind: string, color: string): THREE.CanvasTexture {
     }
   }
   for (let i = 0; i < 24; i++) {
-    ctx.fillStyle = `rgba(26,33,23,${rand() * 0.06})`;
-    ctx.fillRect(rand() * 256, rand() * 256, rand() * 50, rand() * 100);
+    const opacity = rand() * 0.06;
+    const x = rand() * 256,
+      y = rand() * 256,
+      width = rand() * 50,
+      height = rand() * 100;
+    if (kind === 'plaster') {
+      // Soft, wrapped mottling avoids rectangular stains and seams at tile edges.
+      // Consume the same random values so scenery placement remains stable.
+      const radius = 18 + (width + height) * 0.3;
+      for (const dx of [-256, 0, 256])
+        for (const dy of [-256, 0, 256]) {
+          const wash = ctx.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, radius);
+          wash.addColorStop(0, `rgba(66,61,43,${opacity * 0.45})`);
+          wash.addColorStop(1, 'rgba(66,61,43,0)');
+          ctx.fillStyle = wash;
+          ctx.fillRect(x + dx - radius, y + dy - radius, radius * 2, radius * 2);
+        }
+    } else {
+      ctx.fillStyle = `rgba(26,33,23,${opacity})`;
+      ctx.fillRect(x, y, width, height);
+    }
   }
   const map = new THREE.CanvasTexture(canvas);
   map.wrapS = map.wrapT = THREE.RepeatWrapping;

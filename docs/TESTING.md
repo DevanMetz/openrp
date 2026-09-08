@@ -1,5 +1,9 @@
 # Testing
 
+## Plaster surface cleanup
+
+Replaced the plaster texture's rectangular stains with low-contrast radial washes wrapped across tile edges. Fine existing grain remains. The patch loop consumes the same five random values per iteration, preserving the subsequent city random sequence. Chrome reviewed the hardware-shop interior using the same fixture as the ceiling-light review: repeated hard-edged rectangles are gone and the wall reads as subtly varied plaster. Build and production HTTP smoke passed. Exterior plaster has not yet been visually reviewed. Local and undeployed.
+
 ## Clinic reception desk
 
 The clinic counter now has a pale worktop, muted green front panels, a metal toe plate and a reception plaque. Existing counter geometry and collision remain in place beneath the decorative finish. Chrome reviewed the District Clinic desk from the customer side: the sign is readable and the surfaces are visibly distinct without flicker in that view. Build and production HTTP smoke passed. Local and undeployed.
