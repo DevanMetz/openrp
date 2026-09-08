@@ -1,5 +1,9 @@
 # Testing
 
+## Outer skyline layer
+
+Added 36 staggered background buildings at radius 232m with varied heights, roof caps and inward-facing window planes. Existing near skyline positions and random sequence are preserved; the new geometry uses existing material batches and stays outside the playable square. Chrome reviewed the east skyline from (105,15,0): the added row fills several previously empty gaps while retaining nearer roof outlines. Fixture counters changed from 19 calls / 99,966 triangles to 19 / 109,146; these are renderer counters, not GPU timing. Build and production HTTP smoke passed. Street-level views and other bearings remain to review. Local and undeployed.
+
 ## Accumulated visual validation at 77a1fd4
 
 Full `npm run check` passed: TypeScript, all 118 tests, Vite build and production HTTP smoke. This covers the accumulated renderer changes through the plaster cleanup; it does not establish full gameplay or visual parity. Chrome also reviewed exterior plaster in the skyline fixture from (105,15,0), facing (188,22,0). The pale facades read cleanly at that distance without the prior rectangular staining. The isolated, sparse skyline remains visually unfinished; this review does not close that broader issue. Local and undeployed.

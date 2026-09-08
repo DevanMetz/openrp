@@ -1258,6 +1258,36 @@ export class City {
         for (let k = -w / 2 + 2; k < w / 2 - 1; k += 3.2)
           this.box(x + k, y, z + (z < 0 ? d / 2 + 0.02 : -d / 2 - 0.02), 1.2, 1.6, 0.05, '#536064');
     }
+    // A staggered outer row fills gaps while leaving the nearer roof silhouettes readable.
+    for (let i = 0; i < 36; i++) {
+      const angle = ((i + 0.5) / 36) * Math.PI * 2;
+      const x = Math.sin(angle) * 232,
+        z = Math.cos(angle) * 232;
+      const height = 18 + ((i * 7) % 6) * 3.4;
+      const width = 29 + (i % 3) * 3;
+      this.box(x, height / 2, z, width, height, 24, i % 3 ? 'plaster' : 'industrial');
+      this.box(x, height + 0.15, z, width + 0.4, 0.3, 24.4, 'concrete');
+      for (let y = 3.4; y < height - 1; y += 3.4) {
+        for (let offset = -width / 2 + 2; offset < width / 2 - 1; offset += 3.4) {
+          const side = z < 0 ? 1 : -1;
+          this.add(
+            new THREE.PlaneGeometry(1.2, 1.6),
+            this.material('#536064'),
+            new THREE.Vector3(x + offset, y, z + side * 12.025),
+            new THREE.Euler(0, side < 0 ? Math.PI : 0, 0),
+          );
+        }
+        for (let offset = -10; offset < 11; offset += 3.4) {
+          const side = x < 0 ? 1 : -1;
+          this.add(
+            new THREE.PlaneGeometry(1.2, 1.6),
+            this.material('#536064'),
+            new THREE.Vector3(x + side * (width / 2 + 0.025), y, z + offset),
+            new THREE.Euler(0, (side * Math.PI) / 2, 0),
+          );
+        }
+      }
+    }
     // A municipal clock tower frames the northern end of the square.
     this.box(0, 16, -83, 8, 32, 8, 'stone');
     this.box(0, 29.5, -83, 9.2, 0.6, 9.2, 'concrete');
