@@ -1,5 +1,9 @@
 # Testing
 
+## Bin rib fit
+
+Adjusted the eight exterior ribs to follow the tapered shell, with radial orientation and thinner depth. This removes rib corners that protruded into the newly visible liner. Chrome rechecked the same close-up and confirmed the interior is clear of those protrusions. Geometry count is unchanged. Build and production HTTP smoke passed. Local and undeployed.
+
 ## Street bin openings and drain clearance
 
 Street bins now have rolled rims and recessed dark liners instead of solid lids. Chrome close-up caught a missing inner surface in the initial open shell; a back-facing liner was added and rechecked with no pavement showing through the rear opening. Decorative only. Build and production HTTP smoke passed. An independent map geometry check also found no building-pavement or plaza overlap for any of the six revised drains. Local and undeployed.

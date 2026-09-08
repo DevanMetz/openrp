@@ -1055,7 +1055,13 @@ export class City {
       );
       for (let k = 0; k < 8; k++) {
         const a = (k / 8) * Math.PI * 2;
-        this.box(x + Math.sin(a) * 0.305, 0.55, z + Math.cos(a) * 0.305, 0.035, 0.8, 0.035, '#272f2d');
+        const radius = 0.27 + (0.03 * 0.55) / 1.04 + 0.01;
+        this.add(
+          new THREE.BoxGeometry(0.035, Math.hypot(0.8, (0.8 * 0.03) / 1.04), 0.018),
+          this.material('#272f2d'),
+          new THREE.Vector3(x + Math.sin(a) * radius, 0.55, z + Math.cos(a) * radius),
+          new THREE.Euler(Math.atan(0.03 / 1.04), a, 0, 'YXZ'),
+        );
       }
     }
     // Street signage and overhead tram wiring give the square a lived-in scale.
