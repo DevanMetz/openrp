@@ -1,5 +1,9 @@
 # Testing
 
+## Accumulated visual validation at 77a1fd4
+
+Full `npm run check` passed: TypeScript, all 118 tests, Vite build and production HTTP smoke. This covers the accumulated renderer changes through the plaster cleanup; it does not establish full gameplay or visual parity. Chrome also reviewed exterior plaster in the skyline fixture from (105,15,0), facing (188,22,0). The pale facades read cleanly at that distance without the prior rectangular staining. The isolated, sparse skyline remains visually unfinished; this review does not close that broader issue. Local and undeployed.
+
 ## Plaster surface cleanup
 
 Replaced the plaster texture's rectangular stains with low-contrast radial washes wrapped across tile edges. Fine existing grain remains. The patch loop consumes the same five random values per iteration, preserving the subsequent city random sequence. Chrome reviewed the hardware-shop interior using the same fixture as the ceiling-light review: repeated hard-edged rectangles are gone and the wall reads as subtly varied plaster. Build and production HTTP smoke passed. Exterior plaster has not yet been visually reviewed. Local and undeployed.
