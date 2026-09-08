@@ -1,5 +1,9 @@
 # Testing
 
+## Ceiling fixture detail
+
+The generic non-cafe ceiling strips now have metal housings, inset emissive diffusers and end caps. These remain batched decorative meshes without additional scene lights. Chrome reviewed the hardware-shop fixture from below: the diffuser and casing are distinct and meet the ceiling without visible overlap. Build and production HTTP smoke passed. Other building layouts have not yet been individually reviewed. Local and undeployed.
+
 ## Bakery display
 
 Southbank Bakery now has three scored bread loaves on a wooden counter board and bakery-specific menu copy. Decorative geometry stays within the existing counter footprint. Chrome reviewed the actual City renderer from the customer side; the shared espresso equipment and cap fit this room. Initial scoring intersected the rounded tops and was replaced with curved surface marks, then visually rechecked. Build and production HTTP smoke passed. Local and undeployed.

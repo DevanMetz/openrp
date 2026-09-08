@@ -792,10 +792,23 @@ export class City {
         }
       }
     }
-    if (b.use !== 'cafe')
+    if (b.use !== 'cafe') {
+      if (!this.materials.has('ceiling-diffuser'))
+        this.materials.set(
+          'ceiling-diffuser',
+          new THREE.MeshStandardMaterial({
+            color: '#e4e2ce',
+            emissive: '#e4dfbe',
+            emissiveIntensity: 0.45,
+            roughness: 0.65,
+          }),
+        );
       for (const x of [-4, 4]) {
-        local(x, 3.15, 0, 1.3, 0.09, 0.24, '#e4e2bc');
+        local(x, 3.165, 0, 1.38, 0.1, 0.3, 'metal');
+        local(x, 3.108, 0, 1.24, 0.018, 0.22, 'ceiling-diffuser');
+        for (const end of [-0.64, 0.64]) local(x + end, 3.105, 0, 0.05, 0.035, 0.26, 'trim');
       }
+    }
     signage(b.name.toUpperCase(), 0, 2.25, -b.d / 2 + 0.22, 5, 0.6, b.accent, 'bold 62px sans-serif');
     if (b.use === 'cafe') {
       if (!this.materials.has('pendant-diffuser'))
