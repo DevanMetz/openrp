@@ -1,5 +1,9 @@
 # Testing
 
+## Placeable couch upholstery
+
+The placeable couch uses rounded upholstery for the back, arms and seat cushions, retaining the existing dimensions and collision definition. The wooden base is inset 3cm per side after Chrome caught coplanar flicker against the arms; the final front/side view was rechecked cleanly. The fixture manually places one couch in the street, so its ground contact is not a physics-placement check. Build and production HTTP smoke passed. Local and undeployed.
+
 ## Bin rib fit
 
 Adjusted the eight exterior ribs to follow the tapered shell, with radial orientation and thinner depth. This removes rib corners that protruded into the newly visible liner. Chrome rechecked the same close-up and confirmed the interior is clear of those protrusions. Geometry count is unchanged. Build and production HTTP smoke passed. Local and undeployed.

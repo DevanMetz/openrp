@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { JOBS, WEAPONS, entitySize } from '../shared/catalog.ts';
 import type { Entity, Player, WeaponId } from '../shared/types.ts';
@@ -147,10 +148,16 @@ export function makeEntity(e: Entity): THREE.Group {
     for (let x = -1.25; x <= 1.26; x += 0.18) box(group, x, 0, 0, 0.025, h - 0.15, 0.025, c, true);
     for (let y = -1.15; y < 1.2; y += 0.19) box(group, 0, y, 0, w - 0.15, 0.018, 0.025, c, true);
   } else if (e.kind === 'couch') {
-    box(group, 0, -0.22, 0, w, 0.32, d, '#534d40');
-    box(group, 0, 0.08, -0.37, w, 0.9, 0.24, c);
-    for (const x of [-0.56, 0.56]) box(group, x, -0.03, 0.12, 1.05, 0.2, 0.72, c);
-    for (const x of [-1.02, 1.02]) box(group, x, 0.01, 0, 0.25, 0.72, d, c);
+    const cushion = (x: number, y: number, z: number, width: number, height: number, depth: number) => {
+      const mesh = new THREE.Mesh(new RoundedBoxGeometry(width, height, depth, 2, 0.05), material(c));
+      mesh.position.set(x, y, z);
+      mesh.castShadow = mesh.receiveShadow = true;
+      group.add(mesh);
+    };
+    box(group, 0, -0.22, 0, w - 0.06, 0.32, d - 0.06, '#534d40');
+    cushion(0, 0.08, -0.37, w, 0.9, 0.24);
+    for (const x of [-0.56, 0.56]) cushion(x, -0.03, 0.12, 1.05, 0.2, 0.72);
+    for (const x of [-1.02, 1.02]) cushion(x, 0.01, 0, 0.25, 0.72, d);
   } else if (e.kind === 'table' || e.kind === 'shelf') {
     const shelf = e.kind === 'shelf';
     for (const x of [-w / 2 + 0.06, w / 2 - 0.06])
