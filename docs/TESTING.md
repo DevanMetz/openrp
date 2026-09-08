@@ -1,5 +1,9 @@
 # Testing
 
+## Perimeter street review and coping
+
+Chrome inspected the skyline from player-height positions (0,1.7,-110) and (0,1.7,110), facing outward. The 5m boundary wall hides most background facades at these positions, leaving roof silhouettes visible. Added a concrete coping strip to all four perimeter walls; north-facing preview confirmed its visible edge above the brick. The four boxes add 48 triangles using the existing concrete batch. Corner joints and inner-city landmark compositions remain unreviewed. Build and production HTTP smoke passed. Local and undeployed.
+
 ## Outer skyline layer
 
 Added 36 staggered background buildings at radius 232m with varied heights, roof caps and inward-facing window planes. Existing near skyline positions and random sequence are preserved; the new geometry uses existing material batches and stays outside the playable square. Chrome reviewed the east skyline from (105,15,0): the added row fills several previously empty gaps while retaining nearer roof outlines. Fixture counters changed from 19 calls / 99,966 triangles to 19 / 109,146; these are renderer counters, not GPU timing. Build and production HTTP smoke passed. Street-level views and other bearings remain to review. Local and undeployed.

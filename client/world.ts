@@ -1224,6 +1224,10 @@ export class City {
     this.scene.add(this.fountainRipples);
   }
   skyline(): void {
+    for (const side of [-1, 1]) {
+      this.box(0, 5.04, side * MAP_BOUND, MAP_BOUND * 2 + 1.2, 0.18, 1.2, 'concrete');
+      this.box(side * MAP_BOUND, 5.04, 0, 1.2, 0.18, MAP_BOUND * 2 - 1.2, 'concrete');
+    }
     const backgroundGround = new THREE.PlaneGeometry(520, 520);
     backgroundGround.rotateX(-Math.PI / 2);
     this.add(backgroundGround, this.material('#747c6e'), new THREE.Vector3(0, -0.04, 0));
