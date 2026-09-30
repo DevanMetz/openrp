@@ -77,6 +77,7 @@ export class UI {
     muted: new Set(),
   };
   private lastVoiceKey = '';
+  private menuOpener?: HTMLElement;
   onVoice: (command: 'mic' | 'deafen' | 'mute', id?: string) => void = () => {};
   onConnect: (name: string, password: string, account?: boolean) => void = () => {};
   onAccount: (action: 'login' | 'register', username: string, password: string) => void = () => {};
@@ -128,7 +129,7 @@ export class UI {
         <div id="weapon-strip"></div><div id="chat" class="chat"><div id="chat-lines" aria-live="polite"></div><form id="chat-form" hidden><span id="chat-channel">LOCAL</span><input id="chat-input" maxlength="240" autocomplete="off" aria-label="Chat message" placeholder="Message nearby players, or /ooc for everyone"><kbd>↵</kbd></form></div>
         <div id="death" hidden></div><div id="damage" aria-hidden="true"></div>
       </div>
-      <div id="overlay" class="overlay" hidden><section class="modal" role="dialog" aria-modal="true" aria-label="Game menu"><header class="modal-top"><div class="mini-brand">OPEN<span>RP</span></div><span id="modal-subtitle">UNION DISTRICT</span><button id="close-menu" class="close-button" aria-label="Close menu">✕ <kbd>ESC</kbd></button></header><div class="modal-body"><nav id="menu-nav"></nav><main id="menu-content"></main></div><footer class="modal-footer"><span id="menu-footer">Your city. Your rules.</span><span>OPENRP ${VERSION}</span></footer></section></div>
+      <div id="overlay" class="overlay" hidden><section class="modal" role="dialog" aria-modal="true" aria-label="Game menu"><header class="modal-top"><div class="mini-brand">OPEN<span>RP</span></div><span id="modal-subtitle">UNION DISTRICT</span><button id="close-menu" class="close-button" aria-label="Close menu">✕ <kbd>ESC</kbd></button></header><div class="modal-body"><nav id="menu-nav"></nav><main id="menu-content" tabindex="0" aria-label="Menu content"></main></div><footer class="modal-footer"><span id="menu-footer">Your city. Your rules.</span><span>OPENRP ${VERSION}</span></footer></section></div>
       <div class="hud-feed">
         <button id="contract-hud" class="contract-hud" data-menu="contracts" hidden aria-label="Open active contract"><span class="eyebrow">ACTIVE CONTRACT</span><strong id="contract-hud-target"></strong><span id="contract-hud-detail"></span><small>F4 → Contracts for details</small></button>
         <div id="notices" aria-live="polite"></div>
@@ -147,6 +148,17 @@ export class UI {
         this.clickAction(button.dataset.action, button.dataset.target ?? '', button.dataset.value);
     });
     this.el('close-menu').addEventListener('click', () => this.close());
+    this.el('overlay').addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab') return;
+      // Tab navigates the dialog; it must not trigger the in-game player-list shortcut.
+      event.stopPropagation();
+      const controls = this.menuControls();
+      const index = controls.indexOf(document.activeElement as HTMLElement);
+      if (index < 0 || (event.shiftKey ? index === 0 : index === controls.length - 1)) {
+        event.preventDefault();
+        (event.shiftKey ? controls.at(-1) : controls[0])?.focus();
+      }
+    });
     this.root.addEventListener('submit', (event) => {
       const form = event.target;
       if (form instanceof HTMLFormElement && form.dataset.contractRequest !== undefined) {
@@ -291,16 +303,33 @@ export class UI {
       return;
     }
     this.closeChat(false);
+    const opening = !this.menu;
+    if (opening)
+      this.menuOpener = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
     this.menu = menu;
     if (menu === 'context') this.contextTarget = target ?? this.aim;
     this.el('overlay').hidden = false;
     this.onMenu();
     this.renderMenu();
+    if (opening) this.el('close-menu').focus({ preventScroll: true });
+    for (const id of ['entry', 'hud', 'viewport', 'contract-hud']) this.el(id).inert = true;
   }
   close(resume = true): void {
+    const wasOpen = !!this.menu;
     this.menu = '';
     this.el('overlay').hidden = true;
+    for (const id of ['entry', 'hud', 'viewport', 'contract-hud']) this.el(id).inert = false;
+    if (wasOpen && this.menuOpener?.isConnected && this.menuOpener.getClientRects().length)
+      this.menuOpener.focus({ preventScroll: true });
+    this.menuOpener = undefined;
     if (resume && this.playing) this.onResume();
+  }
+  private menuControls(): HTMLElement[] {
+    return [
+      ...this.el('overlay').querySelectorAll<HTMLElement>(
+        'button, a[href], input, select, textarea, [tabindex]',
+      ),
+    ].filter((el) => el.tabIndex >= 0 && !el.matches(':disabled') && el.getClientRects().length > 0);
   }
   openChat(): void {
     if (!this.playing || this.menu) return;
@@ -589,6 +618,8 @@ export class UI {
     return `<section class="voice-settings"><h3>Proximity voice</h3><p>Enable your microphone, return to the streets, then <kbd>hold V</kbd> to talk. Players within 28 metres can hear you. Release V to stop. Sound follows their position and fades with distance.</p><div class="voice-actions"><button data-action="voice-mic">Enable microphone</button><button data-action="voice-deafen">Mute all voice</button></div><p class="muted">Your mic starts off. Menus, chat, losing focus and respawning stop transmission. Mute individual players in Tab. Headphones help prevent echo.</p></section>`;
   }
   renderMenu(): void {
+    const focused = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+    const hadFocus = !!focused && this.el('overlay').contains(focused);
     const p = this.player,
       s = this.state;
     const pages = this.playing
@@ -720,6 +751,20 @@ export class UI {
       html = `<div class="section-heading"><span class="eyebrow">MAKE IT YOURS</span><h2>Settings.</h2><p>Saved on this browser.</p></div><div class="settings-list"><label>Sound volume<output>${Math.round(this.settings.volume * 100)}%</output><input aria-label="Sound volume" data-setting="volume" type="range" min="0" max="1" step="0.05" value="${this.settings.volume}"></label><label>Voice volume<output>${Math.round(this.settings.voiceVolume * 100)}%</output><input aria-label="Voice volume" data-setting="voiceVolume" type="range" min="0" max="1" step="0.05" value="${this.settings.voiceVolume}"></label><label>Mouse sensitivity<output>${this.settings.sensitivity}</output><input aria-label="Mouse sensitivity" data-setting="sensitivity" type="range" min="0.2" max="2.5" step="0.1" value="${this.settings.sensitivity}"></label><label>Field of view<output>${this.settings.fov}</output><input aria-label="Field of view" data-setting="fov" type="range" min="65" max="105" step="1" value="${this.settings.fov}"></label><label>Graphics quality<select aria-label="Graphics quality" data-setting="quality"><option value="high" ${this.settings.quality === 'high' ? 'selected' : ''}>High · soft shadows</option><option value="low" ${this.settings.quality === 'low' ? 'selected' : ''}>Low · better performance</option></select></label></div><p class="muted">For smoother play on integrated graphics, choose Low. A mouse and keyboard are required.</p>${this.voiceControls()}`;
     this.el('menu-content').innerHTML = html;
     this.refreshVoiceControls();
+    // Live snapshots replace menu nodes. Keep keyboard users on the same surviving action.
+    if (hadFocus && focused && !focused.isConnected) {
+      const replacement = this.menuControls().find((control) => {
+        if (focused.id) return control.id === focused.id;
+        const key = ['menu', 'action', 'job', 'setting'].find((key) => focused.dataset[key]);
+        return (
+          !!key &&
+          control.dataset[key] === focused.dataset[key] &&
+          control.dataset.target === focused.dataset.target &&
+          control.dataset.value === focused.dataset.value
+        );
+      });
+      (replacement ?? this.el('close-menu')).focus({ preventScroll: true });
+    }
   }
   voteHtml(): string {
     const v = this.state?.vote;

@@ -1,5 +1,13 @@
 # Testing
 
+## Menu keyboard navigation and couch grounding
+
+Reviewed September 25, 2026 in the in-app browser at 1280 × 720. Opening Help now focuses Close, Tab/Shift+Tab stay within the dialog, Page Down scrolls the focused guide, and Escape returns to the entry button. While playing, Tab navigates the open menu instead of triggering the player-list shortcut. Switching to Jobs and Settings preserves focus through their content replacement. Background entry/game controls are inert while the dialog is open. Screen-reader behavior and narrow layouts were not exhaustively tested.
+
+Four short wooden feet now reach the couch's unchanged 1.1m-high collider bottom. A normal server spawn settled after 600 physics steps with its centre at 0.549888m; the visual bottom changed from 0.169888m above ground to -0.000112m (physics tolerance). The renderer fixture was reviewed at foot height. This supersedes the placement limitation in the upholstery entry below.
+
+Full `npm run check` passed: TypeScript, all 118 tests, production build and HTTP smoke. Screenshots and a local review are in ignored `test-results/ux-review-2026-09-25/`. Local and undeployed.
+
 ## Placeable couch upholstery
 
 The placeable couch uses rounded upholstery for the back, arms and seat cushions, retaining the existing dimensions and collision definition. The wooden base is inset 3cm per side after Chrome caught coplanar flicker against the arms; the final front/side view was rechecked cleanly. The fixture manually places one couch in the street, so its ground contact is not a physics-placement check. Build and production HTTP smoke passed. Local and undeployed.
@@ -351,6 +359,7 @@ Contract UI increment: full check passed all 107 tests. Real four-client tests v
 Contract settlement receipts: successful refunds and payouts now notify the customer and hitman with target and amount. Full/missing wallets do not emit receipts until transfer succeeds. Receipts are online notices, not persistent transaction history; offline wallet settlement remains correct but offline notice delivery is not queued. All 109 tests, typecheck/build and production smoke passed, including delayed payout exactly-once receipt checks and recipient scoping for refund/payout.
 
 Original Hitman outfit: charcoal short jacket, high-neck knit, lapels/pockets/buttons, dark glasses and earpiece. Chrome visual lab reviewed standing and crouched poses at pitch 0/0.7 on two appearance variants. Build/typecheck and production smoke passed. Reused lab captions are not valid model-count or performance evidence; no GPU performance claim is made. Extreme motion/weapon combinations remain unreviewed.
+
 # Active contract HUD — local follow-up
 
 The assigned hitman now sees a compact target, escrow amount and remaining-time card during play. It opens Contracts and disappears after cancellation. Reviewed in isolated, nonpersistent browser sessions at desktop size and in a 360 × 780 iframe; the narrow menu opened from the card and cancellation cleared both views. Temporary connection notices can overlap the card on narrow screens; notification stacking remains a layout follow-up. No production game state was used.

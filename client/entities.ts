@@ -155,6 +155,8 @@ export function makeEntity(e: Entity): THREE.Group {
       group.add(mesh);
     };
     box(group, 0, -0.22, 0, w - 0.06, 0.32, d - 0.06, '#534d40');
+    for (const x of [-0.96, 0.96])
+      for (const z of [-0.35, 0.35]) box(group, x, -h / 2 + 0.105, z, 0.14, 0.21, 0.14, '#3d382f');
     cushion(0, 0.08, -0.37, w, 0.9, 0.24);
     for (const x of [-0.56, 0.56]) cushion(x, -0.03, 0.12, 1.05, 0.2, 0.72);
     for (const x of [-1.02, 1.02]) cushion(x, 0.01, 0, 0.25, 0.72, d);

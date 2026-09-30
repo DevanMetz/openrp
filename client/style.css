@@ -966,6 +966,10 @@ small {
   scrollbar-width: thin;
   scrollbar-color: #52634f transparent;
 }
+#menu-content:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
 .modal-footer {
   display: flex;
   justify-content: space-between;
@@ -2007,4 +2011,3 @@ small {
     font-size: 0.8rem;
   }
 }
-
