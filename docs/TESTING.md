@@ -1,5 +1,11 @@
 # Testing
 
+## Field guide navigation and layout
+
+Replaced the long two-column Help page with three first steps, in-game shortcuts and five native expandable topics. The full command reference is retained; controls now include the menu shortcuts and mouse-capture fallback. Open topics and focused summaries survive live menu updates.
+
+Chrome reviewed the entry guide at 1707 × 847 CSS pixels and the in-game command reference at 360 × 780. The narrow content measured 336px client/scroll width, with no horizontal overflow. Keyboard checks confirmed Shift+Tab from Close reaches the final topic, Enter expands it, Tab wraps back to Close and Escape restores the entry Help button. In a real local guest session, a payday changed the footer from $1,500 to $1,545 while preserving the expanded Controls topic and its focus. Full `npm run check` passed all 118 tests, TypeScript, build and production HTTP smoke. Screenshots are in ignored `test-results/guide-review-2026-09-29/`. Local and undeployed.
+
 ## Menu keyboard navigation and couch grounding
 
 Reviewed September 25, 2026 in the in-app browser at 1280 × 720. Opening Help now focuses Close, Tab/Shift+Tab stay within the dialog, Page Down scrolls the focused guide, and Escape returns to the entry button. While playing, Tab navigates the open menu instead of triggering the player-list shortcut. Switching to Jobs and Settings preserves focus through their content replacement. Background entry/game controls are inert while the dialog is open. Screen-reader behavior and narrow layouts were not exhaustively tested.

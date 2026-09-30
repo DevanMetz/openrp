@@ -16,6 +16,7 @@ import { BUILDINGS, districtAt } from '../shared/map.ts';
 import { distance, eyes } from '../shared/movement.ts';
 import type { GameEvent, JobId, Player, Snapshot } from '../shared/types.ts';
 import type { VoiceStatus } from './voice.ts';
+import { guideHtml } from './guide.ts';
 
 export const escape = (text: unknown): string =>
   String(text ?? '').replace(
@@ -327,7 +328,7 @@ export class UI {
   private menuControls(): HTMLElement[] {
     return [
       ...this.el('overlay').querySelectorAll<HTMLElement>(
-        'button, a[href], input, select, textarea, [tabindex]',
+        'button, a[href], input, select, textarea, summary, [tabindex]',
       ),
     ].filter((el) => el.tabIndex >= 0 && !el.matches(':disabled') && el.getClientRects().length > 0);
   }
@@ -620,6 +621,8 @@ export class UI {
   renderMenu(): void {
     const focused = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
     const hadFocus = !!focused && this.el('overlay').contains(focused);
+    const guideTopics = [...this.el('menu-content').querySelectorAll<HTMLDetailsElement>('.guide-topic')];
+    const openTopics = new Set(guideTopics.filter((topic) => topic.open).map((topic) => topic.id));
     const p = this.player,
       s = this.state;
     const pages = this.playing
@@ -726,30 +729,14 @@ export class UI {
       html = this.username
         ? `<div class="section-heading"><span class="eyebrow">YOUR ACCOUNT</span><h2>${escape(this.username)}</h2><p>Your inventory, props and property belong to this account. Sign in with this username and password on another browser to continue.</p></div><button data-action="account-signout">Sign out</button>`
         : `<div class="section-heading"><span class="eyebrow">SAVE YOUR RESIDENT</span><h2>Make yourself at home.</h2><p>Create an account to keep this guest’s inventory, props and property across browsers.</p></div>${this.accountForm('register', 'menu')}<button class="subtle" data-action="account-signout">Return to sign in</button>`;
-    if (this.menu === 'help')
-      html = `<div class="section-heading"><span class="eyebrow">THE FIELD GUIDE</span><h2>Welcome to the district.</h2><p>DarkRP is a social sandbox. The other players are the story.</p></div><div class="guide-start"><b>Your first five minutes</b><p>Choose a job in F4. Approach a door and press C to buy the property. Furnish your base with Q and the Physics Gun. A printer earns cash; a gun shop or kitchen earns customers. Use Y to introduce yourself.</p></div><div class="guide-start"><b>Find a home</b><p>West Alder has Alder Court and Mercer Court; Canal Quarter has Linden House and Canal House. Each has three walkable floors, two apartments per floor, and a living room/kitchen, bedroom and bathroom in every unit. Lobbies and stairs are shared. Approach a private unit door and press C to buy it. Foundry Ward and Southbank have four new businesses with connected rooms.</p><p>F4 → Account creates a username/password account and keeps your current guest’s belongings. Sign in on another browser to recover your inventory, props and property. Guests can still return using their saved browser identity.</p></div><div class="help-columns"><div><h3>On the streets</h3>${[
-        ['W A S D', 'Move'],
-        ['MOUSE', 'Look around'],
-        ['SPACE', 'Jump'],
-        ['SHIFT', 'Sprint'],
-        ['CTRL', 'Crouch'],
-        ['E', 'Use door, printer or shipment'],
-        ['C', 'Resident, property & entity actions'],
-        ['1–9 / SCROLL', 'Select equipment'],
-        ['LMB / RMB', 'Use / alternate use'],
-        ['R', 'Reload / rotate held prop'],
-        ['Y / ENTER', 'Text chat'],
-        ['HOLD V', 'Proximity voice (enable mic in Settings)'],
-        ['TAB', 'Player list'],
-        ['ESC', 'Release mouse / pause'],
-      ]
-        .map(([key, desc]) => `<div class="control-row"><kbd>${key}</kbd><span>${desc}</span></div>`)
-        .join(
-          '',
-        )}<h3>Building</h3><p>Q opens props and tools. Hold LMB with the Physics Gun to grab your object, then RMB to freeze it. Scroll changes reach. R rotates. F activates fading doors. Z undoes your most recent prop.</p></div><div><h3>Talk & trade</h3><div class="commands"><code>/ooc message</code><p>Talk to the whole server.</p><code>/w message · /whisper message</code><p>Whisper to players within ${CHAT_RANGES.whisper} metres.</p><code>/y message · /yell message</code><p>Call out to players within ${CHAT_RANGES.yell} metres. Normal local chat reaches ${CHAT_RANGES.local} metres. Walls do not block text chat.</p><code>/me action</code><p>Describe an action to nearby players.</p><code>/advert message</code><p>Advertise your business for $50.</p><code>/give 100</code><p>Give money to the player you’re looking at.</p><code>/dropweapon</code><p>Drop your equipped personal firearm with its ammunition. Job-issued equipment cannot be dropped. E picks up a dropped firearm.</p><code>/dropmoney 100</code><p>Drop cash for someone to collect.</p><code>/pm "Full Name" message</code><p>Message one connected resident by exact name (quote names containing spaces) or player ID. Only the sender and recipient receive it; moderation logs record the message and recipient. No offline delivery.</p><code>/channel 0–100 · /channel off</code><p>Tune text radio or turn it off. /channel alone shows your tuning. Everyone starts on channel 1 when joining; tuning is temporary.</p><code>/radio message</code><p>Reach anyone tuned to your channel across the city. These are open channels, and messages are logged for moderation. Text radio is separate from proximity voice.</p><code>/g message</code><p>Speak to your job group.</p><code>/job Your title</code><p>Set a custom roleplay title without changing jobs. Use /job alone to reset it.</p><code>/rpname First Last</code><p>Change your roleplay name.</p></div><h3>Law & order</h3><div class="commands"><code>/demote Full Name reason</code><p>Start a public demotion vote. A majority of residents must agree. Passed votes remove the role for five minutes.</p><code>/wanted Full Name reason</code><p>Government: mark a suspect wanted, then use the arrest baton.</p><code>/unwanted Full Name</code><p>Clear a suspect’s wanted status.</p><code>/warrant Full Name reason</code><p>Mayor or Chief: authorize a search. Officers can then ram the owner’s door.</p><code>/unwarrant Full Name</code><p>Mayor or Chief: revoke a search warrant.</p><code>/license Full Name · /unlicense Full Name</code><p>Mayor: grant or revoke a civilian gun license.</p><code>/addlaw text · /removelaw 1</code><p>Mayor: edit city laws.</p><code>/broadcast message</code><p>Mayor: address the entire server. Unavailable while dead or in custody; broadcasts are logged with other text chat.</p><code>/lockdown · /unlockdown</code><p>Mayor: start or end a city curfew.</p></div></div></div><div class="guide-start"><b>Play with friends</b><p>Everyone connects to the same server address. On a LAN, share the host computer’s IP and port. A private browser window creates a separate test identity. This is an early browser implementation: maps, characters and sounds are original; Source engine assets and vehicles are not included. Proximity voice is optional and requires HTTPS (or localhost).</p></div>`;
+    if (this.menu === 'help') html = guideHtml(this.playing);
     if (this.menu === 'settings')
       html = `<div class="section-heading"><span class="eyebrow">MAKE IT YOURS</span><h2>Settings.</h2><p>Saved on this browser.</p></div><div class="settings-list"><label>Sound volume<output>${Math.round(this.settings.volume * 100)}%</output><input aria-label="Sound volume" data-setting="volume" type="range" min="0" max="1" step="0.05" value="${this.settings.volume}"></label><label>Voice volume<output>${Math.round(this.settings.voiceVolume * 100)}%</output><input aria-label="Voice volume" data-setting="voiceVolume" type="range" min="0" max="1" step="0.05" value="${this.settings.voiceVolume}"></label><label>Mouse sensitivity<output>${this.settings.sensitivity}</output><input aria-label="Mouse sensitivity" data-setting="sensitivity" type="range" min="0.2" max="2.5" step="0.1" value="${this.settings.sensitivity}"></label><label>Field of view<output>${this.settings.fov}</output><input aria-label="Field of view" data-setting="fov" type="range" min="65" max="105" step="1" value="${this.settings.fov}"></label><label>Graphics quality<select aria-label="Graphics quality" data-setting="quality"><option value="high" ${this.settings.quality === 'high' ? 'selected' : ''}>High · soft shadows</option><option value="low" ${this.settings.quality === 'low' ? 'selected' : ''}>Low · better performance</option></select></label></div><p class="muted">For smoother play on integrated graphics, choose Low. A mouse and keyboard are required.</p>${this.voiceControls()}`;
     this.el('menu-content').innerHTML = html;
+    // A payday or resident joining must not collapse the reference someone is reading.
+    if (this.menu === 'help' && guideTopics.length)
+      for (const topic of this.el('menu-content').querySelectorAll<HTMLDetailsElement>('.guide-topic'))
+        topic.open = openTopics.has(topic.id);
     this.refreshVoiceControls();
     // Live snapshots replace menu nodes. Keep keyboard users on the same surviving action.
     if (hadFocus && focused && !focused.isConnected) {

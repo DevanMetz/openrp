@@ -1582,54 +1582,173 @@ small {
     grid-template-columns: 1.2fr 0.85fr 0.8fr 52px;
   }
 }
-.help-columns {
+.guide-first {
+  border: 1px solid #c5b58430;
+  border-top: 2px solid var(--accent);
+  background: #aeab7909;
+  padding: 1.15rem;
+}
+.guide-first > h3 {
+  color: #e2d1ae;
+  font-size: 1rem;
+}
+.guide-steps {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.4rem;
+  list-style: none;
+  margin: 1.2rem 0;
+  padding: 0;
 }
-.help-columns h3 {
-  margin: 1.4rem 0 1rem;
-  color: #dccda7;
+.guide-step-number {
+  font: 500 1.8rem var(--display);
+  color: var(--accent);
 }
-.help-columns p {
-  color: #a6b59d;
-  font-size: 0.83rem;
+.guide-steps h4,
+.guide-topic h4 {
+  font-size: 0.94rem;
+  color: #e2d1ae;
+  margin: 0.35rem 0 0.6rem;
+}
+.guide-steps p,
+.guide-topic p,
+.guide-commands dd {
+  color: #b6c2b0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.guide-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+.guide-actions button,
+.guide-actions > span {
+  font-size: 0.8rem;
+}
+.guide-actions > span {
+  flex: 1;
+  color: var(--muted);
+}
+.guide-actions button > span {
+  margin-left: 0.4rem;
+  color: var(--accent);
+}
+.guide-reference {
+  margin: 1.8rem 0 1rem;
+}
+.guide-reference h3 {
+  font-size: 1rem;
+  margin-bottom: 0.4rem;
+}
+.guide-reference p {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.guide-topic {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  margin: 0.6rem 0;
+}
+.guide-topic[open] {
+  border-color: #c5b58455;
+}
+.guide-topic summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  cursor: pointer;
+  list-style: none;
+  background: #ffffff03;
+}
+.guide-topic summary::-webkit-details-marker {
+  display: none;
+}
+.guide-topic summary:hover {
+  background: #ffffff08;
+}
+.guide-topic summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+.guide-topic summary strong {
+  display: block;
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+.guide-topic summary small {
+  display: block;
+  color: var(--muted);
+  margin-top: 0.3rem;
+  line-height: 1.4;
+}
+.guide-toggle {
+  color: var(--accent);
+  font-size: 1.4rem;
+}
+.guide-topic[open] .guide-toggle {
+  transform: rotate(45deg);
+}
+.guide-topic-body {
+  border-top: 1px solid var(--line);
+  padding: 1rem 1.15rem;
+}
+.guide-topic-body > p + p,
+.guide-topic-body > h4 {
+  margin-top: 1rem;
+}
+.guide-topic-body > :first-child {
+  margin-top: 0;
+}
+.guide-topic-body .guide-note {
+  border-left: 2px solid #c5b58466;
+  padding-left: 0.8rem;
+  color: var(--muted);
+  margin-top: 1rem;
+}
+.guide-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
 }
 .control-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.5rem 0;
+  padding: 0.65rem 0;
   border-bottom: 1px solid var(--line);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: #b5c1a9;
 }
 .control-row kbd {
-  font-size: 0.63rem;
+  font-size: 0.7rem;
 }
-.commands code {
-  font-size: 0.76rem;
+.control-row span {
+  text-align: right;
 }
-.commands p {
-  font-size: 0.75rem;
-  margin: 0.25rem 0 0.85rem;
+.guide-commands {
+  margin: 1rem 0 0;
 }
-.guide-start {
-  padding: 1.1rem 1.25rem;
-  background: #aeab7909;
-  border: 1px solid #c5b58422;
-  margin: 1.5rem 0;
+.guide-commands > div {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 1.2rem;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--line);
 }
-.guide-start b {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #d8c8a0;
+.guide-commands code {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
-.guide-start p {
-  font-size: 0.84rem;
-  color: #acbba2;
-  margin-top: 0.5rem;
+.guide-commands dd {
+  margin: 0;
 }
 .settings-list {
   max-width: 520px;
@@ -1819,9 +1938,24 @@ small {
   .prop-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .help-columns {
+  .guide-steps,
+  .guide-columns,
+  .guide-commands > div {
     grid-template-columns: 1fr;
-    gap: 0;
+    gap: 0.65rem;
+  }
+  .guide-steps > li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.85rem;
+  }
+  .guide-step-number {
+    flex: 0 0 1.8rem;
+  }
+  .guide-topic summary,
+  .guide-topic-body,
+  .guide-first {
+    padding: 0.85rem;
   }
   h2 {
     font-size: 2.3rem;
