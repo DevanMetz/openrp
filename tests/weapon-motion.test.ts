@@ -8,7 +8,7 @@ import { Game } from '../server/game.ts';
 
 test('articulated palms meet firearm grips through crouching, full aim range and reload', () => {
   const player = new Game().join('Motion test').player;
-  Object.assign(player, { job: 'gangster', x: 3, y: 2, z: -5, yaw: 1.1 });
+  Object.assign(player, { job: 'gangster', x: 3, y: 2, z: -5, yaw: 1.1, grounded: true });
   const avatar = makeAvatar(player);
   // Labels are reviewed in the browser; this test exercises the actual limb/equipment hierarchy.
   avatar.labelKey = 'Motion test:gangster::false:false';
@@ -22,6 +22,9 @@ test('articulated palms meet firearm grips through crouching, full aim range and
             pitch,
             reloadUntil: progress ? 10000 + (1 - progress) * WEAPONS[weapon].reload : 0,
           });
+          // Exercise the settled endpoints as well as the transition checks in avatar-motion.test.ts.
+          avatar.pitch = pitch;
+          avatar.crouch = Number(crouch);
           updateAvatar(avatar, player, 1 / 60, new THREE.Vector3(), 10000);
           avatar.root.updateMatrixWorld(true);
           const motion = firearmMotion(weapon, player.reloadUntil, 10000)!;

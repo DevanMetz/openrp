@@ -1,5 +1,13 @@
 # Testing
 
+## Character stance and directional gait — 0.6.2 candidate
+
+Remote characters blend crouch, aim and shortest-path yaw. Fixed-length two-bone legs keep level soles 1mm above the character's ground plane through standing/crouching transitions, and one foot stays on that plane through directional walking. The swing foot lifts during its forward return; airborne characters tuck their legs and stop the walking cycle. Teleports reset the motion state. Rounded knee and elbow surfaces cover previously exposed gaps, using the existing material batches.
+
+Geometry tests cover stance transitions at 30/60/144fps; forward/backward, lateral and diagonal movement with reversal; crouched/standing gait; fixed bone lengths and level feet; foot-cycle direction; yaw wrapping; airborne suspension and teleport reset. The firearm tests retain settled full-pitch/crouch coverage. Chrome compared the 0.6.1 renderer with the updated renderer in paused crouch, forward, strafe and jump views, and inspected a synthetic moving resident in the actual local city without captured console errors. The two-character keys fixture remains 28 draw calls; the joint surfaces add 672 triangles to the updated character. These are renderer counts, not GPU timings. Feet follow the character's ground plane, without terrain raycasts or world-locked foot plants; uneven steps, broader transitions and crowd performance remain work.
+
+Full `npm run check` passed all 127 tests, TypeScript, build and production HTTP smoke. Ignored fixtures, screenshots and the check log are in `test-results/locomotion-*` and `test-results/movement-review-2026-09-30/`. Production release verification is pending. No production test residents or transactions were created.
+
 ## Firearm grip and reload motion — 0.6.1 released September 30, 2026
 
 Third-person firearms use a two-bone arm pose with fixed bone lengths and shared grip coordinates. The actual character hierarchy is tested across pistol/SMG/shotgun, standing/crouched positions, five pitch values from -1.48 to 1.48, seven reload phases and a rotated/translated character root. Both palms stay within 1mm of their respective grip targets. Separate tests cover unreachable-target stability, authoritative reload duration, completion/cancellation reset and first-person loading-hand framing at 16:9, 4:3 and square aspect ratios. These are geometric/animation checks, not GPU benchmarks or full collision tests against clothing.

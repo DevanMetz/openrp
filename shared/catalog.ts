@@ -1,6 +1,6 @@
 import type { EntityKind, JobId, WeaponId } from './types.ts';
 
-export const VERSION = '0.6.1';
+export const VERSION = '0.6.2';
 export const PROTOCOL = 7;
 export const EVIDENCE_CAPACITY = 24;
 export const POCKET_CAPACITY = 8;

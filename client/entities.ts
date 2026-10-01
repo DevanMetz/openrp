@@ -5,6 +5,7 @@ import { JOBS, WEAPONS, entitySize } from '../shared/catalog.ts';
 import type { Entity, Player, WeaponId } from '../shared/types.ts';
 import { labelTexture } from './world.ts';
 import { animateFirearm, firearmGrips, firearmMotion, poseArm } from './weapon-motion.ts';
+import { dampAngle, poseLeg } from './avatar-motion.ts';
 
 const materials = new Map<string, THREE.MeshStandardMaterial>();
 const avatarSurface = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
@@ -211,6 +212,10 @@ export interface Avatar {
   job: string;
   phase: number;
   speed: number;
+  crouch: number;
+  airborne: number;
+  pitch: number;
+  velocity: THREE.Vector3;
   last: THREE.Vector3;
   labelKey: string;
   equipment?: THREE.Group;
@@ -401,6 +406,7 @@ export function makeAvatar(player: Player): Avatar {
     sphere(upper, 0, -0.025, 0, arm ? 0.088 : 0.1, arm ? shirt : trousers, [1, 0.7, 0.95]);
     lower.position.y = arm ? -0.28 : -0.37;
     upper.add(lower);
+    sphere(lower, 0, 0, 0, arm ? 0.065 : 0.079, arm ? shirt : trousers);
     cylinder(
       lower,
       0,
@@ -440,6 +446,7 @@ export function makeAvatar(player: Player): Avatar {
   label.scale.set(2.9, 0.52, 1);
   root.add(label);
   root.position.set(player.x, player.y, player.z);
+  root.rotation.y = player.yaw;
   return {
     root,
     head,
@@ -458,6 +465,10 @@ export function makeAvatar(player: Player): Avatar {
     job: player.job,
     phase: 0,
     speed: 0,
+    crouch: Number(player.crouch),
+    airborne: Number(!player.grounded),
+    pitch: player.pitch,
+    velocity: new THREE.Vector3(),
     last: new THREE.Vector3(player.x, player.y, player.z),
     labelKey: '',
   };
@@ -470,38 +481,63 @@ export function updateAvatar(
   now = Date.now(),
 ): void {
   const dest = new THREE.Vector3(p.x, p.y, p.z);
-  if (a.root.position.distanceTo(dest) > 5) a.root.position.copy(dest);
-  else a.root.position.lerp(dest, 1 - Math.exp(-14 * dt));
-  const speed = Math.hypot(a.root.position.x - a.last.x, a.root.position.z - a.last.z) / Math.max(dt, 0.001);
-  a.speed = THREE.MathUtils.damp(a.speed, Math.min(speed, 8), 10, dt);
+  if (a.root.position.distanceTo(dest) > 5) {
+    a.root.position.copy(dest);
+    a.last.copy(dest);
+    a.velocity.set(0, 0, 0);
+    a.phase = 0;
+    a.crouch = Number(p.crouch);
+    a.airborne = Number(!p.grounded);
+    a.pitch = p.pitch;
+    a.root.rotation.y = p.yaw;
+  } else a.root.position.lerp(dest, 1 - Math.exp(-14 * dt));
+  const velocity = a.root.position.clone().sub(a.last).setY(0).divideScalar(Math.max(dt, 0.001));
+  velocity.clampLength(0, 8);
+  a.velocity.lerp(velocity, 1 - Math.exp(-10 * dt));
+  a.speed = a.velocity.length();
   a.last.copy(a.root.position);
-  a.phase += dt * (3 + a.speed * 2.2);
-  const stride = Math.sin(a.phase) * 0.65 * Math.min(a.speed / 3, 1) * (p.crouch ? 0.22 : 1);
-  a.leftLeg.rotation.x = (p.crouch ? 1.15 : 0) + stride;
-  a.rightLeg.rotation.x = (p.crouch ? 1.15 : 0) - stride;
+  a.crouch = THREE.MathUtils.damp(a.crouch, Number(p.crouch), 14, dt);
+  a.airborne = THREE.MathUtils.damp(a.airborne, Number(!p.grounded), 14, dt);
+  a.pitch = THREE.MathUtils.damp(a.pitch, p.pitch, 18, dt);
+  a.root.rotation.y = dampAngle(a.root.rotation.y, p.yaw, 18, dt);
+  const travel = a.velocity.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -a.root.rotation.y);
+  if (a.speed > 0.001) travel.divideScalar(a.speed);
+  const walking = Math.min(a.speed / 3, 1) * (1 - a.airborne);
+  a.phase = (a.phase + dt * a.speed * 2.8 * (1 - a.airborne)) % (Math.PI * 2);
+  const stride = Math.cos(a.phase) * 0.65 * walking * (1 - a.crouch * 0.78) * -travel.z;
+  a.torso.position.y = 0.785 - a.crouch * 0.33 - walking * (1 - a.crouch) * 0.05;
+  a.torso.rotation.x = -a.crouch * 0.65;
+  const stepLength = walking * (0.28 - a.crouch * 0.12);
+  const footTarget = new THREE.Vector3();
+  for (const [hip, knee, foot, side, offset] of [
+    [a.leftLeg, a.leftShin, a.leftFoot, -1, 0],
+    [a.rightLeg, a.rightShin, a.rightFoot, 1, Math.PI],
+  ] as const) {
+    hip.position.y = a.torso.position.y;
+    const cycle = a.phase + offset;
+    footTarget.set(
+      hip.position.x + travel.x * Math.cos(cycle) * stepLength * 0.28,
+      0.079 + Math.max(0, -Math.sin(cycle)) * walking * (0.14 - a.crouch * 0.07) + a.airborne * 0.12,
+      travel.z * Math.cos(cycle) * stepLength - a.crouch * 0.035,
+    );
+    footTarget.x += side * Math.abs(travel.x) * walking * 0.025;
+    poseLeg(hip, knee, foot, footTarget);
+  }
   a.leftArm.rotation.set(
     p.weapon === 'scanner' ? -stride * 0.45 : p.weapon === 'keys' ? -stride * 0.65 : 0.95,
     0,
     0,
   );
   a.rightArm.rotation.set(
-    p.weapon === 'scanner' ? 0.65 + p.pitch * 0.45 : p.weapon === 'keys' ? stride * 0.65 : 1.15,
+    p.weapon === 'scanner' ? 0.65 + a.pitch * 0.45 : p.weapon === 'keys' ? stride * 0.65 : 1.15,
     0,
     0,
   );
-  a.leftShin.rotation.x = p.crouch ? -2.05 : -Math.max(0, stride) * 0.65;
-  a.rightShin.rotation.x = p.crouch ? -2.05 : -Math.max(0, -stride) * 0.65;
-  a.leftFoot.rotation.x = -a.leftLeg.rotation.x - a.leftShin.rotation.x;
-  a.rightFoot.rotation.x = -a.rightLeg.rotation.x - a.rightShin.rotation.x;
   a.leftForearm.rotation.set(p.weapon === 'scanner' ? 0.12 : p.weapon === 'keys' ? 0.12 : 0.48, 0, 0);
   a.rightForearm.rotation.set(p.weapon === 'scanner' ? 0.85 : p.weapon === 'keys' ? 0.12 : 0.35, 0, 0);
-  a.torso.position.y = p.crouch ? 0.46 : 0.835;
-  a.torso.rotation.x = p.crouch ? -0.65 : 0;
-  a.leftLeg.position.y = a.rightLeg.position.y = a.torso.position.y;
-  a.head.rotation.x = THREE.MathUtils.damp(a.head.rotation.x, p.pitch * 0.75 + (p.crouch ? 0.65 : 0), 12, dt);
-  a.root.rotation.y = p.yaw;
+  a.head.rotation.x = a.pitch * 0.75 + a.crouch * 0.65;
   a.root.scale.y = p.deadUntil ? 0.18 : 1;
-  a.label.position.y = (p.job === 'cook' ? 2.23 : 2.14) - (p.crouch ? 0.57 : 0);
+  a.label.position.y = (p.job === 'cook' ? 2.18 : 2.09) - a.crouch * 0.57;
   if (a.weapon !== p.weapon) {
     if (a.equipment) disposeObject(a.equipment);
     a.equipment = makeViewmodel(p.weapon, false);
@@ -516,10 +552,10 @@ export function updateAvatar(
     if (motion) {
       a.torso.updateMatrix();
       const shoulder = new THREE.Vector3(0, 0.465, 0).applyMatrix4(a.torso.matrix);
-      a.equipment.rotation.set(p.pitch - motion.lower * 0.4, 0, motion.lower * 0.2);
+      a.equipment.rotation.set(a.pitch - motion.lower * 0.4, 0, motion.lower * 0.2);
       a.equipment.position
         .set(0.07, 0.015 - motion.lower * 0.05, -motion.grips.reach)
-        .applyAxisAngle(new THREE.Vector3(1, 0, 0), p.pitch)
+        .applyAxisAngle(new THREE.Vector3(1, 0, 0), a.pitch)
         .add(shoulder);
       a.equipment.updateMatrix();
       const toTorso = a.torso.matrix.clone().invert().multiply(a.equipment.matrix);
@@ -534,12 +570,12 @@ export function updateAvatar(
     } else if (p.weapon === 'scanner') {
       // Keep the grip at the animated palm while holding the display upright.
       a.equipment.rotation.x =
-        p.pitch * 0.3 - a.torso.rotation.x - a.rightArm.rotation.x - a.rightForearm.rotation.x;
+        a.pitch * 0.3 - a.torso.rotation.x - a.rightArm.rotation.x - a.rightForearm.rotation.x;
       const grip = new THREE.Vector3(0, -0.12, 0.015).multiplyScalar(0.7).applyEuler(a.equipment.rotation);
       a.equipment.position.set(-grip.x, -0.3 - grip.y, -0.01 - grip.z);
     } else {
-      a.equipment.rotation.x = p.pitch;
-      a.equipment.position.y = p.crouch ? 0.76 : 1.13;
+      a.equipment.rotation.x = a.pitch;
+      a.equipment.position.y = 1.08 - a.crouch * 0.33;
     }
   }
   a.label.visible = !p.deadUntil && localPosition.distanceTo(dest) < 23;

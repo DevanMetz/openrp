@@ -191,6 +191,10 @@ OpenRP code and original procedural assets: **MIT**, copyright Devan Metz. See [
 
 Garry’s Mod, DarkRP, and Valve names identify the inspiration. OpenRP is not affiliated with their creators.
 
+### 0.6.2
+
+Characters ease into crouching and turn smoothly, with level feet during stance changes and directional walking, strafing and backward steps. Jumping tucks the legs and stops the walking cycle. Rounded knees and elbows cover the gaps that appeared when limbs bent. Firearm grips follow the blended pose; gameplay movement, collision and protocol 7 are unchanged.
+
 ### 0.6.1
 
 Firearms now sit in both hands while aiming and crouching. Pistol and SMG reloads move the magazine and support hand; shotgun reloads show shell loading followed by a pump action. First-person reloads bring the weapon into view and follow the existing server reload timing. Game rules and protocol 7 are unchanged.
