@@ -10,7 +10,9 @@ import { startCollapse, updateCollapse } from './death-motion.ts';
 
 const materials = new Map<string, THREE.MeshStandardMaterial>();
 const avatarSurface = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
+const metalSurface = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.65 });
 materials.set('avatar-surface', avatarSurface);
+materials.set('metal-surface', metalSurface);
 const material = (color: string, metal = false) => {
   const key = `${color}:${metal}`;
   let m = materials.get(key);
@@ -108,13 +110,6 @@ export function makeEntity(e: Entity): THREE.Group {
     const weapon = makeViewmodel(e.item, false);
     weapon.rotation.z = Math.PI / 2;
     weapon.position.z = 0.22;
-    weapon.traverse((object) => {
-      if (object instanceof THREE.Mesh) {
-        object.castShadow = object.receiveShadow = true;
-        object.frustumCulled = true;
-        object.renderOrder = 0;
-      }
-    });
     group.add(weapon);
   } else if (e.kind === 'crate' || e.kind === 'shipment') {
     box(group, 0, 0, 0, w, h, d, c);
@@ -225,15 +220,21 @@ export interface Avatar {
   equipment?: THREE.Group;
   weapon?: WeaponId;
 }
-// Keep articulation, but bake solid clothing/skin colors into one surface per body part.
-function batchAvatarPart(group: THREE.Group): void {
+// Merge rigid siblings by surface, retaining joints, animated named meshes and lit details.
+function batchModelPart(group: THREE.Group): void {
   const buckets = new Map<THREE.Material, THREE.Mesh[]>();
   for (const child of [...group.children]) {
-    if (child instanceof THREE.Group) batchAvatarPart(child);
-    else if (child instanceof THREE.Mesh && !Array.isArray(child.material)) {
+    if (child instanceof THREE.Group) batchModelPart(child);
+    else if (child instanceof THREE.Mesh && !child.name && !Array.isArray(child.material)) {
       const mat = child.material;
       const batchMaterial =
-        mat instanceof THREE.MeshStandardMaterial && !mat.map && !mat.metalness ? avatarSurface : mat;
+        mat instanceof THREE.MeshStandardMaterial && !mat.map && mat.emissive.getHex() === 0
+          ? mat.metalness === 0 && mat.roughness === 0.85
+            ? avatarSurface
+            : mat.metalness === 0.65 && mat.roughness === 0.4
+              ? metalSurface
+              : mat
+          : mat;
       const meshes = buckets.get(batchMaterial) ?? [];
       meshes.push(child);
       buckets.set(batchMaterial, meshes);
@@ -241,10 +242,13 @@ function batchAvatarPart(group: THREE.Group): void {
   }
   for (const [mat, meshes] of buckets) {
     if (meshes.length < 2) continue;
+    // RoundedBoxGeometry is unindexed; all parts in a merge must use the same layout.
+    const indexed = meshes.every((mesh) => mesh.geometry.index);
     const parts = meshes.map((mesh) => {
       mesh.updateMatrix();
-      const geometry = mesh.geometry.clone().applyMatrix4(mesh.matrix);
-      if (mat === avatarSurface) {
+      const geometry = !indexed && mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+      geometry.applyMatrix4(mesh.matrix);
+      if (mat === avatarSurface || mat === metalSurface) {
         const color = (mesh.material as THREE.MeshStandardMaterial).color;
         const colors = new Float32Array(geometry.getAttribute('position').count * 3);
         for (let i = 0; i < colors.length; i += 3) color.toArray(colors, i);
@@ -444,7 +448,7 @@ export function makeAvatar(player: Player): Avatar {
     torso.add(child);
   }
   root.add(torso);
-  batchAvatarPart(root);
+  batchModelPart(root);
   const body = new THREE.Group();
   for (const child of [...root.children]) body.add(child);
   root.add(body);
@@ -821,16 +825,12 @@ export function makeViewmodel(weapon: WeaponId, withHands = true): THREE.Group {
     );
     stripe.rotation.x = -0.45;
   }
+  batchModelPart(group);
   group.traverse((o) => {
     if (o instanceof THREE.Mesh) {
-      o.castShadow = false;
-      o.receiveShadow = false;
-      o.frustumCulled = false;
-      o.renderOrder = 10;
-      const m = o.material as THREE.Material;
-      if (m instanceof THREE.MeshStandardMaterial) {
-        /* World and viewmodel materials remain lit consistently. */
-      }
+      o.castShadow = o.receiveShadow = !withHands;
+      o.frustumCulled = !withHands;
+      o.renderOrder = withHands ? 10 : 0;
     }
   });
   return group;

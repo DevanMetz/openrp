@@ -191,6 +191,10 @@ OpenRP code and original procedural assets: **MIT**, copyright Devan Metz. See [
 
 Garry’s Mod, DarkRP, and Valve names identify the inspiration. OpenRP is not affiliated with their creators.
 
+### 0.6.5
+
+Held tools and firearms now cast and receive world shadows. Rigid equipment pieces share draw calls while retaining their shapes, colors, metal surfaces, glowing tips, screens and moving reload parts. Remote equipment outside the camera view is culled, and development render counters include both the city and first-person passes. Server rules and protocol 7 are unchanged.
+
 ### 0.6.4
 
 Physics/tool guns, medical kits and battering rams use connected two-handed carry poses; scanners, batons and lockpicks use one hand with a relaxed spare arm. Hands stay on their handles while aiming and crouching. The ram has an original horizontal body and two handles, the medical kit has rounded edges, latches and markings on both faces, and tool viewmodels have longer sleeves. Server actions and protocol 7 are unchanged.

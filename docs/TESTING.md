@@ -1,5 +1,23 @@
 # Testing
 
+## Equipment rendering and shadows — 0.6.5 local release candidate
+
+Rigid equipment siblings now share vertex-colored matte/metal surfaces. Named magazine/pump meshes, moving hand/shell groups, textured screens and emissive tips retain their own behavior. Mixed indexed/unindexed geometry is normalized before merging. World equipment uses normal camera culling and casts/receives shadows; first-person hands retain their overlay behavior. Development render counters accumulate the world, shadow and first-person passes.
+
+A comparison against the 0.6.4 renderer checked 132 model poses: all twelve equipment types with/without hands at five reload phases, plus all twelve jobs in a crouched aimed pose. Visible triangle counts, roughness, metalness, emissive values and texture presence matched; transformed vertex positions/normals/colors agreed within 0.00011 component tolerance (0.11mm for positions). This checks geometry/material preservation, not complete pixel equivalence. Chrome reviewed medical-kit shadows, physics-gun glowing details, scanner screens, and separate SMG magazine/shotgun shell/pump motion, with no captured console errors.
+
+The isolated 32-resident Chrome fixture uses a 1280×720 render buffer at pixel ratio 1, fixed poses and hidden labels. A/B/B/A passes each warm up for 60 renders then sample 120 renders, in batches of eight per animation callback. GPU elapsed queries are asynchronous and discard disjoint samples. The local GPU was an AMD Radeon RX 7900 GRE through ANGLE/D3D11. Results:
+
+| Scene | Released 0.6.4 draws | Updated draws | Triangle counts |
+| --- | ---: | ---: | --- |
+| 32 visible, shadows off | 632 | 511 | 163,604 for both |
+| 32 visible, shadows on | 1,063 | 1,015 | 320,600 → 327,194, including the new equipment shadows |
+| 32 behind camera, shadows off | 195 | 1 | 6,596 → 2 (ground only) |
+
+Visible-crowd CPU render-submission medians were 1.4–1.5ms before / 1.3–1.4ms after without shadows, and 1.5–1.7ms before / 1.7ms after with shadows. GPU medians were 0.077ms before / 0.090ms after without shadows, and 0.108–0.124ms before / 0.123–0.124ms after with shadows. No hidden/disjoint samples occurred in those completed runs. These measurements establish fewer draw submissions and retained geometry, **not an overall FPS improvement**: GPU time did not improve, browser scheduling was irregular, and this fixture excludes city geometry, labels, moving crowds and networking. The off-camera run used one render per animation callback; its draw counts are comparable but its timings are not pooled with the batched runs. Wider hardware, city and moving-crowd profiling remain work.
+
+Ignored source, geometry comparison data, timing JSON and screenshots are in `test-results/crowd-*`, `test-results/verify-crowd-geometry.ts` and `test-results/crowd-review-2026-09-30/`. GPU query handling follows the [Khronos extension specification](https://registry.khronos.org/webgl/extensions/EXT_disjoint_timer_query_webgl2/). The real local client also rendered 24 synthetic residents in the city and switched from ram to scanner without captured console errors. A development-only DOM overlay showed 1,019 world/shadow draws with the menu open and 1,023 total draws with either four-draw viewmodel visible, confirming both passes are counted. No production test residents or transactions were created. Full `npm run check` passed TypeScript, all 135 tests, build and production HTTP smoke; the log is retained with the review evidence. Production verification is pending. No server rules, protocol or persistence schema changes.
+
 ## Tool grips and carry models — 0.6.4 released September 30, 2026
 
 Eight tools now share model-local grip coordinates between first-person hands and third-person articulated arms: Physics Gun, Tool Gun, medical kit, ram, scanner, arrest/release batons and lockpick. Two-handed equipment uses both palms; single-handed tools leave the spare arm relaxed. Tool carry positions remain forward of the torso even at steep aim angles. The ram has a horizontal body, impact plate and two handles. The medical kit has a rounded shell, latches, side grips and markings on both faces. First-person sleeves extend to the viewport edge. Keys remain hidden on remote characters.

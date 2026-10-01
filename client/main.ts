@@ -59,6 +59,8 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.13;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+// Keep world, shadow and first-person passes in the same frame's telemetry.
+renderer.info.autoReset = false;
 ui.el('viewport').append(renderer.domElement);
 const city = new City(scene, renderer);
 const viewScene = new THREE.Scene();
@@ -795,6 +797,7 @@ function frame(now: number): void {
       object.removeFromParent();
     }
   city.update(elapsed, dt, camera.position);
+  renderer.info.reset();
   renderer.autoClear = true;
   renderer.render(scene, camera);
   if (ui.playing && me && !me.deadUntil && !ui.menu && !ui.chatOpen) {
