@@ -732,7 +732,7 @@ function frame(now: number): void {
     }
     for (const other of state.players) {
       const a = avatars.get(other.id);
-      if (a) updateAvatar(a, other, dt, cameraPos, serverNow());
+      if (a) updateAvatar(a, other, dt, cameraPos, serverNow(), colliders);
     }
     if (hudTimer > 0.1) {
       hudTimer = 0;

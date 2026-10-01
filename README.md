@@ -191,6 +191,10 @@ OpenRP code and original procedural assets: **MIT**, copyright Devan Metz. See [
 
 Garry’s Mod, DarkRP, and Valve names identify the inspiration. OpenRP is not affiliated with their creators.
 
+### 0.6.3
+
+Characters now collapse with articulated limbs instead of flattening vertically. Falls follow the current crouched or standing pose, choose an open direction around nearby walls, and settle on a sampled floor below the character. Held equipment and nameplates disappear during death; respawn restores the normal pose. This is a cosmetic animation, with unchanged server death rules and protocol 7.
+
 ### 0.6.2
 
 Characters ease into crouching and turn smoothly, with level feet during stance changes and directional walking, strafing and backward steps. Jumping tucks the legs and stops the walking cycle. Rounded knees and elbows cover the gaps that appeared when limbs bent. Firearm grips follow the blended pose; gameplay movement, collision and protocol 7 are unchanged.

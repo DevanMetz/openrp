@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { JOBS, WEAPONS, entitySize } from '../shared/catalog.ts';
-import type { Entity, Player, WeaponId } from '../shared/types.ts';
+import type { Box, Entity, Player, WeaponId } from '../shared/types.ts';
 import { labelTexture } from './world.ts';
 import { animateFirearm, firearmGrips, firearmMotion, poseArm } from './weapon-motion.ts';
 import { dampAngle, poseLeg } from './avatar-motion.ts';
+import { startCollapse, updateCollapse } from './death-motion.ts';
 
 const materials = new Map<string, THREE.MeshStandardMaterial>();
 const avatarSurface = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
@@ -196,6 +197,9 @@ export function makeEntity(e: Entity): THREE.Group {
 }
 export interface Avatar {
   root: THREE.Group;
+  body: THREE.Group;
+  collapse?: ReturnType<typeof startCollapse>;
+  seenAlive: boolean;
   head: THREE.Group;
   torso: THREE.Group;
   leftShin: THREE.Group;
@@ -441,6 +445,9 @@ export function makeAvatar(player: Player): Avatar {
   }
   root.add(torso);
   batchAvatarPart(root);
+  const body = new THREE.Group();
+  for (const child of [...root.children]) body.add(child);
+  root.add(body);
   const label = new THREE.Sprite(new THREE.SpriteMaterial({ depthTest: true, transparent: true }));
   label.position.set(0, cook ? 2.23 : 2.14, 0);
   label.scale.set(2.9, 0.52, 1);
@@ -449,6 +456,8 @@ export function makeAvatar(player: Player): Avatar {
   root.rotation.y = player.yaw;
   return {
     root,
+    body,
+    seenAlive: !player.deadUntil,
     head,
     torso,
     leftArm: leftArm.upper,
@@ -479,8 +488,31 @@ export function updateAvatar(
   dt: number,
   localPosition: THREE.Vector3,
   now = Date.now(),
+  getColliders?: () => readonly Box[],
 ): void {
   const dest = new THREE.Vector3(p.x, p.y, p.z);
+  if (p.deadUntil) {
+    if (!a.collapse || a.collapse.deadline !== p.deadUntil) {
+      a.root.position.copy(dest);
+      a.collapse = startCollapse(a, p, getColliders?.() ?? [], !a.seenAlive);
+    }
+    updateCollapse(a, dt);
+    return;
+  }
+  if (a.collapse) {
+    a.collapse = undefined;
+    a.body.position.set(0, 0, 0);
+    a.body.quaternion.identity();
+    a.root.position.copy(dest);
+    a.last.copy(dest);
+    a.velocity.set(0, 0, 0);
+    a.phase = 0;
+    a.crouch = Number(p.crouch);
+    a.airborne = Number(!p.grounded);
+    a.pitch = p.pitch;
+    a.root.rotation.y = p.yaw;
+  }
+  a.seenAlive = true;
   if (a.root.position.distanceTo(dest) > 5) {
     a.root.position.copy(dest);
     a.last.copy(dest);
@@ -506,7 +538,7 @@ export function updateAvatar(
   a.phase = (a.phase + dt * a.speed * 2.8 * (1 - a.airborne)) % (Math.PI * 2);
   const stride = Math.cos(a.phase) * 0.65 * walking * (1 - a.crouch * 0.78) * -travel.z;
   a.torso.position.y = 0.785 - a.crouch * 0.33 - walking * (1 - a.crouch) * 0.05;
-  a.torso.rotation.x = -a.crouch * 0.65;
+  a.torso.rotation.set(-a.crouch * 0.65, 0, 0);
   const stepLength = walking * (0.28 - a.crouch * 0.12);
   const footTarget = new THREE.Vector3();
   for (const [hip, knee, foot, side, offset] of [
@@ -535,8 +567,7 @@ export function updateAvatar(
   );
   a.leftForearm.rotation.set(p.weapon === 'scanner' ? 0.12 : p.weapon === 'keys' ? 0.12 : 0.48, 0, 0);
   a.rightForearm.rotation.set(p.weapon === 'scanner' ? 0.85 : p.weapon === 'keys' ? 0.12 : 0.35, 0, 0);
-  a.head.rotation.x = a.pitch * 0.75 + a.crouch * 0.65;
-  a.root.scale.y = p.deadUntil ? 0.18 : 1;
+  a.head.rotation.set(a.pitch * 0.75 + a.crouch * 0.65, 0, 0);
   a.label.position.y = (p.job === 'cook' ? 2.18 : 2.09) - a.crouch * 0.57;
   if (a.weapon !== p.weapon) {
     if (a.equipment) disposeObject(a.equipment);
@@ -544,10 +575,11 @@ export function updateAvatar(
     a.equipment.position.set(0.2, 1.13, -0.28);
     a.equipment.scale.setScalar(0.7);
     a.equipment.visible = p.weapon !== 'keys';
-    (p.weapon === 'scanner' ? a.rightForearm : a.root).add(a.equipment);
+    (p.weapon === 'scanner' ? a.rightForearm : a.body).add(a.equipment);
     a.weapon = p.weapon;
   }
   if (a.equipment) {
+    a.equipment.visible = p.weapon !== 'keys';
     const motion = firearmMotion(p.weapon, p.deadUntil || p.arrestedUntil ? 0 : p.reloadUntil, now);
     if (motion) {
       a.torso.updateMatrix();
