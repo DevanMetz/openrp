@@ -1,12 +1,16 @@
 # Testing
 
-## Articulated collapse and respawn — 0.6.3 candidate
+## Articulated collapse and respawn — 0.6.3 released September 30, 2026
 
 The death renderer preserves body scale and bone lengths while blending from the current pose to a collapsed pose. Crouched residents fall in the direction of their lean. The renderer samples nearby floor/prop bounds, chooses the clearest of four fall directions and applies cosmetic gravity for airborne deaths. Held equipment and nameplates hide during death; respawn resets all pose transforms and restores equipment, including when the player returns nearby with the same weapon. A resident first seen dead appears already settled. Server death, respawn, collision, persistence and protocol 7 remain unchanged.
 
 Five geometry tests cover standing/crouched falls at 30/60/144fps; unchanged scale and bone lengths; no upward pop or floor penetration; first-seen dead residents and raised support planes; airborne deaths; every frame of a wall-blocked fall; and nearby respawn with firearm/scanner restoration. Chrome compared the released 0.6.2 renderer against the updated renderer using actual character meshes, including a paused crouched fall, a wall-blocked fall, a raised floor and respawn. A synthetic resident also died and respawned through the real server lifecycle in the local city. Neither browser fixture nor city review captured console errors. No production residents or transactions were created. Full `npm run check` passed all 132 tests, TypeScript, the production build and HTTP smoke checks.
 
 Ignored screenshots and fixtures are in `test-results/collapse-review-2026-09-30/`, `test-results/collapse-review.*` and `test-results/collapse-lab.ts`. The fixture's shortened death/respawn timeline is only for renderer comparison; the city review uses the actual seven-second server respawn. This is an authored animation rather than a physical ragdoll. A sampled support plane can suspend parts of a body on uneven terrain, and tightly enclosed spaces can still clip when no direction is clear. Moving props do not push the settled body. Exact mesh bounds are sampled during the fall and the settled floor offset is cached; crowd CPU/GPU timing has not been profiled.
+
+Released commit `d068dac8ec549d73b4f7cc61a3b6de031fef8e52` through Railway deployment `97d0dbd8-c6bd-44aa-b57f-385411cef8fa`. [GitHub CI](https://github.com/DevanMetz/openrp/actions/runs/36805074652) passed on Node 22 and 24. Public health returned `ok`, status reported 0.6.3/protocol 7, and all three live JavaScript/CSS assets matched the tested build bytes. Chrome displayed ALPHA 0.6.3 without captured console errors. Screenshots and public asset hashes are in ignored `test-results/release-063/`.
+
+The same `/app/data` volume `b4f75341-242b-4381-8b8b-10f0afded387` remains attached. Deployment configuration retained one replica, zero overlap, 30-second draining and `/health` checks. No server rules, collision, persistence schema or protocol changed; private world contents were not inspected for this client animation patch.
 
 ## Character stance and directional gait — 0.6.2 released September 30, 2026
 
