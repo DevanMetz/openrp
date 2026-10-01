@@ -4,6 +4,8 @@ The active objective is comprehensive DarkRP feature coverage and the best pract
 
 ## Verified increments
 
+0.6.0 release candidate (September 30, 2026) brings together police scanning/evidence, funded hitman contracts, broadcasts, text radio, direct messages and the accumulated city/prop/UI improvements. Protocol 7 requires a browser refresh. The recent full suite passes 118 tests; deployment and persistent-volume verification are still pending. Earlier local/undeployed entries below record the history of individual increments.
+
 - Legal controls: revoke search warrants and civilian gun licenses; wanted and warrant HUD countdowns; correct reason parsing for player-ID commands.
 - Public demotion: chat and context-menu entry points, reasoned 20-second ballots, fixed electorate and majority threshold, five-minute role restrictions, reconnect-safe cooldowns and offline results. Police and Chief share their role restriction. Completed restrictions persist; pending votes are cancelled on restart.
 - Voting interface: distinct demotion ballot, reason, threshold meter, eligibility state and countdown updates without rebuilding the menu every second.

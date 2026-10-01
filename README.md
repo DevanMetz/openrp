@@ -4,7 +4,7 @@
 
 Choose a job, buy a storefront, sell weapons or meals, hide money printers, build with physics props, become mayor, or patrol the city as Civil Protection. Everyone plays in the same server-owned world.
 
-OpenRP is a playable **0.5 alpha**, not a complete Source engine port. All map geometry, characters, equipment, textures, and game sound effects are original and generated locally. No Garry’s Mod installation, extracted Valve assets, external asset CDN, API keys, or paid services are required to run your own server.
+OpenRP is a playable **0.6 alpha**, not a complete Source engine port. All map geometry, characters, equipment, textures, and game sound effects are original and generated locally. No Garry’s Mod installation, extracted Valve assets, external asset CDN, API keys, or paid services are required to run your own server.
 
 ![OpenRP's multiplayer city, with buildings, streets, and a public square](public/social-card.png)
 
@@ -190,6 +190,16 @@ OpenRP code and original procedural assets: **MIT**, copyright Devan Metz. See [
 - Barlow and Barlow Condensed by Jeremy Tribby, distributed locally through Fontsource — SIL Open Font License 1.1. Their licenses are included in the dependency packages.
 
 Garry’s Mod, DarkRP, and Valve names identify the inspiration. OpenRP is not affiliated with their creators.
+
+### 0.6.0
+
+- Police and Chief receive an inspection scanner: inspect nearby carried and pocketed firearms, confiscate eligible illegal weapons, and return stored evidence. Evidence and exact ammunition persist with the world.
+- Hitmen can accept funded contracts through F4 → Contracts. Offers reserve money, completed assignments pay the hitman, and cancellations return the funds. Participants receive private status updates and settlement notices.
+- Text radio uses `/channel` and `/radio`; `/pm` or the resident menu addresses one connected resident. Mayors can use `/broadcast`. Text channels, including private messages, are logged for moderation.
+- The city has animated fountain water, drifting clouds, richer street surfaces, branching trees, a fuller skyline and detailed cafes, bakery and clinic interiors. Graphics quality controls the added effects.
+- The field guide now has a short introduction and expandable topics. Menus retain keyboard focus, and contract drafts survive live updates.
+
+Protocol 7 requires players to refresh their browser. Existing worlds upgrade in place; retain the persistent data volume and stop the server gracefully. This remains an alpha, with feature gaps and visual work tracked in [DARKRP-COVERAGE.md](docs/DARKRP-COVERAGE.md).
 
 ### 0.5.2
 
