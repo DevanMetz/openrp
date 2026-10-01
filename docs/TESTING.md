@@ -1,5 +1,13 @@
 # Testing
 
+## Contract form drafts and availability
+
+Chrome reproduced a lost draft when a private contract-state event replaced the form: the chosen second hitman and target reverted to defaults and $675 became $500. Rendering now restores the unfinished form's values, keeps its focused control, and applies current availability even while editing. A missing participant clears to a required placeholder rather than selecting someone else. A new form's default payment is capped by the current wallet.
+
+The isolated server fixture at port 3182 forced private contract refreshes and harmless public resident updates every seven seconds. The corrected form retained Blair Contractor, Casey Target, $675 and payment-field focus across these updates. A normal browser submission then reserved $675 and showed an $825 wallet; cancellation returned it to $1,500 with the draft retained. A separate fixture using the actual UI class confirmed missing targets and retired hitmen become required empty selections, and a new $300-wallet form starts at a valid $300. The earlier suspected submit navigation was ruled out: the existing menu-content submit handler already prevents browser navigation.
+
+Full `npm run check` passed TypeScript, the test suite, build and production HTTP smoke. These are manual browser checks with synthetic local residents, not production transactions or full multiplayer contract-lifecycle coverage. The server/availability fixtures and screenshot are in ignored `test-results/contract-form-*` and `test-results/contract-review-2026-09-30/`. Local and undeployed.
+
 ## Field guide navigation and layout
 
 Replaced the long two-column Help page with three first steps, in-game shortcuts and five native expandable topics. The full command reference is retained; controls now include the menu shortcuts and mouse-capture fallback. Open topics and focused summaries survive live menu updates.

@@ -506,7 +506,9 @@ export class UI {
     if (
       this.menu &&
       this.lastMenuKey !== menuKey &&
-      (residentMenu || !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? ''))
+      (residentMenu ||
+        this.menu === 'contracts' ||
+        !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? ''))
     ) {
       this.lastMenuKey = menuKey;
       // Keep resident details and permissions live without discarding a typed amount or reason.
@@ -623,6 +625,15 @@ export class UI {
     const hadFocus = !!focused && this.el('overlay').contains(focused);
     const guideTopics = [...this.el('menu-content').querySelectorAll<HTMLDetailsElement>('.guide-topic')];
     const openTopics = new Set(guideTopics.filter((topic) => topic.open).map((topic) => topic.id));
+    // Private contract events and public snapshots can both replace an unfinished offer.
+    const contractDraft =
+      this.menu === 'contracts'
+        ? [
+            ...this.el('menu-content').querySelectorAll<HTMLInputElement | HTMLSelectElement>(
+              '[data-contract-request] input, [data-contract-request] select',
+            ),
+          ].map((field) => ({ id: field.id, value: field.value }))
+        : [];
     const p = this.player,
       s = this.state;
     const pages = this.playing
@@ -647,7 +658,7 @@ export class UI {
       const hitmen = s.players.filter(
         (v) => v.id !== p.id && v.job === 'hitman' && !v.deadUntil && !v.arrestedUntil,
       );
-      html = `<div class="section-heading"><span class="eyebrow">UNDERWORLD WORK</span><h2>Contracts.</h2><p>Fund an offer while standing within 3 metres of a hitman with a clear view. Offers expire after 30 seconds; accepted contracts last ten minutes. City laws still apply.</p></div><h3>Your offers and assignments</h3>${this.contracts.length ? this.contracts.map((c) => `<article class="catalog-card pocket-card"><h3>${escape(c.targetName)}</h3><p>Customer: ${escape(c.customerName)}<br>Hitman: ${escape(c.hitmanName)}</p><p>${money(c.price)} reserved · ${c.status === 'offered' ? 'Awaiting acceptance' : c.status === 'active' ? 'Active assignment' : c.status === 'refund' ? 'Refund waiting for wallet space' : 'Payout waiting for wallet space'}${['offered', 'active'].includes(c.status) ? ` · <span data-contract-end="${c.expires}">${Math.max(0, Math.ceil((c.expires - s.time) / 1000))}s</span>` : ''}</p><div class="context-actions">${c.hitman === p.id && c.status === 'offered' ? `<button data-action="contract-accept" data-target="${c.id}">Accept contract</button>` : ''}${['offered', 'active'].includes(c.status) ? `<button data-action="contract-cancel" data-target="${c.id}">Cancel and refund</button>` : ''}</div></article>`).join('') : '<p>No offers or assignments. Completed payments leave this list.</p>'}<section class="evidence-section"><h3>Request a contract</h3><p>Payment is reserved immediately. Cancellation, expiry or participant departure refunds the customer. Only the assigned hitman’s kill earns payment. Customer requests have a five-minute cooldown.</p>${hitmen.length ? `<form data-contract-request><label class="field-label" for="contract-hitman">HITMAN</label><select id="contract-hitman" name="hitman" required>${options(hitmen)}</select><label class="field-label" for="contract-target">TARGET</label><select id="contract-target" name="target" required><option value="" disabled selected>Choose a resident</option>${options(s.players.filter((v) => v.id !== p.id && !v.deadUntil && !v.arrestedUntil))}</select><label class="field-label" for="contract-price">PAYMENT IN DOLLARS</label><input id="contract-price" name="price" type="number" min="250" max="${Math.min(50000, p.money)}" value="500" step="1" required><p class="muted">The customer, hitman and target must be different residents.</p><button type="submit" ${p.deadUntil || p.arrestedUntil || p.money < 250 ? 'disabled' : ''}>Fund offer</button></form>` : '<p>No available hitmen. A resident can choose Hitman in Jobs.</p>'}</section>`;
+      html = `<div class="section-heading"><span class="eyebrow">UNDERWORLD WORK</span><h2>Contracts.</h2><p>Fund an offer while standing within 3 metres of a hitman with a clear view. Offers expire after 30 seconds; accepted contracts last ten minutes. City laws still apply.</p></div><h3>Your offers and assignments</h3>${this.contracts.length ? this.contracts.map((c) => `<article class="catalog-card pocket-card"><h3>${escape(c.targetName)}</h3><p>Customer: ${escape(c.customerName)}<br>Hitman: ${escape(c.hitmanName)}</p><p>${money(c.price)} reserved · ${c.status === 'offered' ? 'Awaiting acceptance' : c.status === 'active' ? 'Active assignment' : c.status === 'refund' ? 'Refund waiting for wallet space' : 'Payout waiting for wallet space'}${['offered', 'active'].includes(c.status) ? ` · <span data-contract-end="${c.expires}">${Math.max(0, Math.ceil((c.expires - s.time) / 1000))}s</span>` : ''}</p><div class="context-actions">${c.hitman === p.id && c.status === 'offered' ? `<button data-action="contract-accept" data-target="${c.id}">Accept contract</button>` : ''}${['offered', 'active'].includes(c.status) ? `<button data-action="contract-cancel" data-target="${c.id}">Cancel and refund</button>` : ''}</div></article>`).join('') : '<p>No offers or assignments. Completed payments leave this list.</p>'}<section class="evidence-section"><h3>Request a contract</h3><p>Payment is reserved immediately. Cancellation, expiry or participant departure refunds the customer. Only the assigned hitman’s kill earns payment. Customer requests have a five-minute cooldown.</p>${hitmen.length ? `<form data-contract-request><label class="field-label" for="contract-hitman">HITMAN</label><select id="contract-hitman" name="hitman" required><option value="" disabled selected>Choose a hitman</option>${options(hitmen)}</select><label class="field-label" for="contract-target">TARGET</label><select id="contract-target" name="target" required><option value="" disabled selected>Choose a resident</option>${options(s.players.filter((v) => v.id !== p.id && !v.deadUntil && !v.arrestedUntil))}</select><label class="field-label" for="contract-price">PAYMENT IN DOLLARS</label><input id="contract-price" name="price" type="number" min="250" max="${Math.min(50000, p.money)}" value="${Math.min(500, p.money)}" step="1" required><p class="muted">The customer, hitman and target must be different residents.</p><button id="contract-submit" type="submit" ${p.deadUntil || p.arrestedUntil || p.money < 250 ? 'disabled' : ''}>Fund offer</button></form>` : '<p>No available hitmen. A resident can choose Hitman in Jobs.</p>'}</section>`;
     }
     if (this.menu === 'pause')
       html = `<div class="section-heading"><span class="eyebrow">UNION DISTRICT</span><h2>You’re still in the city.</h2><p>Multiplayer continues while this menu is open.</p></div><button class="primary" data-action="resume">Return to the streets ↗</button><div class="pause-links"><button data-menu="jobs">Find a job</button><button data-menu="build">Build something</button><button data-menu="help">Read the field guide</button></div><p class="muted">Invite friends with this server address: <code>${escape(location.origin)}</code></p>${this.voiceControls()}`;
@@ -733,6 +744,12 @@ export class UI {
     if (this.menu === 'settings')
       html = `<div class="section-heading"><span class="eyebrow">MAKE IT YOURS</span><h2>Settings.</h2><p>Saved on this browser.</p></div><div class="settings-list"><label>Sound volume<output>${Math.round(this.settings.volume * 100)}%</output><input aria-label="Sound volume" data-setting="volume" type="range" min="0" max="1" step="0.05" value="${this.settings.volume}"></label><label>Voice volume<output>${Math.round(this.settings.voiceVolume * 100)}%</output><input aria-label="Voice volume" data-setting="voiceVolume" type="range" min="0" max="1" step="0.05" value="${this.settings.voiceVolume}"></label><label>Mouse sensitivity<output>${this.settings.sensitivity}</output><input aria-label="Mouse sensitivity" data-setting="sensitivity" type="range" min="0.2" max="2.5" step="0.1" value="${this.settings.sensitivity}"></label><label>Field of view<output>${this.settings.fov}</output><input aria-label="Field of view" data-setting="fov" type="range" min="65" max="105" step="1" value="${this.settings.fov}"></label><label>Graphics quality<select aria-label="Graphics quality" data-setting="quality"><option value="high" ${this.settings.quality === 'high' ? 'selected' : ''}>High · soft shadows</option><option value="low" ${this.settings.quality === 'low' ? 'selected' : ''}>Low · better performance</option></select></label></div><p class="muted">For smoother play on integrated graphics, choose Low. A mouse and keyboard are required.</p>${this.voiceControls()}`;
     this.el('menu-content').innerHTML = html;
+    for (const draft of contractDraft) {
+      const field = document.getElementById(draft.id);
+      if (field instanceof HTMLSelectElement)
+        field.value = [...field.options].some((option) => option.value === draft.value) ? draft.value : '';
+      else if (field instanceof HTMLInputElement) field.value = draft.value;
+    }
     // A payday or resident joining must not collapse the reference someone is reading.
     if (this.menu === 'help' && guideTopics.length)
       for (const topic of this.el('menu-content').querySelectorAll<HTMLDetailsElement>('.guide-topic'))
