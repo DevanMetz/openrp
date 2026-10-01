@@ -1,5 +1,15 @@
 # Testing
 
+## 0.6.0 production release — September 30, 2026
+
+Released commit `40fa8b7c066deb8cb6e97d1191498cb70d3ac075` through Railway deployment `18699e42-8c0e-4ccb-94bb-3a3d8cea8288`. Local `npm run check` passed TypeScript, all 118 tests, Vite build and production HTTP smoke. [GitHub CI](https://github.com/DevanMetz/openrp/actions/runs/36799243458) passed the full check on Node 22 and 24 before the automatic deployment started.
+
+The public health endpoint returned `ok`; `/api/status` reported 0.6.0/protocol 7, and all three live JavaScript/CSS assets matched the local release bytes. Chrome showed the updated city entry and redesigned field guide without captured console errors. Opening the guide focused Close; Shift+Tab reached the final topic and Escape returned focus to How to play. Earlier local checks below cover narrow layouts and live-update behavior; this release check did not repeat a complete multiplayer gameplay review.
+
+The existing volume `b4f75341-242b-4381-8b8b-10f0afded387` stayed attached at `/app/data`. Deployment configuration retained one replica, zero overlap, 30-second draining and `/health` checks. Before deployment, a non-overwriting private copy of the atomic world checkpoint was saved on that volume; no world contents or credentials were displayed or downloaded. The new container's persistence validator accepted the saved world. Private comparisons confirmed exact profiles and doors, the same entity IDs, laws and lockdown state; the backup remained 30,178 bytes with mode 600. Entity motion and production timers were not compared byte-for-byte. No production test resident or transaction was created.
+
+Release screenshots and public asset hashes are in ignored `test-results/release-060/`; the full local check log is `test-results/release-060-check.log`. This release supersedes the local/undeployed status of the historical increments below, while retaining their stated testing limits and outstanding work. Players must refresh for protocol 7.
+
 ## Contract form drafts and availability
 
 Chrome reproduced a lost draft when a private contract-state event replaced the form: the chosen second hitman and target reverted to defaults and $675 became $500. Rendering now restores the unfinished form's values, keeps its focused control, and applies current availability even while editing. A missing participant clears to a required placeholder rather than selecting someone else. A new form's default payment is capped by the current wallet.
