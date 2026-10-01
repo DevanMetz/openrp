@@ -191,6 +191,10 @@ OpenRP code and original procedural assets: **MIT**, copyright Devan Metz. See [
 
 Garry’s Mod, DarkRP, and Valve names identify the inspiration. OpenRP is not affiliated with their creators.
 
+### 0.6.4
+
+Physics/tool guns, medical kits and battering rams use connected two-handed carry poses; scanners, batons and lockpicks use one hand with a relaxed spare arm. Hands stay on their handles while aiming and crouching. The ram has an original horizontal body and two handles, the medical kit has rounded edges, latches and markings on both faces, and tool viewmodels have longer sleeves. Server actions and protocol 7 are unchanged.
+
 ### 0.6.3
 
 Characters now collapse with articulated limbs instead of flattening vertically. Falls follow the current crouched or standing pose, choose an open direction around nearby walls, and settle on a sampled floor below the character. Held equipment and nameplates disappear during death; respawn restores the normal pose. This is a cosmetic animation, with unchanged server death rules and protocol 7.

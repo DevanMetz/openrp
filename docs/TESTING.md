@@ -1,5 +1,13 @@
 # Testing
 
+## Tool grips and carry models — 0.6.4 candidate
+
+Eight tools now share model-local grip coordinates between first-person hands and third-person articulated arms: Physics Gun, Tool Gun, medical kit, ram, scanner, arrest/release batons and lockpick. Two-handed equipment uses both palms; single-handed tools leave the spare arm relaxed. Tool carry positions remain forward of the torso even at steep aim angles. The ram has a horizontal body, impact plate and two handles. The medical kit has a rounded shell, latches, side grips and markings on both faces. First-person sleeves extend to the viewport edge. Keys remain hidden on remote characters.
+
+Three new geometry tests cover handle contact and fixed arm lengths across full pitch, standing/crouched stances, translated/rotated roots and equipment changes; moving stance/aim transitions at 30/60/144fps; and first-person palm framing at 16:9, 4:3 and square aspect ratios. Browser comparison against 0.6.3 caught a steep-aim torso intersection and the medical kit's blank front face; both were corrected. Chrome reviewed the actual models in standing, crouched, side and first-person views, plus ram/medical-kit/tool-gun/scanner switching and remote tool poses in the local city. The comparison and city tabs captured no console errors. No production residents or transactions were created. Full `npm run check` passed all 135 tests, TypeScript, the production build and HTTP smoke checks.
+
+Ignored fixtures, screenshots and the check log are in `test-results/tool-review*`, `test-results/tool-lab.ts` and `test-results/tool-review-2026-09-30/`. This pass changes carry/grip presentation, not tool-use animations or gameplay actions. Fingers remain stylized; cloth/weapon collision, draw/holster/use transitions and crowded-scene CPU/GPU costs still need work. The more detailed ram and medical kit add meshes; fixture draw counts are not a frame-rate benchmark. Protocol, persistence and server rules are unchanged.
+
 ## Articulated collapse and respawn — 0.6.3 released September 30, 2026
 
 The death renderer preserves body scale and bone lengths while blending from the current pose to a collapsed pose. Crouched residents fall in the direction of their lean. The renderer samples nearby floor/prop bounds, chooses the clearest of four fall directions and applies cosmetic gravity for airborne deaths. Held equipment and nameplates hide during death; respawn resets all pose transforms and restores equipment, including when the player returns nearby with the same weapon. A resident first seen dead appears already settled. Server death, respawn, collision, persistence and protocol 7 remain unchanged.

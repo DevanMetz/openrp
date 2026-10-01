@@ -8,6 +8,23 @@ export const firearmGrips = {
   shotgun: { right: [0, -0.12, 0.015], left: [-0.045, -0.065, -0.41], reach: 0.17 },
 } satisfies Partial<Record<WeaponId, { right: number[]; left: number[]; reach: number }>>;
 
+/** Model-local handles, shared by the viewmodel hands and the character's fixed-length arms. */
+export const toolGrips: Partial<
+  Record<
+    WeaponId,
+    { right: [number, number, number]; left?: [number, number, number]; reach: number; aim: number }
+  >
+> = {
+  physgun: { right: [0, -0.17, 0.12], left: [-0.065, -0.135, -0.28], reach: 0.29, aim: 1 },
+  toolgun: { right: [0, -0.17, 0.12], left: [-0.065, -0.135, -0.28], reach: 0.29, aim: 1 },
+  medkit: { right: [0.2, -0.05, -0.1], left: [-0.26, -0.05, -0.1], reach: 0.28, aim: 0.3 },
+  ram: { right: [0.16, 0.13, 0.06], left: [-0.16, 0.13, -0.23], reach: 0.32, aim: 0.6 },
+  scanner: { right: [0, -0.12, 0.015], reach: 0.29, aim: 0.3 },
+  baton: { right: [0.07, -0.1, 0.046], reach: 0.27, aim: 0.5 },
+  unarrest: { right: [0.07, -0.1, 0.046], reach: 0.27, aim: 0.5 },
+  lockpick: { right: [0.06, -0.074, 0.034], reach: 0.32, aim: 0.75 },
+};
+
 export function firearmMotion(weapon: WeaponId, reloadUntil: number, now: number) {
   if (weapon !== 'pistol' && weapon !== 'smg' && weapon !== 'shotgun') return;
   const grips = firearmGrips[weapon];
