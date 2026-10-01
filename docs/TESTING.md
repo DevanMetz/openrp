@@ -1,12 +1,16 @@
 # Testing
 
-## Character stance and directional gait — 0.6.2 candidate
+## Character stance and directional gait — 0.6.2 released September 30, 2026
 
 Remote characters blend crouch, aim and shortest-path yaw. Fixed-length two-bone legs keep level soles 1mm above the character's ground plane through standing/crouching transitions, and one foot stays on that plane through directional walking. The swing foot lifts during its forward return; airborne characters tuck their legs and stop the walking cycle. Teleports reset the motion state. Rounded knee and elbow surfaces cover previously exposed gaps, using the existing material batches.
 
 Geometry tests cover stance transitions at 30/60/144fps; forward/backward, lateral and diagonal movement with reversal; crouched/standing gait; fixed bone lengths and level feet; foot-cycle direction; yaw wrapping; airborne suspension and teleport reset. The firearm tests retain settled full-pitch/crouch coverage. Chrome compared the 0.6.1 renderer with the updated renderer in paused crouch, forward, strafe and jump views, and inspected a synthetic moving resident in the actual local city without captured console errors. The two-character keys fixture remains 28 draw calls; the joint surfaces add 672 triangles to the updated character. These are renderer counts, not GPU timings. Feet follow the character's ground plane, without terrain raycasts or world-locked foot plants; uneven steps, broader transitions and crowd performance remain work.
 
-Full `npm run check` passed all 127 tests, TypeScript, build and production HTTP smoke. Ignored fixtures, screenshots and the check log are in `test-results/locomotion-*` and `test-results/movement-review-2026-09-30/`. Production release verification is pending. No production test residents or transactions were created.
+Full `npm run check` passed all 127 tests, TypeScript, build and production HTTP smoke. Ignored fixtures, screenshots and the check log are in `test-results/locomotion-*` and `test-results/movement-review-2026-09-30/`. No production test residents or transactions were created.
+
+Released commit `5cc9f9bf9e65735eabba67f6ee020429e4e9de2c` through Railway deployment `9d92265c-1748-4643-b80c-a9558e2177d8`. [GitHub CI](https://github.com/DevanMetz/openrp/actions/runs/36802443493) passed on Node 22 and 24. Public health returned `ok`, status reported 0.6.2/protocol 7, and all three live JavaScript/CSS assets matched the tested build bytes. Chrome displayed ALPHA 0.6.2 without captured console errors. Screenshots and public asset hashes are in ignored `test-results/release-062/`.
+
+The same `/app/data` volume `b4f75341-242b-4381-8b8b-10f0afded387` remains attached. Deployment configuration retained one replica, zero overlap, 30-second draining and `/health` checks. Server movement rules, collision, persistence schema and protocol remain unchanged; private world contents were not inspected for this client animation patch.
 
 ## Firearm grip and reload motion — 0.6.1 released September 30, 2026
 
