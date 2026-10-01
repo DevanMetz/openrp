@@ -6,6 +6,8 @@ Choose a job, buy a storefront, sell weapons or meals, hide money printers, buil
 
 OpenRP is a playable **0.5 alpha**, not a complete Source engine port. All map geometry, characters, equipment, textures, and game sound effects are original and generated locally. No Garry’s Mod installation, extracted Valve assets, external asset CDN, API keys, or paid services are required to run your own server.
 
+![OpenRP's multiplayer city, with buildings, streets, and a public square](public/social-card.png)
+
 ## Run it
 
 Install **Node.js 22.12 or newer** (Node 24 recommended), then:
