@@ -17,6 +17,7 @@ import {
   type Avatar,
 } from './entities.ts';
 import { GameAudio } from './audio.ts';
+import { updateViewmodel } from './weapon-motion.ts';
 import { ProximityVoice } from './voice.ts';
 import { UI, type AimTarget } from './ui.ts';
 import { EYE_HEIGHT, JOBS, PROPS, PROTOCOL, TICK_RATE, WEAPONS, entitySize } from '../shared/catalog.ts';
@@ -731,7 +732,7 @@ function frame(now: number): void {
     }
     for (const other of state.players) {
       const a = avatars.get(other.id);
-      if (a) updateAvatar(a, other, dt, cameraPos);
+      if (a) updateAvatar(a, other, dt, cameraPos, serverNow());
     }
     if (hudTimer > 0.1) {
       hudTimer = 0;
@@ -756,12 +757,15 @@ function frame(now: number): void {
     }
     for (const [id, group] of models) group.visible = id === me.weapon;
     recoil = Math.max(0, recoil - dt * 7);
-    model.position.set(
-      0.31 + Math.cos(elapsed * 6) * (moving ? 0.012 : 0.002),
-      -0.28 + bob * 0.65 - recoil * 0.015,
-      -0.78 + recoil * 0.08,
-    );
-    model.rotation.set(recoil * 0.08, -0.05, -0.025 + bob * 0.3);
+    updateViewmodel(model, {
+      weapon: me.weapon,
+      reloadUntil: me.deadUntil || me.arrestedUntil ? 0 : me.reloadUntil,
+      now: serverNow(),
+      elapsed,
+      bob,
+      moving,
+      recoil,
+    });
     const held = me.holding ? entityVisuals.get(me.holding) : undefined;
     beam.visible = !!held;
     if (held) {

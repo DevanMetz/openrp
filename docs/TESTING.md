@@ -1,5 +1,13 @@
 # Testing
 
+## Firearm grip and reload motion — 0.6.1 candidate
+
+Third-person firearms use a two-bone arm pose with fixed bone lengths and shared grip coordinates. The actual character hierarchy is tested across pistol/SMG/shotgun, standing/crouched positions, five pitch values from -1.48 to 1.48, seven reload phases and a rotated/translated character root. Both palms stay within 1mm of their respective grip targets. Separate tests cover unreachable-target stability, authoritative reload duration, completion/cancellation reset and first-person loading-hand framing at 16:9, 4:3 and square aspect ratios. These are geometric/animation checks, not GPU benchmarks or full collision tests against clothing.
+
+Chrome compared the released and updated character models in an isolated fixture, including standing pistol grip/reload, crouched downward SMG aim and upward shotgun aim. First-person review caught loading hands leaving the screen; the final motion raises the gun and lengthens the viewmodel forearms so their cut ends stay off screen. Paused views using the actual viewmodel update function verified visible SMG magazine handling and shotgun shell insertion. The shotgun hand returns to the fore-end before pumping. A real local game session reloaded a pistol from 3/180 to 12/171 and an SMG from 5/180 to 30/155; no production residents or transactions were used. Broader motion transitions, weapon model detail and crowd GPU costs remain work.
+
+Full `npm run check` passed all 122 tests, TypeScript, build and production HTTP smoke. Fixtures and screenshots are in ignored `test-results/firearm-review*`, `test-results/viewmodel-review.html` and `test-results/firearm-lab.ts`. Release verification is pending.
+
 ## 0.6.0 production release — September 30, 2026
 
 Released commit `40fa8b7c066deb8cb6e97d1191498cb70d3ac075` through Railway deployment `18699e42-8c0e-4ccb-94bb-3a3d8cea8288`. Local `npm run check` passed TypeScript, all 118 tests, Vite build and production HTTP smoke. [GitHub CI](https://github.com/DevanMetz/openrp/actions/runs/36799243458) passed the full check on Node 22 and 24 before the automatic deployment started.

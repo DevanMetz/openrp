@@ -191,6 +191,10 @@ OpenRP code and original procedural assets: **MIT**, copyright Devan Metz. See [
 
 Garry’s Mod, DarkRP, and Valve names identify the inspiration. OpenRP is not affiliated with their creators.
 
+### 0.6.1
+
+Firearms now sit in both hands while aiming and crouching. Pistol and SMG reloads move the magazine and support hand; shotgun reloads show shell loading followed by a pump action. First-person reloads bring the weapon into view and follow the existing server reload timing. Game rules and protocol 7 are unchanged.
+
 ### 0.6.0
 
 - Police and Chief receive an inspection scanner: inspect nearby carried and pocketed firearms, confiscate eligible illegal weapons, and return stored evidence. Evidence and exact ammunition persist with the world.

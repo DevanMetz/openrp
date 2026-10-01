@@ -4,6 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { JOBS, WEAPONS, entitySize } from '../shared/catalog.ts';
 import type { Entity, Player, WeaponId } from '../shared/types.ts';
 import { labelTexture } from './world.ts';
+import { animateFirearm, firearmGrips, firearmMotion, poseArm } from './weapon-motion.ts';
 
 const materials = new Map<string, THREE.MeshStandardMaterial>();
 const avatarSurface = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
@@ -461,7 +462,13 @@ export function makeAvatar(player: Player): Avatar {
     labelKey: '',
   };
 }
-export function updateAvatar(a: Avatar, p: Player, dt: number, localPosition: THREE.Vector3): void {
+export function updateAvatar(
+  a: Avatar,
+  p: Player,
+  dt: number,
+  localPosition: THREE.Vector3,
+  now = Date.now(),
+): void {
   const dest = new THREE.Vector3(p.x, p.y, p.z);
   if (a.root.position.distanceTo(dest) > 5) a.root.position.copy(dest);
   else a.root.position.lerp(dest, 1 - Math.exp(-14 * dt));
@@ -472,16 +479,22 @@ export function updateAvatar(a: Avatar, p: Player, dt: number, localPosition: TH
   const stride = Math.sin(a.phase) * 0.65 * Math.min(a.speed / 3, 1) * (p.crouch ? 0.22 : 1);
   a.leftLeg.rotation.x = (p.crouch ? 1.15 : 0) + stride;
   a.rightLeg.rotation.x = (p.crouch ? 1.15 : 0) - stride;
-  a.leftArm.rotation.x =
-    p.weapon === 'scanner' ? -stride * 0.45 : p.weapon === 'keys' ? -stride * 0.65 : 0.95;
-  a.rightArm.rotation.x =
-    p.weapon === 'scanner' ? 0.65 + p.pitch * 0.45 : p.weapon === 'keys' ? stride * 0.65 : 1.15;
+  a.leftArm.rotation.set(
+    p.weapon === 'scanner' ? -stride * 0.45 : p.weapon === 'keys' ? -stride * 0.65 : 0.95,
+    0,
+    0,
+  );
+  a.rightArm.rotation.set(
+    p.weapon === 'scanner' ? 0.65 + p.pitch * 0.45 : p.weapon === 'keys' ? stride * 0.65 : 1.15,
+    0,
+    0,
+  );
   a.leftShin.rotation.x = p.crouch ? -2.05 : -Math.max(0, stride) * 0.65;
   a.rightShin.rotation.x = p.crouch ? -2.05 : -Math.max(0, -stride) * 0.65;
   a.leftFoot.rotation.x = -a.leftLeg.rotation.x - a.leftShin.rotation.x;
   a.rightFoot.rotation.x = -a.rightLeg.rotation.x - a.rightShin.rotation.x;
-  a.leftForearm.rotation.x = p.weapon === 'scanner' ? 0.12 : p.weapon === 'keys' ? 0.12 : 0.48;
-  a.rightForearm.rotation.x = p.weapon === 'scanner' ? 0.85 : p.weapon === 'keys' ? 0.12 : 0.35;
+  a.leftForearm.rotation.set(p.weapon === 'scanner' ? 0.12 : p.weapon === 'keys' ? 0.12 : 0.48, 0, 0);
+  a.rightForearm.rotation.set(p.weapon === 'scanner' ? 0.85 : p.weapon === 'keys' ? 0.12 : 0.35, 0, 0);
   a.torso.position.y = p.crouch ? 0.46 : 0.835;
   a.torso.rotation.x = p.crouch ? -0.65 : 0;
   a.leftLeg.position.y = a.rightLeg.position.y = a.torso.position.y;
@@ -499,7 +512,26 @@ export function updateAvatar(a: Avatar, p: Player, dt: number, localPosition: TH
     a.weapon = p.weapon;
   }
   if (a.equipment) {
-    if (p.weapon === 'scanner') {
+    const motion = firearmMotion(p.weapon, p.deadUntil || p.arrestedUntil ? 0 : p.reloadUntil, now);
+    if (motion) {
+      a.torso.updateMatrix();
+      const shoulder = new THREE.Vector3(0, 0.465, 0).applyMatrix4(a.torso.matrix);
+      a.equipment.rotation.set(p.pitch - motion.lower * 0.4, 0, motion.lower * 0.2);
+      a.equipment.position
+        .set(0.07, 0.015 - motion.lower * 0.05, -motion.grips.reach)
+        .applyAxisAngle(new THREE.Vector3(1, 0, 0), p.pitch)
+        .add(shoulder);
+      a.equipment.updateMatrix();
+      const toTorso = a.torso.matrix.clone().invert().multiply(a.equipment.matrix);
+      poseArm(
+        a.rightArm,
+        a.rightForearm,
+        new THREE.Vector3().fromArray(motion.grips.right).applyMatrix4(toTorso),
+        1,
+      );
+      poseArm(a.leftArm, a.leftForearm, motion.support.clone().applyMatrix4(toTorso), -1);
+      animateFirearm(a.equipment, motion);
+    } else if (p.weapon === 'scanner') {
       // Keep the grip at the animated palm while holding the display upright.
       a.equipment.rotation.x =
         p.pitch * 0.3 - a.torso.rotation.x - a.rightArm.rotation.x - a.rightForearm.rotation.x;
@@ -552,9 +584,16 @@ export function makeViewmodel(weapon: WeaponId, withHands = true): THREE.Group {
     skin = '#c0a182';
   const hand = (x: number, y: number, z: number) => {
     if (!withHands) return;
-    const arm = cylinder(group, x, y - 0.12, z + 0.16, 0.065, 0.08, 0.42, '#697265');
-    arm.rotation.x = Math.PI / 2 + 0.3;
-    sphere(group, x, y, z, 0.07, skin, [0.8, 1.1, 1.2]);
+    const limb = new THREE.Group();
+    limb.position.set(x, y, z);
+    group.add(limb);
+    const firearm = WEAPONS[weapon].magazine > 0;
+    const arm = firearm
+      ? cylinder(limb, 0, -0.195, 0.4, 0.1, 0.06, Math.hypot(0.8, 0.33), '#697265')
+      : cylinder(limb, 0, -0.12, 0.16, 0.065, 0.08, 0.42, '#697265');
+    arm.rotation.x = firearm ? Math.atan2(0.8, -0.33) : Math.PI / 2 + 0.3;
+    sphere(limb, 0, 0, 0, 0.07, skin, [0.8, 1.1, 1.2]);
+    return limb;
   };
   if (weapon === 'keys') {
     hand(0.11, -0.08, 0.04);
@@ -603,10 +642,12 @@ export function makeViewmodel(weapon: WeaponId, withHands = true): THREE.Group {
       box(group, 0, 0.2, -0.02, 0.27, 0.22, 0.07, '#56655f');
       panel(group, 'TOOL', 0, 0.2, 0.022, 0.22, 0.14);
     }
-  } else if (['pistol', 'smg', 'shotgun'].includes(weapon)) {
+  } else if (weapon === 'pistol' || weapon === 'smg' || weapon === 'shotgun') {
     const long = weapon !== 'pistol';
-    hand(0, -0.12, 0.04);
-    if (long) hand(-0.07, -0.07, -0.45);
+    const grips = firearmGrips[weapon];
+    hand(grips.right[0], grips.right[1], grips.right[2]);
+    const support = hand(grips.left[0], grips.left[1], grips.left[2]);
+    if (support) support.name = 'support-hand';
     box(group, 0, 0.015, -0.17, 0.11, 0.13, long ? 0.6 : 0.34, dark, true);
     const grip = box(group, 0, -0.14, 0, 0.085, 0.22, 0.11, '#52564b');
     grip.rotation.x = 0.22;
@@ -623,8 +664,23 @@ export function makeViewmodel(weapon: WeaponId, withHands = true): THREE.Group {
     );
     barrel.rotation.x = Math.PI / 2;
     box(group, 0, 0.096, -0.29, 0.016, 0.035, 0.025, '#a6aa8f', true);
-    if (weapon === 'smg') box(group, 0, -0.19, -0.29, 0.06, 0.24, 0.1, '#3b453e');
-    if (weapon === 'shotgun') box(group, 0, -0.03, -0.47, 0.13, 0.13, 0.25, '#8c7655');
+    if (weapon !== 'shotgun') {
+      const magazine =
+        weapon === 'smg'
+          ? box(group, 0, -0.19, -0.29, 0.06, 0.24, 0.1, '#3b453e')
+          : box(group, 0, -0.22, 0.015, 0.065, 0.14, 0.075, '#3b453e');
+      magazine.name = 'magazine';
+      magazine.userData.restY = magazine.position.y;
+    }
+    if (weapon === 'shotgun') {
+      box(group, 0, -0.03, -0.47, 0.13, 0.13, 0.25, '#8c7655').name = 'pump';
+      const shell = new THREE.Group();
+      shell.name = 'loading-shell';
+      shell.visible = false;
+      group.add(shell);
+      cylinder(shell, 0, 0, 0, 0.017, 0.017, 0.065, '#a7543d').rotation.x = Math.PI / 2;
+      cylinder(shell, 0, 0, 0.032, 0.018, 0.018, 0.013, '#bda36d', true).rotation.x = Math.PI / 2;
+    }
   } else if (weapon === 'scanner') {
     hand(0, -0.16, 0.09);
     box(group, 0, -0.12, 0.015, 0.1, 0.25, 0.13, '#303e3a');
