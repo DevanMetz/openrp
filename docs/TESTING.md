@@ -1,12 +1,16 @@
 # Testing
 
-## Firearm grip and reload motion — 0.6.1 candidate
+## Firearm grip and reload motion — 0.6.1 released September 30, 2026
 
 Third-person firearms use a two-bone arm pose with fixed bone lengths and shared grip coordinates. The actual character hierarchy is tested across pistol/SMG/shotgun, standing/crouched positions, five pitch values from -1.48 to 1.48, seven reload phases and a rotated/translated character root. Both palms stay within 1mm of their respective grip targets. Separate tests cover unreachable-target stability, authoritative reload duration, completion/cancellation reset and first-person loading-hand framing at 16:9, 4:3 and square aspect ratios. These are geometric/animation checks, not GPU benchmarks or full collision tests against clothing.
 
 Chrome compared the released and updated character models in an isolated fixture, including standing pistol grip/reload, crouched downward SMG aim and upward shotgun aim. First-person review caught loading hands leaving the screen; the final motion raises the gun and lengthens the viewmodel forearms so their cut ends stay off screen. Paused views using the actual viewmodel update function verified visible SMG magazine handling and shotgun shell insertion. The shotgun hand returns to the fore-end before pumping. A real local game session reloaded a pistol from 3/180 to 12/171 and an SMG from 5/180 to 30/155; no production residents or transactions were used. Broader motion transitions, weapon model detail and crowd GPU costs remain work.
 
-Full `npm run check` passed all 122 tests, TypeScript, build and production HTTP smoke. Fixtures and screenshots are in ignored `test-results/firearm-review*`, `test-results/viewmodel-review.html` and `test-results/firearm-lab.ts`. Release verification is pending.
+Full `npm run check` passed all 122 tests, TypeScript, build and production HTTP smoke. Fixtures and screenshots are in ignored `test-results/firearm-review*`, `test-results/viewmodel-review.html` and `test-results/firearm-lab.ts`.
+
+Released commit `c4e36ed9d6fb7d3dd41bca5372d6695dfc18756b` through Railway deployment `b119f31e-c608-42ec-9459-d9d6556c1a91`. [GitHub CI](https://github.com/DevanMetz/openrp/actions/runs/36801211585) passed the full check on Node 22 and 24. Public health returned `ok`, status reported 0.6.1/protocol 7, and all three live JavaScript/CSS assets matched the tested build bytes. Chrome displayed ALPHA 0.6.1 without captured console errors. Public verification and deployment screenshots are in ignored `test-results/release-061/`.
+
+The existing `/app/data` volume `b4f75341-242b-4381-8b8b-10f0afded387` remains attached. Deployment configuration retained one replica, zero overlap, 30-second draining and `/health` checks. This client animation release changes neither server rules nor protocol. The 0.6.0 checkpoint and private persistence comparison below were not repeated for this patch.
 
 ## 0.6.0 production release — September 30, 2026
 

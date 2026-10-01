@@ -1,6 +1,6 @@
 # DarkRP coverage audit
 
-Reviewed September 7, 2026 against OpenRP `1e1a400` and upstream DarkRP `5abcf7abab9e489b2d882a55d95f84c206d9d05c`. This is a first system audit, not a parity certificate. OpenRP evidence was updated September 30 through release `40fa8b7` (0.6.0, protocol 7). Production now includes police inspection/evidence, contracts, broadcasts, text radio, direct messages and the accumulated visual/UI work. This follow-up does not re-audit the upstream specification.
+Reviewed September 7, 2026 against OpenRP `1e1a400` and upstream DarkRP `5abcf7abab9e489b2d882a55d95f84c206d9d05c`. This is a first system audit, not a parity certificate. OpenRP evidence was updated September 30 through release `c4e36ed` (0.6.1, protocol 7). Production now includes police inspection/evidence, contracts, broadcasts, text radio, direct messages and the accumulated visual/UI work, including firearm grip and reload motion. This follow-up does not re-audit the upstream specification.
 
 ## Evidence and scope
 
@@ -22,7 +22,7 @@ Common server addons and Source/Sandbox functionality remain part of the broader
 | Trading             | Shipments, adjustable prices, direct money, loose firearms with ammunition and pocket storage         | Recipient-bound cheques and additional shop types                                   |
 | Illegal economy     | Printer purchase, periodic income, collection, health and police confiscation                         | Printer lifecycle/fire behavior and other original illegal-production counterparts            |
 | Food and medicine   | Hunger, meals, microwave stock/production and medical-kit healing                                     | Food variety and fuller upstream medic/hunger behavior comparison                             |
-| Combat              | Three firearms, ammunition/reload, armor, damage and respawn                                          | Wider original weapon roster and better aiming/reload poses              |
+| Combat              | Three firearms, ammunition/reload, armor, damage and respawn; connected aim/crouch grips and reload animation | Wider original weapon roster, surface detail and motion transitions |
 | Contracts           | Funded offers, acceptance, expiry/cancellation refunds, assigned-kill payouts, cooldowns, atomic saves, private menus/HUD and original Hitman outfit         | Broader multiplayer browser scenarios, settlement history/presentation and upstream option comparison                                       |
 | Hobo activities     | Hobo job, ordinary prop building and basic tip jars with offline wallet payments                      | Further role activities and donation presentation                                             |
 | AFK and sleep       | No player AFK/sleep state or commands; physics sleeping is unrelated                                  | Player state, presentation, input restrictions and economy policy                             |
@@ -36,7 +36,7 @@ Specific upstream checks: [chat declarations](https://github.com/FPtje/DarkRP/bl
 
 The character, foliage and glazing passes improve the current city, but their measurements are limited to the scenes recorded in TESTING.md. They do not prove the expanded city is optimized or visually complete.
 
-Outstanding work includes equipment grip/aim/reload motion; richer clothing and material detail; interiors and reusable street props; pocket object thumbnails; foliage motion and distant stability; lighting/atmosphere; and repeatable GPU measurements with crowds and the expanded district. Narrow HUD/menu checks must cover ballots, title editing and full pockets. Source assets should not be extracted to fill these gaps; new assets must remain original or appropriately licensed.
+The first firearm grip/aim/reload pass is released in 0.6.1. Tests exercise the actual avatar hierarchy across crouching, pitch and reload phases, while browser fixtures cover third-person grips and first-person loading. Outstanding work includes other equipment poses and motion transitions; richer clothing and material detail; interiors and reusable street props; pocket object thumbnails; foliage motion and distant stability; lighting/atmosphere; and repeatable GPU measurements with crowds and the expanded district. Narrow HUD/menu checks must cover ballots, title editing and full pockets. Source assets should not be extracted to fill these gaps; new assets must remain original or appropriately licensed.
 
 ## Next implementation sequence
 
