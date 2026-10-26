@@ -1,13 +1,15 @@
+import { WebSocket } from 'ws';
+import { once } from 'node:events';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Game, type SavedWorld } from '../server/game.ts';
-import { loadWorld, saveProfiles, saveWorld } from './support/file-persistence.ts';
-import { startServer } from './support/node-server.ts';
+import { parseWorld, serializeWorld, validProfiles } from '../server/persistence.ts';
+import { startTestWorker as startServer } from './support/worker.ts';
 import { JAIL, SPAWNS } from '../shared/map.ts';
 import { MAX_PROPS } from '../shared/catalog.ts';
 import { idleInput } from '../shared/movement.ts';
@@ -23,13 +25,13 @@ function directory(t: TestContext) {
 }
 
 test('custom job titles survive world replacement, reset on a full role and reject corrupt saves', (t) => {
-  const dir = directory(t);
+  let checkpoint = '';
   const game = new Game({ now: () => 100_000 });
   const owner = game.join('Title Owner');
   game.applyJob(owner.player, 'mayor');
   game.setJobTitle(owner.player, 'District Organizer');
-  saveWorld(dir, game.exportWorld());
-  const saved = loadWorld(dir)!;
+  checkpoint = serializeWorld(game.exportWorld());
+  const saved = parseWorld(checkpoint)!;
   const next = new Game({ world: saved, now: game.now });
   const returning = next.join('Ignored', owner.token).player;
   assert.equal(returning.jobTitle, 'District Organizer');
@@ -40,12 +42,12 @@ test('custom job titles survive world replacement, reset on a full role and reje
   assert.equal(fallback.job, 'citizen');
   assert.equal(fallback.jobTitle, undefined);
   saved.profiles[0].character!.jobTitle = 'x'.repeat(33);
-  writeFileSync(join(dir, 'world.json'), JSON.stringify(saved));
-  assert.throws(() => loadWorld(dir));
+  checkpoint = JSON.stringify(saved);
+  assert.throws(() => parseWorld(checkpoint));
 });
 
 test('offline demotion survives a saved world replacement, removes job stock and keeps property', (t) => {
-  const dir = directory(t);
+  let checkpoint = '';
   let now = 100_000;
   const game = new Game({ now: () => now });
   const owner = game.join('Shop Owner');
@@ -66,8 +68,8 @@ test('offline demotion survives a saved world replacement, removes job stock and
   assert.equal(game.entities.has(shipment.id), false);
   assert.equal(game.entities.has(prop.id), true);
   assert.equal(door.owner, owner.player.id);
-  saveWorld(dir, game.exportWorld());
-  const restored = new Game({ now: () => now, world: loadWorld(dir) });
+  checkpoint = serializeWorld(game.exportWorld());
+  const restored = new Game({ now: () => now, world: parseWorld(checkpoint) });
   const p = restored.join('Shop Owner', owner.token).player;
   assert.equal(p.job, 'citizen');
   assert.equal(p.jobTitle, undefined, 'offline demotion clears the previous roleplay title');
@@ -100,7 +102,7 @@ test('a demotion target can reconnect during voting but cannot evade the police 
   assert.equal(resumed.job, 'citizen');
 });
 test('dropped firearm and exact ammunition survive a world replacement without restoring the source gun', (t) => {
-  const dir = directory(t);
+  let checkpoint = '';
   const game = new Game();
   const source = game.join('Trader');
   source.player.weapons.push('smg');
@@ -110,8 +112,8 @@ test('dropped firearm and exact ammunition survive a world replacement without r
   game.dropWeapon(source.player);
   const dropped = [...game.entities.values()].find((e) => e.kind === 'weapon')!;
   assert.ok(dropped);
-  saveWorld(dir, game.exportWorld());
-  const restored = new Game({ world: loadWorld(dir) });
+  checkpoint = serializeWorld(game.exportWorld());
+  const restored = new Game({ world: parseWorld(checkpoint) });
   const trader = restored.join('Trader', source.token).player;
   assert.equal(trader.weapons.includes('smg'), false);
   const buyer = restored.join('Customer').player;
@@ -120,14 +122,14 @@ test('dropped firearm and exact ammunition survive a world replacement without r
   assert.equal(buyer.ammo.smg, 13);
   assert.equal(buyer.reserve.smg, 47);
   assert.equal(restored.entities.has(dropped.id), false);
-  saveWorld(dir, restored.exportWorld());
+  checkpoint = serializeWorld(restored.exportWorld());
   assert.equal(
-    loadWorld(dir)!.entities.some((e) => e.kind === 'weapon'),
+    parseWorld(checkpoint)!.entities.some((e) => e.kind === 'weapon'),
     false,
   );
   const corrupt = game.exportWorld();
   corrupt.entities.find((e) => e.id === dropped.id)!.loadedAmmo = 31;
-  assert.throws(() => saveWorld(dir, corrupt), /Invalid entity/);
+  assert.throws(() => ((checkpoint = serializeWorld(corrupt)), /Invalid entity/));
 });
 test('refresh preserves inventory, vitals, ownership and shared keys while releasing transient physics holds', () => {
   let now = 100_000;
@@ -172,7 +174,7 @@ test('refresh preserves inventory, vitals, ownership and shared keys while relea
 });
 
 test('one atomic checkpoint restores props, physics, businesses, wallets and property across a restart', (t) => {
-  const dir = directory(t);
+  let checkpoint = '';
   let now = 100_000;
   const game = new Game({ now: () => now });
   const { player, token } = game.join('Persistent Builder');
@@ -192,9 +194,9 @@ test('one atomic checkpoint restores props, physics, businesses, wallets and pro
   game.laws.push('Keep Union Square clean.');
   player.money = 987;
   const saved = game.exportWorld();
-  saveWorld(dir, saved);
-  assert.deepEqual(loadWorld(dir), saved);
-  const restored = new Game({ world: loadWorld(dir), now: () => now });
+  checkpoint = serializeWorld(saved);
+  assert.deepEqual(parseWorld(checkpoint), saved);
+  const restored = new Game({ world: parseWorld(checkpoint), now: () => now });
   assert.equal(restored.players.size, 0, 'saved residents are offline until authenticated');
   assert.deepEqual(restored.snapshot().entities, saved.entities);
   assert.deepEqual(restored.exportWorld().doors, saved.doors);
@@ -210,11 +212,11 @@ test('one atomic checkpoint restores props, physics, businesses, wallets and pro
   assert.equal(restored.entities.get(crate.id)!.y, 4, 'frozen placement survives physics stepping');
   assert.ok(restored.entities.get(barrel.id)!.y < 4, 'unfrozen props retain live rigid-body physics');
   restored.removeEntity(printer.id);
-  saveWorld(dir, restored.exportWorld());
-  const restartedAgain = new Game({ world: loadWorld(dir) });
+  checkpoint = serializeWorld(restored.exportWorld());
+  const restartedAgain = new Game({ world: parseWorld(checkpoint) });
   assert.equal(restartedAgain.entities.has(printer.id), false, 'deleted objects never resurrect');
   assert.equal(restartedAgain.entities.size, 4);
-  const before = readFileSync(join(dir, 'world.json'), 'utf8');
+  const before = checkpoint;
   for (const corrupt of [
     (w: SavedWorld) => {
       w.entities[0].q = { x: 0, y: 0, z: 0, w: 0 };
@@ -231,8 +233,8 @@ test('one atomic checkpoint restores props, physics, businesses, wallets and pro
   ]) {
     const invalid = restartedAgain.exportWorld();
     corrupt(invalid);
-    assert.throws(() => saveWorld(dir, invalid), /Invalid|Duplicate/);
-    assert.equal(readFileSync(join(dir, 'world.json'), 'utf8'), before);
+    assert.throws(() => ((checkpoint = serializeWorld(invalid)), /Invalid|Duplicate/));
+    assert.equal(checkpoint, before);
   }
 });
 
@@ -260,8 +262,8 @@ test('offline keys can be revoked and operator cleanup stays removed across rest
 });
 
 test('offline businesses credit the saved owner and preserve stock and cash together', (t) => {
-  const dir = directory(t),
-    game = new Game();
+  let checkpoint = '';
+  const game = new Game();
   const seller = game.join('Offline Dealer'),
     buyer = game.join('Customer');
   game.applyJob(seller.player, 'dealer');
@@ -273,8 +275,8 @@ test('offline businesses credit the saved owner and preserve stock and cash toge
   assert.equal(buyer.player.money, 1250);
   assert.ok(buyer.player.weapons.includes('pistol'));
   assert.equal(shipment.stock, 4);
-  saveWorld(dir, game.exportWorld());
-  const next = new Game({ world: loadWorld(dir) });
+  checkpoint = serializeWorld(game.exportWorld());
+  const next = new Game({ world: parseWorld(checkpoint) });
   assert.equal(next.join('Offline Dealer', seller.token).player.money, 1750);
   assert.equal(next.join('Customer', buyer.token).player.money, 1250);
   assert.equal(next.entities.get(shipment.id)!.stock, 4);
@@ -333,23 +335,21 @@ test('saved jobs respect occupied slots without deleting the returning inventory
 });
 
 test('legacy wallet saves migrate once and damaged or unsupported worlds never fall back to old money', async (t) => {
-  const dir = directory(t),
-    legacy = new Game(),
+  let checkpoint = '';
+  const legacy = new Game(),
     joined = legacy.join('Legacy Resident');
   joined.player.money = 1234;
   const profile = { ...legacy.exportProfiles()[0] };
   delete profile.character;
-  saveProfiles(dir, [profile]);
-  const original = readFileSync(join(dir, 'profiles.json'), 'utf8');
-  const app = await startServer({ port: 0, host: '127.0.0.1', production: true, dataDir: dir });
-  try {
-    assert.equal(app.game.join('Legacy Resident', joined.token).player.money, 1234);
-  } finally {
-    await app.close();
-  }
-  const good = loadWorld(dir)!;
+  const profiles = JSON.parse(JSON.stringify([profile]));
+  assert.ok(validProfiles(profiles));
+  const original = JSON.stringify(profiles);
+  const migrated = new Game({ profiles: profiles });
+  assert.equal(migrated.join('Legacy Resident', joined.token).player.money, 1234);
+  checkpoint = serializeWorld(migrated.exportWorld());
+  const good = parseWorld(checkpoint)!;
   assert.equal(good.profiles[0].id, profile.id);
-  assert.equal(readFileSync(join(dir, 'profiles.json'), 'utf8'), original);
+  assert.equal(JSON.stringify(profiles), original);
   const corruptions: ((world: SavedWorld) => void)[] = [
     (w) => {
       (w as { version: number }).version = 999;
@@ -373,14 +373,14 @@ test('legacy wallet saves migrate once and damaged or unsupported worlds never f
   for (const corrupt of corruptions) {
     const value = structuredClone(good);
     corrupt(value);
-    assert.throws(() => saveWorld(dir, value), /Invalid|Duplicate/);
-    assert.deepEqual(loadWorld(dir), good, 'failed validation leaves the last checkpoint intact');
-    writeFileSync(join(dir, 'world.json'), JSON.stringify(value));
-    await assert.rejects(startServer({ port: 0, production: true, dataDir: dir }), /Restore a backup/);
-    saveWorld(dir, good);
+    assert.throws(() => ((checkpoint = serializeWorld(value)), /Invalid|Duplicate/));
+    assert.deepEqual(parseWorld(checkpoint), good, 'failed validation leaves the last checkpoint intact');
+    checkpoint = JSON.stringify(value);
+    assert.throws(() => parseWorld(checkpoint), /Invalid|Duplicate|JSON/);
+    checkpoint = serializeWorld(good);
   }
-  writeFileSync(join(dir, 'world.json'), '{truncated');
-  assert.throws(() => loadWorld(dir), /Restore a backup/);
+  checkpoint = '{truncated';
+  assert.throws(() => parseWorld(checkpoint), /Invalid|Duplicate|JSON/);
 });
 
 test('authenticated operators can clear an offline owner without wiping inventories or other residents', async (t) => {
@@ -400,14 +400,16 @@ test('authenticated operators can clear an offline owner without wiping inventor
   const key = 'test-only-cleanup-key',
     readKey = 'test-only-analytics-read-key';
   let app = await startServer({
-    port: 0,
-    host: '127.0.0.1',
-    production: true,
     dataDir: dir,
-    game,
     adminKey: key,
     analyticsReadKey: readKey,
   });
+  await app.restore(game.exportWorld());
+  const live = new WebSocket(`ws://127.0.0.1:${app.port}/ws`);
+  await once(live, 'open');
+  const welcome = once(live, 'message');
+  live.send(JSON.stringify({ type: 'join', name: 'Active Builder', token: other.token }));
+  await welcome;
   try {
     const url = `http://127.0.0.1:${app.port}/api/admin`;
     const command = (credential: string, id = owner.player.id) =>
@@ -434,7 +436,7 @@ test('authenticated operators can clear an offline owner without wiping inventor
     assert.ok(!JSON.stringify(list).includes('character'));
     for (const credential of ['', readKey]) {
       assert.equal((await command(credential)).status, 401);
-      assert.equal(app.game.entities.size, 3);
+      assert.equal((await app.world()).entities.length, 3);
     }
     assert.equal((await command(key, 'unknown-id')).status, 400);
     const cleaned = await promisify(execFile)(
@@ -449,11 +451,14 @@ test('authenticated operators can clear an offline owner without wiping inventor
       },
     );
     assert.deepEqual(JSON.parse(cleaned.stdout), { ok: true, removed: { entities: 2, properties: 1 } });
-    assert.equal(app.game.entities.size, 1);
-    assert.equal(app.game.entities.has(preserved.id), true);
-    assert.equal(app.game.players.has(other.player.id), true, 'cleanup does not kick residents');
-    assert.equal(loadWorld(dir)!.entities.length, 1, 'the cleanup is saved before success is returned');
-    assert.equal(loadWorld(dir)!.doors.find((d) => d.id === door.id)!.owner, null);
+    assert.equal((await app.world()).entities.length, 1);
+    assert.equal(
+      (await app.world()).entities.some((e) => e.id === preserved.id),
+      true,
+    );
+    assert.equal((await app.status()).players === 1, true, 'cleanup does not kick residents');
+    assert.equal((await app.world()).entities.length, 1, 'the cleanup is saved before success is returned');
+    assert.equal((await app.world()).doors.find((d) => d.id === door.id)!.owner, null);
     const events = await (
       await fetch(`${url}/events?kind=moderation`, { headers: { Authorization: `Bearer ${readKey}` } })
     ).text();
@@ -461,14 +466,18 @@ test('authenticated operators can clear an offline owner without wiping inventor
     const again = await command(key);
     assert.deepEqual(await again.json(), { ok: true, removed: { entities: 0, properties: 0 } });
     await app.close();
-    app = await startServer({ port: 0, host: '127.0.0.1', production: true, dataDir: dir });
-    assert.equal(app.game.entities.size, 1);
-    assert.equal(app.game.entities.has(preserved.id), true);
-    const restored = app.game.join('Offline Builder', owner.token).player;
+    app = await startServer({ dataDir: dir });
+    assert.equal((await app.world()).entities.length, 1);
+    assert.equal(
+      (await app.world()).entities.some((e) => e.id === preserved.id),
+      true,
+    );
+    const restored = new Game({ world: await app.world() }).join('Offline Builder', owner.token).player;
     assert.equal(restored.money, 1234);
     assert.equal(restored.ammo.pistol, 6);
     assert.ok(restored.weapons.includes('pistol'));
   } finally {
+    live.terminate();
     await app.close();
   }
 });

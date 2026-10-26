@@ -9,6 +9,7 @@ export interface VoiceSocket {
   addEventListener(type: 'close' | 'error', listener: () => void): void;
 }
 interface VoiceSession {
+  timeout?: ReturnType<typeof setTimeout>;
   id?: string;
   ip: string;
   listening: boolean;
@@ -43,6 +44,15 @@ export class VoiceRelay {
   }
 
   constructor(private game: Game) {}
+  private end(ws: VoiceSocket, code: number, reason: string) {
+    clearTimeout(this.sessions.get(ws)?.timeout);
+    this.sessions.delete(ws);
+    try {
+      ws.close(code, reason);
+    } catch {
+      /* Transport already gone. */
+    }
+  }
   pending(ip: string): number {
     return [...this.sessions.values()].filter((s) => !s.id && s.ip === ip).length;
   }
@@ -59,7 +69,7 @@ export class VoiceRelay {
       if (session.id === id) {
         session.id = undefined;
         session.transmitting = session.listening = false;
-        ws.close(1000, 'Game session ended');
+        this.end(ws, 1000, 'Game session ended');
       }
     }
   }
@@ -79,18 +89,15 @@ export class VoiceRelay {
       lastFrame: Date.now(),
     };
     this.sessions.set(ws, session);
-    const timeout = setTimeout(() => {
-      if (!session.id) ws.close(1008, 'Voice join timed out');
-    }, 5000);
-    ws.addEventListener('error', () => ws.close(1011, 'Voice connection failed'));
-    ws.addEventListener('close', () => {
-      clearTimeout(timeout);
-      this.sessions.delete(ws);
-    });
+    const timeout = (session.timeout = setTimeout(() => {
+      if (!session.id) this.end(ws, 1008, 'Voice join timed out');
+    }, 5000));
+    ws.addEventListener('error', () => this.end(ws, 1011, 'Voice connection failed'));
+    ws.addEventListener('close', () => this.end(ws, 1000, 'Connection closed'));
     ws.addEventListener('message', (event) => {
       const raw = event.data,
         binary = typeof raw !== 'string';
-      if (ws.readyState !== 1) return;
+      if (ws.readyState !== 1 || !this.sessions.has(ws)) return;
       const now = Date.now();
       if (now - session.window >= 1000) {
         session.window = now;
@@ -98,16 +105,16 @@ export class VoiceRelay {
       }
       const bytes = typeof raw === 'string' ? Buffer.from(raw) : Buffer.from(raw);
       if (bytes.byteLength > 48_000) {
-        ws.close(1009, 'Voice message too large');
+        this.end(ws, 1009, 'Voice message too large');
         return;
       }
       if (binary) {
         if (!session.id || !validVoiceFrame(bytes)) {
-          ws.close(1008, 'Invalid voice frame');
+          this.end(ws, 1008, 'Invalid voice frame');
           return;
         }
         if (++session.frames > 120) {
-          ws.close(1008, 'Voice rate exceeded');
+          this.end(ws, 1008, 'Voice rate exceeded');
           return;
         }
         session.allowance = Math.min(12, session.allowance + (now - session.lastFrame) * 0.06);
@@ -146,7 +153,7 @@ export class VoiceRelay {
             try {
               peer.send(packet);
             } catch {
-              peer.close(1011, 'Voice send failed');
+              this.end(peer, 1011, 'Voice send failed');
               continue;
             }
             this.framesOut++;
@@ -156,25 +163,25 @@ export class VoiceRelay {
         return;
       }
       if (++session.controls > 30 || bytes.byteLength > 44_000) {
-        ws.close(1008, 'Voice control rate exceeded');
+        this.end(ws, 1008, 'Voice control rate exceeded');
         return;
       }
       let msg;
       try {
         msg = JSON.parse(bytes.toString());
       } catch {
-        ws.close(1007, 'Invalid voice message');
+        this.end(ws, 1007, 'Invalid voice message');
         return;
       }
       if (!msg || typeof msg !== 'object') {
-        ws.close(1007, 'Invalid voice message');
+        this.end(ws, 1007, 'Invalid voice message');
         return;
       }
       if (!session.id) {
         const id =
           msg.type === 'join' && typeof msg.ticket === 'string' ? this.tickets.get(msg.ticket) : undefined;
         if (!id || !this.game.players.has(id) || [...this.sessions.values()].some((s) => s.id === id)) {
-          ws.close(1008, 'Voice session unavailable');
+          this.end(ws, 1008, 'Voice session unavailable');
           return;
         }
         session.id = id;
@@ -190,7 +197,7 @@ export class VoiceRelay {
         msg.muted.length > 1000 ||
         msg.muted.some((id: unknown) => typeof id !== 'string')
       ) {
-        ws.close(1007, 'Invalid voice configuration');
+        this.end(ws, 1007, 'Invalid voice configuration');
         return;
       }
       session.listening = msg.listening;
@@ -201,6 +208,6 @@ export class VoiceRelay {
 
   close(): void {
     this.tickets.clear();
-    for (const ws of this.sessions.keys()) ws.close(1000, 'World stopped');
+    for (const ws of this.sessions.keys()) this.end(ws, 1000, 'World stopped');
   }
 }

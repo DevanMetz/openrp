@@ -46,6 +46,10 @@ test(
         assert.ok((await response.text()).includes('<html'));
       }
       assert.equal(await (await fetch(app.base + '/health')).text(), 'ok');
+      const analytics = await (
+        await fetch(app.base + '/api/admin/analytics', { headers: readHeaders })
+      ).json();
+      assert.ok(analytics.totals.pageRequests >= 1);
       assert.equal((await fetch(app.base + '/api/admin')).status, 401);
       assert.equal((await fetch(app.base + '/api/admin', { headers: readHeaders })).status, 401);
       assert.equal((await fetch(app.base + '/api/admin/world', { headers: readHeaders })).status, 401);
@@ -161,12 +165,19 @@ test(
       );
       await app.close();
       app = undefined;
+      app = await startLocalWorker({ persistTo: dir, vars });
+      assert.equal(
+        (await (await fetch(app.base + '/api/admin/world', { headers })).json()).profiles.length,
+        2000,
+      );
+      await app.close();
+      app = undefined;
       app = await startLocalWorker({ persistTo: dir });
       assert.equal((await fetch(app.base + '/api/admin')).status, 503);
       assert.equal((await fetch(app.base + '/api/admin/analytics')).status, 503);
       assert.equal((await fetch(app.base + '/api/admin/world')).status, 503);
     } finally {
-      sockets.forEach((ws) => ws.terminate());
+      sockets.forEach((ws) => ws.close());
       await app?.close();
       await rm(dir, { recursive: true, force: true });
     }

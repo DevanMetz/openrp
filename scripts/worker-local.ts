@@ -21,11 +21,19 @@ export async function startLocalWorker(
     const worker = await unstable_dev('server/worker.ts', {
       config: 'wrangler.jsonc',
       local: true,
+      logLevel: 'error',
+      envFiles: [],
       ip: '127.0.0.1',
       port: options.port ?? 0,
       persist: true,
       persistTo: dir,
-      vars: { ALLOWED_ORIGINS: '', ...options.vars },
+      vars: {
+        ALLOWED_ORIGINS: '',
+        ADMIN_TOKEN: '',
+        ANALYTICS_READ_TOKEN: '',
+        SERVER_PASSWORD: '',
+        ...options.vars,
+      },
       experimental: { disableExperimentalWarning: true, disableDevRegistry: true, watch: false },
     });
     return {

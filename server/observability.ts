@@ -97,7 +97,6 @@ interface Session {
   accounted: number;
 }
 export interface ObservationOptions {
-  dataDir: string;
   files?: LogFiles;
   persist: boolean;
   retentionDays?: number;
@@ -118,7 +117,6 @@ export interface LogQuery {
 
 export class Observability {
   readonly retentionDays: number;
-  private dir: string;
   private get files(): LogFiles {
     if (!this.options.files) throw new Error('Persistent log storage is required');
     return this.options.files;
@@ -142,7 +140,6 @@ export class Observability {
   private bootId = randomUUID();
 
   private constructor(private options: ObservationOptions) {
-    this.dir = options.dataDir;
     this.now = options.now ?? Date.now;
     this.retentionDays = Math.max(1, Math.min(90, options.retentionDays ?? 30));
     this.maxBytes = options.maxDailyBytes ?? 16 * 1024 * 1024;
@@ -178,7 +175,7 @@ export class Observability {
   private issue(message: string): void {
     if (this.issues.has(message) || this.issues.size >= 20) return;
     this.issues.add(message);
-    console.error(`Observability: ${message}`);
+    console.error(JSON.stringify({ event: 'observability_error', message }));
   }
 
   private day(at = this.now()): DayStats {
@@ -404,7 +401,7 @@ export class Observability {
           this.sizes.set(file, size);
         } catch {
           add(this.day().counters, 'droppedLogRecords', rows.length);
-          this.issue(`Writing ${file} failed. Check persistent disk space and permissions.`);
+          this.issue(`Writing ${file} failed. Check durable storage availability and limits.`);
         }
       }
       for (const date of [...this.dirty]) {

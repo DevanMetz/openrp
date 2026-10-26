@@ -4,9 +4,11 @@ Current hosting targets Cloudflare Workers Static Assets and one SQLite-backed W
 
 ## Cloudflare migration validation
 
-The restricted migration sandbox passed TypeScript, the Vite build for all three HTML pages, Wrangler's credential-free dry-run bundle, and 108 of 138 tests in a diagnostic run without test-process isolation. The other 30 tests failed at loopback binding with EPERM, including the real Worker integration test. `npm run check` and the production Worker smoke therefore could not pass in that sandbox. Wrangler dev on port 8799 also failed because local networking was denied; no HTTP, gameplay join or production runtime verification is claimed.
+Network, account, moderation, voice, observability and restart tests run the production `server/worker.ts` entry and `World` Durable Object through local Wrangler/workerd, with isolated SQLite persistence. Voice tests share a Worker; restart tests reuse only their own temporary directory. Fixtures enter through authenticated backup import. There is no test-only Node server or deployed test endpoint.
 
-The added SQLite tests verify large Unicode chunks, byte-range reads, append behavior and rollback after a failed replacement. HTTP adapter tests verify split UTF-8 moderation bodies and authorization. The real Worker test covers assets, accounts, voice admission, auth, log persistence, restart and large validated backup imports when networking is available. Existing synchronous Game mutation tests retain a Node transport fixture under `tests/support`, sharing account, voice, moderation and observability logic with production; that fixture is outside the Worker dependency graph.
+Game rules and recipient selection use the shared Game directly with controlled clocks. Checkpoint validation uses the same JSON codec as the Worker. Aggregation tests use byte-addressed memory storage; SQLite adapter tests cover Unicode chunks, bounded range reads and transactional rollback. Real Worker tests cover static pages, health/status, accounts, reconnects, origins, passwords, connection/message limits, silent-client heartbeats, voice range and revocation, operator/read authorization, CLI log queries, backup import and restart persistence. `npm test` builds assets first, so it also works from a clean checkout.
+
+`npm run check` passed 146 tests, the built-Worker smoke and the credential-free Wrangler bundle. Local development was checked on port 8787: `npm run dev` served the game page and health endpoint, accepted a same-origin gameplay join with a voice ticket, and stopped cleanly. These are local runtime checks; no production deployment or DNS change is verified. The installed local workerd reports `Network connection lost` when some sockets close before joining, despite successful close handshakes. The same diagnostic was reproduced with a minimal echo Worker, both directly and through a Durable Object; it is not suppressed by the tests.
 
 ## Equipment rendering and shadows — 0.6.5 local release candidate
 
@@ -16,11 +18,11 @@ A comparison against the 0.6.4 renderer checked 132 model poses: all twelve equi
 
 The isolated 32-resident Chrome fixture uses a 1280×720 render buffer at pixel ratio 1, fixed poses and hidden labels. A/B/B/A passes each warm up for 60 renders then sample 120 renders, in batches of eight per animation callback. GPU elapsed queries are asynchronous and discard disjoint samples. The local GPU was an AMD Radeon RX 7900 GRE through ANGLE/D3D11. Results:
 
-| Scene | Released 0.6.4 draws | Updated draws | Triangle counts |
-| --- | ---: | ---: | --- |
-| 32 visible, shadows off | 632 | 511 | 163,604 for both |
-| 32 visible, shadows on | 1,063 | 1,015 | 320,600 → 327,194, including the new equipment shadows |
-| 32 behind camera, shadows off | 195 | 1 | 6,596 → 2 (ground only) |
+| Scene                         | Released 0.6.4 draws | Updated draws | Triangle counts                                        |
+| ----------------------------- | -------------------: | ------------: | ------------------------------------------------------ |
+| 32 visible, shadows off       |                  632 |           511 | 163,604 for both                                       |
+| 32 visible, shadows on        |                1,063 |         1,015 | 320,600 → 327,194, including the new equipment shadows |
+| 32 behind camera, shadows off |                  195 |             1 | 6,596 → 2 (ground only)                                |
 
 Visible-crowd CPU render-submission medians were 1.4–1.5ms before / 1.3–1.4ms after without shadows, and 1.5–1.7ms before / 1.7ms after with shadows. GPU medians were 0.077ms before / 0.090ms after without shadows, and 0.108–0.124ms before / 0.123–0.124ms after with shadows. No hidden/disjoint samples occurred in those completed runs. These measurements establish fewer draw submissions and retained geometry, **not an overall FPS improvement**: GPU time did not improve, browser scheduling was irregular, and this fixture excludes city geometry, labels, moving crowds and networking. The off-camera run used one render per animation callback; its draw counts are comparable but its timings are not pooled with the batched runs. Wider hardware, city and moving-crowd profiling remain work.
 
@@ -348,7 +350,7 @@ The final build and production HTTP smoke passed. An earlier smoke attempt faile
 
 ## Automated
 
-Run `npm run check`. It runs strict TypeScript checks, Node's test runner through `tsx`, a production client build, and an HTTP smoke test of the built files. Tests use disposable worlds and storage; they do not modify a running player's wallet file.
+Run `npm run check`. It runs strict TypeScript checks, builds the client, runs Node's test runner through `tsx`, exercises the built Worker with a smoke test, and performs a credential-free Wrangler dry-run deployment. Tests use disposable local worlds and storage.
 
 Coverage includes:
 
@@ -356,27 +358,27 @@ Coverage includes:
 - Closed-door collision and passage into an actual building when open.
 - Remote/unauthorized property actions, purchase, shared keys and resale.
 - Role limits, elections, duplicate votes, job cooldowns and chief prerequisites.
-- Demotion majority/ties, fixed electorates, request cooldowns, role bans, custody preservation, offline results, reconnects and real WebSocket ballot/result replication.
+- Demotion majority/ties, fixed electorates, request cooldowns, role bans, custody preservation, offline results, reconnects and authoritative ballot/result snapshots.
 - Printer purchase/production/collection/confiscation and shipment cash/stock transfers.
 - Physics settling, freezing, ownership restrictions and fading collision restoration.
 - Weapon damage, world occlusion, ammunition, reload timing, death and respawn.
-- Physical firearm drop/pickup with exact ammunition transfer, duplicate/reach/custody/issued-equipment restrictions, obstructed placement, corrupt ammunition rejection, saved-world replacement and real multi-client WebSocket replication.
+- Physical firearm drop/pickup with exact ammunition transfer, duplicate/reach/custody/issued-equipment restrictions, obstructed placement, corrupt ammunition rejection, saved-world replacement and authoritative snapshots.
 - Wanted/arrest permissions, custody restrictions, release and lockpicking.
 - Resident actions through menus and chat: exact identity targeting, full names/IDs, role checks, clean reasons, shared cooldown, transfer conservation, wallet caps, range/occlusion and stale targets.
 - Credential privacy, wallet reconnect, local/global chat delivery and text filtering.
 - Real WebSocket clients sharing players, props, jobs and chat; retained belongings on disconnect.
 - Invalid JSON, origin restrictions, flooding, optional passwords and server status.
 - Atomic world/inventory round-trip, migration from legacy wallets, and refusal to load corrupt or unsupported saves.
-- Real WebSocket purchases through a refresh and replacement server using the same data directory: inventory, ammo, armor, cash, props, property and stock.
+- Real WebSocket purchases through a refresh and replacement server using the same SQLite persistence directory: inventory, ammo, armor, cash, props, property and stock.
 - Restored rigid-body rotation, frozen/fading collision, offline shop income, persistent prop limits, shared keys and reconnect penalties.
 - Authenticated offline-owner cleanup, preserved inventories and unrelated objects, immediate checkpointing, and rejection of analytics-only credentials.
 - Voice frame validation and quantization; capture at 44.1/48 kHz with no packets outside push-to-talk.
-- Real voice sockets: server-enforced range, dead-player suppression, individual mute, deafen and no self echo.
+- Real voice sockets: server-enforced range, individual mute, deafen and no self echo; pure relay tests also check death and live position changes.
 - Voice ticket admission/revocation, duplicate sockets, origin rejection, replayed frames, flood isolation and operator removal.
-- Production worklet asset, same-origin microphone policy, and exclusion of the development voice lab.
+- Production worklet asset, same-origin microphone policy, and all three built HTML entry points.
 - Analytics across UTC midnight, new/returning identity counts, job time, completed-session averages and successful-only purchases.
-- Chat captured once before audience fan-out, all channels, search filters, Unicode disk boundaries, identical-timestamp pagination and interrupted-tail recovery.
-- Log and summary persistence through server replacement, expiration, disk-cap loss indicators and preservation of corrupt summaries.
+- Chat captured once before audience fan-out, all channels, search filters, Unicode byte boundaries, identical-timestamp pagination and interrupted-tail recovery.
+- Log and summary persistence through server replacement, expiration, storage-cap loss indicators and preservation of corrupt summaries.
 - Private HTTP endpoints, rejection of URL credentials, read-key isolation from moderation, credential redaction and human/JSON CLI reads against a real local server.
 
 ## Browser checklist
@@ -424,11 +426,11 @@ The 0.5 automated suite has 64 tests. New checks walk every room in all 24 apart
 
 ### Reproducible browser voice lab
 
-Run `node --import tsx scripts/voice-lab.ts`, then open `http://localhost:3175/voice-lab.html` and click **Run synthetic voice checks**. It uses disposable residents and a synthesized MediaStream, never `getUserMedia`, so it exercises the actual AudioWorklet → voice relay → PannerNode → output graph without accessing a person's microphone. It checks silence before PTT, received audio energy, individual mute, deafen, PTT release and track release. The loopback-only lab and its client are excluded from the production build/container. This does not replace testing two real microphones and devices for echo or network quality.
+Run `npm run build` and `node --import tsx scripts/voice-lab.ts`, then open `http://localhost:3175/voice-lab.html` and click **Run synthetic voice checks**. It uses disposable residents and a synthesized MediaStream, never `getUserMedia`, so it exercises the actual AudioWorklet → voice relay → PannerNode → output graph without accessing a person's microphone. It checks silence before PTT, received audio energy, individual mute, deafen, PTT release and track release. The lab client is a built static page; this launcher gives it a disposable local Worker. This does not replace testing two real microphones and devices for echo or network quality.
 
 Chrome on Windows, September 7, 2026: the synthetic run captured 108 frames and played 108, with measured nonzero output (peak RMS 0.01757). The device context ran at 48 kHz and the transport at 16 kHz. All six browser audio checks passed. Automated voice tests also exercise 44.1 kHz capture. Voice crowd capacity and other browsers have not been measured.
 
-Browser checks use the real browser. Automated tests additionally cover 80 concurrent connections, delta reconstruction, trusted proxy headers and operator authorization. Run `npx tsx scripts/load.ts 100 15` for an isolated local synthetic movement load check; it never targets production. A local September 2026 run held 100 connections for 15 seconds, delivered 12.93 updates/client/second, used 10.49 MiB/s total outbound traffic and measured 21.45 ms p99 event-loop delay. This is a reproducible diagnostic, not a real-player or production capacity guarantee. CI validates Node 22 and 24; graphical rendering depends on a WebGL2-capable browser and GPU.
+Browser checks use the real browser. Automated tests additionally cover 80 concurrent connections, delta reconstruction, Cloudflare ingress addresses and operator authorization. Run `npx tsx scripts/load.ts 100 15` for an isolated local synthetic movement load check; it never targets production. A local September 2026 run held 100 connections for 15 seconds, delivered 12.93 updates/client/second, used 10.49 MiB/s total outbound traffic and measured 21.45 ms p99 event-loop delay. This is a reproducible diagnostic, not a real-player or production capacity guarantee. CI validates Node 22 and 24; graphical rendering depends on a WebGL2-capable browser and GPU.
 
 0.5.2 tip jars: server tests cover exact wallet conservation, invalid input, self tipping, overflow, reach/occlusion, custody/death, purchase limits, offline payment and world replacement. A real two-client WebSocket test checks replicated donor/owner balances. Chrome review covers opening the amount form with E; narrow form and wider performance review remain outstanding.
 

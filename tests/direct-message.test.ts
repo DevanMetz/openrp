@@ -20,14 +20,29 @@ test('direct messages resolve exact recipients and never fan out to bystanders o
   };
   for (const address of ['"morgan vale"', b.id]) {
     send(`/PM ${address} Meet <here>`);
-    assert.deepEqual(events.map(({ to }) => to), [a.id, b.id]);
-    assert.ok(events.every(({ e }) => e.type === 'chat' && e.channel === 'pm' && e.text === 'Meet <here>' && e.recipientName === b.name));
+    assert.deepEqual(
+      events.map(({ to }) => to),
+      [a.id, b.id],
+    );
+    assert.ok(
+      events.every(
+        ({ e }) =>
+          e.type === 'chat' && e.channel === 'pm' && e.text === 'Meet <here>' && e.recipientName === b.name,
+      ),
+    );
     assert.equal(logs.at(-1)?.recipientId, b.id);
     game.handle(a.id, { type: 'chat', text: `/pm ${b.id} spam` });
     assert.equal(events.length, 2);
   }
   assert.equal(logs.length, 2, 'one log per accepted message');
-  for (const text of ['/pm', '/pm "Morgan Vale"', '/pm "Missing" hello', '/pm Alice hello', '/pm "Morgan Va" hello', '/pm "Morgan Vale hello']) {
+  for (const text of [
+    '/pm',
+    '/pm "Morgan Vale"',
+    '/pm "Missing" hello',
+    '/pm Alice hello',
+    '/pm "Morgan Va" hello',
+    '/pm "Morgan Vale hello',
+  ]) {
     send(text);
     assert.ok(events.every(({ e, to }) => e.type === 'notice' && to === a.id));
     assert.equal(logs.length, 2);

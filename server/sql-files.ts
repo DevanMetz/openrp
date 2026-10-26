@@ -33,9 +33,10 @@ export class SqlFiles implements LogFiles {
   async range(name: string, start: number, length: number) {
     const out = new Uint8Array(length);
     for (const row of this.storage.sql.exec<{ offset: number; data: ArrayBuffer }>(
-      'SELECT offset, data FROM chunks WHERE name = ? AND offset < ? AND offset + length(data) > ? ORDER BY offset',
+      'SELECT offset, data FROM chunks WHERE name = ? AND offset < ? AND offset > ? AND offset + length(data) > ? ORDER BY offset',
       name,
       start + length,
+      start - 65536,
       start,
     )) {
       const data = new Uint8Array(row.data),

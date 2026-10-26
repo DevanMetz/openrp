@@ -171,7 +171,18 @@ export type GameEvent =
       type: 'chat';
       name: string;
       text: string;
-      channel: 'local' | 'whisper' | 'yell' | 'ooc' | 'advert' | 'broadcast' | 'pm' | 'radio' | 'me' | 'system' | 'group';
+      channel:
+        | 'local'
+        | 'whisper'
+        | 'yell'
+        | 'ooc'
+        | 'advert'
+        | 'broadcast'
+        | 'pm'
+        | 'radio'
+        | 'me'
+        | 'system'
+        | 'group';
       color?: string;
       radioChannel?: number;
       recipientName?: string;

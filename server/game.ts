@@ -1681,7 +1681,8 @@ export class Game {
     r.lastChat = this.now();
     const [command, ...words] = text.split(/\s+/);
     const args = words.join(' ');
-    let channel: 'local' | 'whisper' | 'yell' | 'ooc' | 'advert' | 'broadcast' | 'radio' | 'me' | 'group' = 'local',
+    let channel: 'local' | 'whisper' | 'yell' | 'ooc' | 'advert' | 'broadcast' | 'radio' | 'me' | 'group' =
+        'local',
       message = text;
     if (command.startsWith('/')) {
       switch (command.toLowerCase()) {
@@ -1703,29 +1704,52 @@ export class Game {
         case '/pm': {
           const parsed = /^(?:"([^"]+)"|(\S+))\s+(.+)$/.exec(args);
           if (!parsed) {
-            this.notice(p.id, 'Use /pm "Full Name" message, or /pm player-id message. Direct messages are logged.', 'error');
+            this.notice(
+              p.id,
+              'Use /pm "Full Name" message, or /pm player-id message. Direct messages are logged.',
+              'error',
+            );
             return;
           }
           const address = parsed[1] ?? parsed[2];
-          const matches = [...this.players.values()].filter((other) =>
-            other.id === address || other.name.toLowerCase() === address.toLowerCase());
+          const matches = [...this.players.values()].filter(
+            (other) => other.id === address || other.name.toLowerCase() === address.toLowerCase(),
+          );
           if (matches.length !== 1 || matches[0] === p) {
             this.notice(p.id, 'Choose one other connected resident by exact name or player ID.', 'error');
             return;
           }
           const recipient = matches[0];
           const message = parsed[3];
-          this.onChat({ playerId: p.id, name: p.name, job: p.job, channel: 'pm', text: message,
-            recipientId: recipient.id, recipientName: recipient.name });
-          const event: GameEvent = { type: 'chat', channel: 'pm', name: p.name, text: message,
-            recipientName: recipient.name, color: JOBS[p.job].color };
+          this.onChat({
+            playerId: p.id,
+            name: p.name,
+            job: p.job,
+            channel: 'pm',
+            text: message,
+            recipientId: recipient.id,
+            recipientName: recipient.name,
+          });
+          const event: GameEvent = {
+            type: 'chat',
+            channel: 'pm',
+            name: p.name,
+            text: message,
+            recipientName: recipient.name,
+            color: JOBS[p.job].color,
+          };
           this.onEvent(event, p.id);
           this.onEvent(event, recipient.id);
           return;
         }
         case '/channel': {
           if (!args) {
-            this.notice(p.id, r.radioChannel === null ? 'Text radio is off.' : `Text radio channel ${r.radioChannel}. Anyone tuned to this channel can hear; messages are logged.`);
+            this.notice(
+              p.id,
+              r.radioChannel === null
+                ? 'Text radio is off.'
+                : `Text radio channel ${r.radioChannel}. Anyone tuned to this channel can hear; messages are logged.`,
+            );
             return;
           }
           if (args.toLowerCase() === 'off') r.radioChannel = null;
@@ -1734,7 +1758,12 @@ export class Game {
             this.notice(p.id, 'Use /channel 0–100, /channel off, or /channel to check.', 'error');
             return;
           }
-          this.notice(p.id, r.radioChannel === null ? 'Text radio switched off.' : `Tuned to text radio ${r.radioChannel}. Anyone on this channel can hear; messages are logged. Rejoining resets to channel 1.`);
+          this.notice(
+            p.id,
+            r.radioChannel === null
+              ? 'Text radio switched off.'
+              : `Tuned to text radio ${r.radioChannel}. Anyone on this channel can hear; messages are logged. Rejoining resets to channel 1.`,
+          );
           return;
         }
         case '/radio':
@@ -1797,8 +1826,22 @@ export class Game {
     if (!message) return;
     // Record one accepted message before fan-out, not one copy per recipient.
     const radioChannel = channel === 'radio' ? r.radioChannel! : undefined;
-    this.onChat({ playerId: p.id, name: p.name, job: p.job, text: message, channel, ...(radioChannel === undefined ? {} : { radioChannel }) });
-    const event: GameEvent = { type: 'chat', name: p.name, text: message, channel, ...(radioChannel === undefined ? {} : { radioChannel }), color: JOBS[p.job].color };
+    this.onChat({
+      playerId: p.id,
+      name: p.name,
+      job: p.job,
+      text: message,
+      channel,
+      ...(radioChannel === undefined ? {} : { radioChannel }),
+    });
+    const event: GameEvent = {
+      type: 'chat',
+      name: p.name,
+      text: message,
+      channel,
+      ...(radioChannel === undefined ? {} : { radioChannel }),
+      color: JOBS[p.job].color,
+    };
     if (channel === 'ooc' || channel === 'advert' || channel === 'broadcast') this.onEvent(event);
     else
       for (const other of this.players.values())
@@ -1806,13 +1849,13 @@ export class Game {
           channel === 'radio'
             ? this.runtime.get(other.id)?.radioChannel === r.radioChannel
             : channel === 'group'
-            ? GOVERNMENT.includes(p.job)
-              ? GOVERNMENT.includes(other.job)
-              : ['boss', 'gangster', 'thief'].includes(p.job)
-                ? ['boss', 'gangster', 'thief'].includes(other.job)
-                : other.job === p.job
-            : distance(p, other) <
-              CHAT_RANGES[channel === 'whisper' || channel === 'yell' ? channel : 'local']
+              ? GOVERNMENT.includes(p.job)
+                ? GOVERNMENT.includes(other.job)
+                : ['boss', 'gangster', 'thief'].includes(p.job)
+                  ? ['boss', 'gangster', 'thief'].includes(other.job)
+                  : other.job === p.job
+              : distance(p, other) <
+                CHAT_RANGES[channel === 'whisper' || channel === 'yell' ? channel : 'local']
         )
           this.onEvent(event, other.id);
   }

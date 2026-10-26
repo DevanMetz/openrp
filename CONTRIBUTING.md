@@ -14,4 +14,4 @@ New art must be original or clearly licensed for redistribution. Include attribu
 
 Keep `data/`, `.env`, `.dev.vars`, `.wrangler/`, credentials, logs, generated builds and `node_modules/` out of commits. Describe incomplete behavior plainly. By submitting code, you agree to make your contribution available under this repository’s MIT license.
 
-Production runs `server/worker.ts`; platform-independent rules remain in Game and shared modules. Regenerate binding declarations with `npm run cf-typegen` after config changes. Tests include the actual Worker via Wrangler with isolated local SQLite persistence; synchronous mutation regression fixtures stay under `tests/support` and are never deployed. See [hosting](docs/HOSTING.md).
+Production runs `server/worker.ts`; platform-independent rules remain in Game and shared modules. Regenerate binding declarations with `npm run cf-typegen` after config changes. Tests include the actual Worker via Wrangler with isolated local SQLite persistence; clock-controlled game tests call the shared Game directly. Do not introduce a second server implementation or production test endpoints. See [hosting](docs/HOSTING.md).

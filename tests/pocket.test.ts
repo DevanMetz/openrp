@@ -1,10 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve, sep } from 'node:path';
 import { Game } from '../server/game.ts';
-import { loadWorld, saveWorld } from './support/file-persistence.ts';
+import { parseWorld, serializeWorld } from '../server/persistence.ts';
 import { MAX_ENTITIES, MAX_PROPS, POCKET_CAPACITY } from '../shared/catalog.ts';
 import { BLOCKS } from '../shared/map.ts';
 import type { EntityKind, Player } from '../shared/types.ts';
@@ -122,19 +119,15 @@ test('pocket placement preserves stored objects on obstruction and server limits
 });
 
 test('pockets survive job changes, reconnect and saved-world replacement; corrupt or duplicated contents fail closed', (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'openrp-pocket-test-'));
-  t.after(() => {
-    assert.ok(resolve(dir).startsWith(resolve(tmpdir()) + sep) && dir.includes('openrp-pocket-test-'));
-    rmSync(dir, { recursive: true, force: true });
-  });
+  let checkpoint = '';
   const { game, p, source, place, act } = fixture();
   const cash = place('money');
   cash.cash = 723;
   act(p, 'pocket-store', cash.id);
   game.applyJob(p, 'medic');
   game.disconnect(p.id);
-  saveWorld(dir, game.exportWorld());
-  const saved = loadWorld(dir)!;
+  checkpoint = serializeWorld(game.exportWorld());
+  const saved = parseWorld(checkpoint)!;
   const restored = new Game({ world: saved, now: game.now });
   const returning = restored.join('Ignored', source.token).player;
   assert.equal(returning.pocket?.[0].cash, 723);
@@ -147,9 +140,9 @@ test('pockets survive job changes, reconnect and saved-world replacement; corrup
   const profile = saved.profiles.find((v) => v.id === p.id)!;
   const corrupt = structuredClone(saved);
   corrupt.profiles.find((v) => v.id === p.id)!.character!.pocket![0].cash = -1;
-  writeFileSync(join(dir, 'world.json'), JSON.stringify(corrupt));
-  assert.throws(() => loadWorld(dir));
+  checkpoint = JSON.stringify(corrupt);
+  assert.throws(() => parseWorld(checkpoint));
   profile.character!.pocket!.push(structuredClone(profile.character!.pocket![0]));
-  writeFileSync(join(dir, 'world.json'), JSON.stringify(saved));
-  assert.throws(() => loadWorld(dir));
+  checkpoint = JSON.stringify(saved);
+  assert.throws(() => parseWorld(checkpoint));
 });

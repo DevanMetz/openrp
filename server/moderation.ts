@@ -60,6 +60,7 @@ export class Moderation {
       return;
     }
     try {
+      req.setTimeout(10_000, () => req.destroy());
       const chunks: Buffer[] = [];
       let length = 0;
       for await (const chunk of req) {

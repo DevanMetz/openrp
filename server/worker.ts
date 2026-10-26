@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { Game, cleanText } from './game.ts';
-import { validateWorld } from './persistence.ts';
+import { parseWorld, serializeWorld } from './persistence.ts';
 import { clientIP, JoinRate } from './network.ts';
 import { Accounts, profileForToken } from './accounts.ts';
 import { Moderation } from './moderation.ts';
@@ -84,9 +84,7 @@ export class World extends DurableObject<WorldEnv> {
       const names = await this.files.list();
       let world;
       if (names.includes('world')) {
-        const saved: unknown = JSON.parse(await this.files.read('world'));
-        validateWorld(saved);
-        world = saved;
+        world = parseWorld(await this.files.read('world'));
       }
       this.game = new Game({
         startingMoney: numeric(this.env.STARTING_MONEY, 1500, 0, 1e7),
@@ -104,7 +102,6 @@ export class World extends DurableObject<WorldEnv> {
         this.files.checkpoint('bans', JSON.stringify(saved)),
       );
       this.observations = await Observability.create({
-        dataDir: '',
         persist: true,
         files: this.files,
         maintenance: false,
@@ -129,27 +126,45 @@ export class World extends DurableObject<WorldEnv> {
     });
   }
   private checkpoint() {
-    const saved = this.game.exportWorld();
-    validateWorld(saved);
-    this.files.checkpoint('world', JSON.stringify(saved));
+    this.files.checkpoint('world', serializeWorld(this.game.exportWorld()));
   }
   async alarm() {
     await this.observations.prune();
     await this.observations.flush();
     await this.ctx.storage.setAlarm((Math.floor(Date.now() / 86_400_000) + 1) * 86_400_000 + 1000);
   }
+  private release(ws: WebSocket, reason = 'socket_closed', removeOwned = false) {
+    const session = this.sessions.get(ws);
+    if (!session) return;
+    this.sessions.delete(ws);
+    clearTimeout(session.timeout);
+    if (session.id) {
+      this.observations.left(session.id, reason);
+      this.voice.remove(session.id);
+      this.game.disconnect(session.id, removeOwned);
+      session.id = undefined;
+      this.checkpoint();
+    }
+    this.stopIfEmpty();
+    this.ctx.waitUntil(this.observations.flush());
+  }
+  private closeGame(ws: WebSocket, code: number, reason: string) {
+    // Release immediately: an unresponsive peer may never acknowledge the close handshake.
+    this.release(ws);
+    try {
+      ws.close(code, reason);
+    } catch {
+      /* Transport already gone. */
+    }
+  }
   private disconnect(id: string, reason: string, removeOwned = true) {
     for (const [ws, session] of this.sessions)
       if (session.id === id) {
         this.send(ws, { type: 'notice', text: reason, tone: 'error' });
-        this.observations.left(id, 'operator_or_account_removal');
-        this.game.disconnect(id, removeOwned);
-        this.voice.remove(id);
-        session.id = undefined;
-        ws.close(1008, reason);
+        this.release(ws, 'operator_or_account_removal', removeOwned);
+        // The full operator reason is in the notice; WebSocket reasons are limited to 123 bytes.
+        this.closeGame(ws, 1008, 'Session ended');
       }
-    this.checkpoint();
-    this.stopIfEmpty();
   }
   private allowDelivery(session: Session, bytes: number): boolean {
     const now = Date.now();
@@ -169,13 +184,13 @@ export class World extends DurableObject<WorldEnv> {
       const bytes = new TextEncoder().encode(text).byteLength,
         session = this.sessions.get(ws);
       if (session && !this.allowDelivery(session, bytes)) {
-        ws.close(1008, 'Outbound rate exceeded');
+        this.closeGame(ws, 1008, 'Outbound rate exceeded');
         return;
       }
       this.bytesOut += bytes;
       ws.send(text);
     } catch {
-      ws.close(1011, 'Send failed');
+      this.closeGame(ws, 1011, 'Send failed');
     }
   }
   private start() {
@@ -202,7 +217,7 @@ export class World extends DurableObject<WorldEnv> {
       this.voiceRate.prune();
       const now = Date.now();
       for (const [ws, s] of this.sessions)
-        if (now - s.lastSeen > 30_000) ws.close(1008, 'Heartbeat timed out');
+        if (now - s.lastSeen > 30_000) this.closeGame(ws, 1008, 'Heartbeat timed out');
       this.sample();
       this.ctx.waitUntil(this.observations.flush());
     }, 3000);
@@ -241,6 +256,9 @@ export class World extends DurableObject<WorldEnv> {
     const current: Snapshot = JSON.parse(full);
     const resync = !this.previous || current.time - this.lastFull >= 5000;
     const delta = resync ? full : JSON.stringify(makeDelta(this.previous!, current));
+    const encoder = new TextEncoder();
+    const fullBytes = encoder.encode(full).byteLength,
+      deltaBytes = encoder.encode(delta).byteLength;
     if (resync) this.lastFull = current.time;
     for (const [ws, session] of this.sessions)
       if (session.id && ws.readyState === 1) {
@@ -252,14 +270,14 @@ export class World extends DurableObject<WorldEnv> {
           continue;
         }
         const payload = session.needsFull ? full : delta;
-        const bytes = new TextEncoder().encode(payload).byteLength;
+        const bytes = session.needsFull ? fullBytes : deltaBytes;
         if (!this.allowDelivery(session, bytes)) continue;
         try {
           ws.send(payload);
           this.bytesOut += bytes;
           session.needsFull = false;
         } catch {
-          ws.close(1011, 'Snapshot send failed');
+          this.closeGame(ws, 1011, 'Snapshot send failed');
         }
       }
     this.previous = current;
@@ -274,18 +292,19 @@ export class World extends DurableObject<WorldEnv> {
       outbound: 1_000_000,
       outboundAt: Date.now(),
       timeout: setTimeout(() => {
-        if (!session.id) ws.close(1008, 'Join timed out');
+        if (!session.id) this.closeGame(ws, 1008, 'Join timed out');
       }, 10_000),
     };
     this.sessions.set(ws, session);
     ws.addEventListener('message', (event) => {
+      if (!this.sessions.has(ws)) return;
       if (typeof event.data !== 'string') {
-        ws.close(1003, 'Text JSON required');
+        this.closeGame(ws, 1003, 'Text JSON required');
         return;
       }
       const bytes = new TextEncoder().encode(event.data).byteLength;
       if (bytes > 8192) {
-        ws.close(1009, 'Message too large');
+        this.closeGame(ws, 1009, 'Message too large');
         return;
       }
       this.bytesIn += bytes;
@@ -296,7 +315,7 @@ export class World extends DurableObject<WorldEnv> {
       }
       if (++session.count > 120) {
         this.observations.count('messageRateRejections');
-        ws.close(1008, 'Message rate exceeded');
+        this.closeGame(ws, 1008, 'Message rate exceeded');
         return;
       }
       let msg: ClientMessage;
@@ -304,7 +323,7 @@ export class World extends DurableObject<WorldEnv> {
         msg = JSON.parse(event.data);
         if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string') throw new Error();
       } catch {
-        ws.close(1007, 'Invalid JSON message');
+        this.closeGame(ws, 1007, 'Invalid JSON message');
         return;
       }
       session.lastSeen = now;
@@ -316,7 +335,7 @@ export class World extends DurableObject<WorldEnv> {
         ) {
           this.observations.count('joinRejections');
           this.send(ws, { type: 'notice', text: 'Incorrect server password.', tone: 'error' });
-          ws.close(1008, 'Incorrect server password');
+          this.closeGame(ws, 1008, 'Incorrect server password');
           return;
         }
         try {
@@ -349,7 +368,7 @@ export class World extends DurableObject<WorldEnv> {
         } catch (error) {
           this.observations.count('joinRejections');
           this.send(ws, { type: 'notice', text: (error as Error).message, tone: 'error' });
-          ws.close(1008, 'Join rejected');
+          this.closeGame(ws, 1008, 'Join rejected');
         }
         return;
       }
@@ -360,30 +379,18 @@ export class World extends DurableObject<WorldEnv> {
       }
       this.game.handle(session.id, msg);
     });
-    const closed = () => {
-      if (!this.sessions.delete(ws)) return;
-      clearTimeout(session.timeout);
-      if (session.id) {
-        this.observations.left(session.id, 'socket_closed');
-        this.voice.remove(session.id);
-        this.game.disconnect(session.id);
-        this.checkpoint();
-      }
-      this.stopIfEmpty();
-      this.ctx.waitUntil(this.observations.flush());
-    };
-    ws.addEventListener('close', closed);
-    ws.addEventListener('error', () => {
-      closed();
-      ws.close(1011, 'Connection failed');
-    });
+    ws.addEventListener('close', () => this.closeGame(ws, 1000, 'Connection closed'));
+    ws.addEventListener('error', () => this.closeGame(ws, 1011, 'Connection failed'));
   }
+
   async fetch(request: Request): Promise<Response> {
     try {
       return await this.route(request);
     } catch {
       console.error(JSON.stringify({ event: 'request_failed', path: new URL(request.url).pathname }));
       return json({ error: 'World request failed' }, 500);
+    } finally {
+      if (request.body && !request.body.locked) await request.body.cancel().catch(() => {});
     }
   }
   private async route(request: Request): Promise<Response> {
@@ -454,8 +461,10 @@ export class World extends DurableObject<WorldEnv> {
         const reader = request.body?.getReader();
         if (!reader) return json({ error: 'Send a world.json backup' }, 400);
         this.restoring = true;
+        let expired = false;
         const deadline = setTimeout(() => {
-          void reader.cancel();
+          expired = true;
+          void reader.cancel().catch(() => {});
         }, 10_000);
         const parts: Uint8Array[] = [];
         let length = 0;
@@ -470,14 +479,14 @@ export class World extends DurableObject<WorldEnv> {
             }
             parts.push(part.value);
           }
+          if (expired) return json({ error: 'Backup upload timed out' }, 408);
           const bytes = new Uint8Array(length);
           let offset = 0;
           for (const part of parts) {
             bytes.set(part, offset);
             offset += part.length;
           }
-          const world: unknown = JSON.parse(new TextDecoder().decode(bytes));
-          validateWorld(world);
+          const world = parseWorld(new TextDecoder().decode(bytes));
           // Validate and construct before touching the durable checkpoint.
           const replacement = new Game({ ...this.game.options, world });
           this.files.checkpoint('world', JSON.stringify(world));
@@ -548,27 +557,37 @@ export class World extends DurableObject<WorldEnv> {
       }
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
+      server.binaryType = 'arraybuffer';
       server.accept();
       if (voice) {
         this.voice.connect(server, ip);
       } else this.connectGame(server, ip);
       return new Response(null, { status: 101, webSocket: client });
     }
+    // These pages run Worker-first to retain page/referrer analytics (not for SPA routing).
     if (path === '/' || path === '/index.html') {
-      if (request.method === 'GET') {
+      const response = await this.env.ASSETS.fetch(request);
+      if (request.method === 'GET' && response.ok) {
         this.observations.page(request.headers.get('Referer') ?? undefined);
         this.ctx.waitUntil(this.observations.flush());
       }
-      return this.env.ASSETS.fetch(request);
+      return response;
     }
     return json({ error: 'Not found' }, 404);
   }
 }
 
 export default {
-  async fetch(request: Request, env: WorldEnv): Promise<Response> {
+  async fetch(request: Request, env: WorldEnv, ctx: ExecutionContext): Promise<Response> {
     try {
       const path = new URL(request.url).pathname;
+      // Keep the ingress upload alive until forwarding settles, even when the object
+      // rejects authorization before consuming the body. Cancellation stops the pump.
+      if (request.body) {
+        const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+        ctx.waitUntil(request.body.pipeTo(writable).catch(() => {}));
+        request = new Request(request, { body: readable });
+      }
       const response =
         ['/', '/index.html', '/ws', '/voice', '/health'].includes(path) || path.startsWith('/api/')
           ? await env.WORLD.get(env.WORLD.idFromName('official')).fetch(request)

@@ -2,10 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../server/game.ts';
 import { EVIDENCE_CAPACITY } from '../shared/catalog.ts';
-import { saveWorld, loadWorld } from './support/file-persistence.ts';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve, sep } from 'node:path';
+import { parseWorld, serializeWorld } from '../server/persistence.ts';
 function fixture() {
   let now = 100000;
   const game = new Game({ now: () => now });
@@ -131,13 +128,9 @@ test('evidence survives role changes, reconnect and validated world replacement;
   f.advance();
   f.game.applyJob(f.b, 'medic');
   f.game.disconnect(f.b.id);
-  const dir = mkdtempSync(join(tmpdir(), 'openrp-evidence-test-'));
-  t.after(() => {
-    assert.ok(resolve(dir).startsWith(resolve(tmpdir()) + sep) && dir.includes('openrp-evidence-test-'));
-    rmSync(dir, { recursive: true, force: true });
-  });
-  saveWorld(dir, f.game.exportWorld());
-  const restored = new Game({ world: loadWorld(dir), now: f.game.now });
+  let checkpoint = '';
+  checkpoint = serializeWorld(f.game.exportWorld());
+  const restored = new Game({ world: parseWorld(checkpoint), now: f.game.now });
   const b = restored.join('Ignored', f.token).player;
   assert.equal(b.evidence?.length, 2);
   assert.deepEqual(
@@ -149,8 +142,8 @@ test('evidence survives role changes, reconnect and validated world replacement;
   );
   const world = restored.exportWorld();
   world.profiles.find((p) => p.id === b.id)!.character!.evidence![1].id = b.evidence![0].id;
-  assert.throws(() => saveWorld(dir, world));
-  assert.equal(loadWorld(dir)?.profiles.find((p) => p.id === b.id)?.character?.evidence?.length, 2);
+  assert.throws(() => (checkpoint = serializeWorld(world)));
+  assert.equal(parseWorld(checkpoint)?.profiles.find((p) => p.id === b.id)?.character?.evidence?.length, 2);
 });
 
 test('switching equipment cancels a scanner seizure even if the officer switches back', () => {

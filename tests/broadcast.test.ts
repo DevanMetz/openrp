@@ -30,10 +30,18 @@ test('mayor broadcasts enforce real authority, custody, text limits and shared c
     mayor[status] = 0;
   }
   send('/BROADCAST Welcome <residents>');
-  assert.deepEqual(events, [{ event: {
-    type: 'chat', name: mayor.name, text: 'Welcome <residents>',
-    channel: 'broadcast', color: JOBS.mayor.color,
-  }, to: undefined }]);
+  assert.deepEqual(events, [
+    {
+      event: {
+        type: 'chat',
+        name: mayor.name,
+        text: 'Welcome <residents>',
+        channel: 'broadcast',
+        color: JOBS.mayor.color,
+      },
+      to: undefined,
+    },
+  ]);
   assert.equal(logs.length, 1, 'one log for the server-wide message');
   game.handle(mayor.id, { type: 'chat', text: '/ooc bypass' });
   assert.equal(events.length, 1, 'broadcast shares the chat cooldown');

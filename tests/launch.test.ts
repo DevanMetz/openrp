@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { WebSocket } from 'ws';
 import { Game } from '../server/game.ts';
-import { startServer } from './support/node-server.ts';
+import { startTestWorker as startServer } from './support/worker.ts';
 import { makeDelta, applyDelta } from '../shared/replication.ts';
 import { clientIP, JoinRate } from '../server/network.ts';
 import type { ServerMessage } from '../shared/types.ts';
@@ -62,9 +62,9 @@ async function connect(url: string, name: string, token?: string) {
 
 test(
   '80 simultaneous joined residents exceed both former slot caps and same-IP socket cap',
-  { timeout: 20_000 },
+  { timeout: 120_000 },
   async () => {
-    const app = await startServer({ port: 0, host: '127.0.0.1', production: true, persist: false });
+    const app = await startServer({});
     const clients: WebSocket[] = [];
     try {
       for (let i = 0; i < 80; i++) {
@@ -72,13 +72,13 @@ test(
         clients.push(client.ws);
         assert.ok(client.welcome, `Resident ${i} should join`);
       }
-      assert.equal(app.game.players.size, 80);
+      assert.equal((await app.status()).players, 80);
       const status = await (await fetch(`http://127.0.0.1:${app.port}/api/status`)).json();
       assert.equal(status.players, 80);
       assert.equal(status.maxPlayers, null);
       assert.ok(clients.every((ws) => ws.readyState === WebSocket.OPEN));
     } finally {
-      clients.forEach((ws) => ws.terminate());
+      clients.forEach((ws) => ws.close());
       await app.close();
     }
   },
@@ -87,10 +87,6 @@ test(
 test('moderation requires the operator secret, cleans up bans, and rejects banned reconnects', async () => {
   const key = 'test-only-operator-secret';
   const app = await startServer({
-    port: 0,
-    host: '127.0.0.1',
-    production: true,
-    persist: false,
     adminKey: key,
   });
   const base = `http://127.0.0.1:${app.port}`,
@@ -105,12 +101,12 @@ test('moderation requires the operator secret, cleans up bans, and rejects banne
       fetch(`${base}/api/admin`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ action, id: a.welcome!.id, reason: 'Test ban' }),
+        body: JSON.stringify({ action, id: a.welcome!.id, reason: '🙂'.repeat(40) }),
       });
     const closed = once(a.ws, 'close');
     assert.equal((await command('ban')).status, 200);
     await closed;
-    assert.equal(app.game.players.size, 0);
+    assert.equal((await app.status()).players, 0);
     const rejected = await connect(url, 'Moderation Subject', a.welcome.token);
     clients.push(rejected.ws);
     assert.equal(rejected.welcome, undefined);
@@ -120,7 +116,7 @@ test('moderation requires the operator secret, cleans up bans, and rejects banne
     clients.push(allowed.ws);
     assert.equal(allowed.welcome?.id, a.welcome.id);
   } finally {
-    clients.forEach((ws) => ws.terminate());
+    clients.forEach((ws) => ws.close());
     await app.close();
   }
 });

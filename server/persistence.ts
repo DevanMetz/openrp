@@ -245,3 +245,14 @@ export function validateWorld(value: unknown): asserts value is SavedWorld {
   if (!unique(objectIds) || !unique(value.doors.map((d) => d.id)))
     throw new Error('Duplicate object IDs in world save.');
 }
+
+/** Shared checkpoint codec for SQL storage and portable backup files. */
+export function parseWorld(text: string): SavedWorld {
+  const world: unknown = JSON.parse(text);
+  validateWorld(world);
+  return world;
+}
+export function serializeWorld(world: SavedWorld): string {
+  validateWorld(world);
+  return JSON.stringify(world);
+}

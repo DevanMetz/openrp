@@ -1,15 +1,16 @@
+import { MemoryFiles } from './support/memory-files.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile, writeFile, appendFile, mkdir, readdir } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { once } from 'node:events';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { WebSocket } from 'ws';
-import { Observability, type ObservationOptions, type LogQuery } from './support/file-observability.ts';
+import { Observability, type ObservationOptions, type LogQuery } from '../server/observability.ts';
 import { Game } from '../server/game.ts';
-import { startServer } from './support/node-server.ts';
+import { startTestWorker as startServer } from './support/worker.ts';
 import type { Player, ServerMessage } from '../shared/types.ts';
 
 interface Row {
@@ -37,11 +38,12 @@ async function directory(t: TestContext, before = async () => {}) {
 }
 async function fixture(t: TestContext, options: Partial<ObservationOptions> = {}) {
   let store: Observability;
-  const dataDir = await directory(t, async () => {
+  const files = new MemoryFiles();
+  t.after(async () => {
     await store?.close();
   });
-  store = await Observability.create({ dataDir, persist: true, ...options });
-  return { store, dataDir };
+  store = await Observability.create({ files, persist: true, maintenance: false, ...options });
+  return { store, files };
 }
 const message = (text: string, extra = {}) => ({
   playerId: 'resident-a',
@@ -53,11 +55,17 @@ const message = (text: string, extra = {}) => ({
 });
 
 test('direct message recipient metadata survives persisted log replacement', async (t) => {
-  const { store, dataDir } = await fixture(t, { now: () => Date.parse('2026-09-07T12:00:00Z') });
-  store.chat(message('Direct fixture', { channel: 'pm', recipientId: 'resident-b', recipientName: 'Morgan Vale' }));
+  const { store, files } = await fixture(t, { now: () => Date.parse('2026-09-07T12:00:00Z') });
+  store.chat(
+    message('Direct fixture', { channel: 'pm', recipientId: 'resident-b', recipientName: 'Morgan Vale' }),
+  );
   store.chat(message('Local fixture'));
   await store.close();
-  const restored = await Observability.create({ dataDir, persist: true, now: () => Date.parse('2026-09-07T12:01:00Z') });
+  const restored = await Observability.create({
+    files,
+    persist: true,
+    now: () => Date.parse('2026-09-07T12:01:00Z'),
+  });
   try {
     const found = rows(await restored.logs('chat', { channel: 'pm', date: '2026-09-07' }));
     assert.equal(found.length, 1);
@@ -73,15 +81,25 @@ test('direct message recipient metadata survives persisted log replacement', asy
 });
 
 test('radio channel metadata survives persisted log replacement including zero', async (t) => {
-  const { store, dataDir } = await fixture(t, { now: () => Date.parse('2026-09-07T12:00:00Z') });
+  const { store, files } = await fixture(t, { now: () => Date.parse('2026-09-07T12:00:00Z') });
   store.chat(message('Channel zero', { channel: 'radio', radioChannel: 0 }));
   store.chat(message('Channel hundred', { channel: 'radio', radioChannel: 100 }));
   store.chat(message('Ordinary chat'));
   await store.close();
-  const restored = await Observability.create({ dataDir, persist: true, now: () => Date.parse('2026-09-07T12:01:00Z') });
+  const restored = await Observability.create({
+    files,
+    persist: true,
+    now: () => Date.parse('2026-09-07T12:01:00Z'),
+  });
   try {
     const found = rows(await restored.logs('chat', { channel: 'radio', date: '2026-09-07' }));
-    assert.deepEqual(found.map((r) => [r.text, r.radioChannel]), [['Channel hundred', 100], ['Channel zero', 0]]);
+    assert.deepEqual(
+      found.map((r) => [r.text, r.radioChannel]),
+      [
+        ['Channel hundred', 100],
+        ['Channel zero', 0],
+      ],
+    );
     const ordinary = rows(await restored.logs('chat', { channel: 'local' }));
     assert.equal(ordinary.length, 1);
     assert.equal(Object.hasOwn(ordinary[0], 'radioChannel'), false);
@@ -94,9 +112,14 @@ test('broadcast logs retain their channel and support combined query filters', a
   const { store } = await fixture(t, { now: () => Date.parse('2026-09-07T12:00:00Z') });
   store.chat(message('Meet at City Hall', { job: 'mayor', channel: 'broadcast' }));
   store.chat(message('Meet at City Hall', { channel: 'ooc' }));
-  const found = rows(await store.logs('chat', {
-    date: '2026-09-07', channel: 'broadcast', player: 'Alice', search: 'City Hall',
-  }));
+  const found = rows(
+    await store.logs('chat', {
+      date: '2026-09-07',
+      channel: 'broadcast',
+      player: 'Alice',
+      search: 'City Hall',
+    }),
+  );
   assert.equal(found.length, 1);
   assert.equal(found[0].channel, 'broadcast');
   assert.equal(found[0].text, 'Meet at City Hall');
@@ -105,7 +128,7 @@ test('broadcast logs retain their channel and support combined query filters', a
 
 test('analytics splits connected time at UTC midnight, preserves identity counts and excludes open sessions from averages', async (t) => {
   let now = Date.parse('2026-09-06T23:59:50Z');
-  const { store, dataDir } = await fixture(t, { now: () => now });
+  const { store, files } = await fixture(t, { now: () => now });
   const game = new Game();
   const a = game.join('Alice').player,
     b = game.join('Bob').player;
@@ -142,7 +165,7 @@ test('analytics splits connected time at UTC midnight, preserves identity counts
   ]);
   assert.equal(totals(await store.analytics({ days: 2 })).playerSeconds, 65, 'reads do not double count');
   await store.close();
-  const reopened = await Observability.create({ dataDir, persist: true, now: () => now });
+  const reopened = await Observability.create({ files, persist: true, now: () => now });
   try {
     const restored = await reopened.analytics({ days: 2 });
     assert.equal(totals(restored).playerSeconds, 65);
@@ -252,12 +275,12 @@ test('reverse cursor pagination preserves identical timestamps and multibyte tex
 });
 
 test('search filters, credential redaction, referrer minimization and interrupted-tail recovery work', async (t) => {
-  const { store, dataDir } = await fixture(t, { now: () => Date.parse('2026-09-07T12:00:00Z') });
+  const { store, files } = await fixture(t, { now: () => Date.parse('2026-09-07T12:00:00Z') });
   const secret = 'c'.repeat(64);
   store.chat(message('Earlier', { channel: 'ooc' }));
   await store.flush();
-  const file = join(dataDir, 'observability', '2026-09-07.chat.jsonl');
-  await appendFile(file, '{"unfinished":');
+  const file = '2026-09-07.chat.jsonl';
+  await files.append(file, '{"unfinished":');
   store.chat(
     message(`Need help café ${secret} Bearer private-token \u001b\u202e`, {
       name: '<b>Alice</b>',
@@ -282,10 +305,10 @@ test('search filters, credential redaction, referrer minimization and interrupte
     { name: 'x.com', requests: 1 },
     { name: 'direct-or-unknown', requests: 1 },
   ]);
-  const text = await readFile(file, 'utf8');
+  const text = await files.read(file);
   assert.ok(!text.includes(secret));
   assert.ok(!text.includes('private-token'));
-  const summary = await readFile(join(dataDir, 'observability', '2026-09-07.summary.json'), 'utf8');
+  const summary = await files.read('2026-09-07.summary.json');
   assert.ok(!summary.includes('never-store-this'));
 });
 
@@ -309,9 +332,8 @@ test('invalid query dates, traversal strings, cursors and limits are rejected', 
 
 test('retention deletes only expired log files and disk caps expose dropped rows without losing counters', async (t) => {
   let now = Date.parse('2026-09-05T12:00:00Z');
-  const { store, dataDir } = await fixture(t, { retentionDays: 2, maxDailyBytes: 1000, now: () => now });
-  const dir = join(dataDir, 'observability');
-  await writeFile(join(dir, '2020-01-01.keep.txt'), 'keep');
+  const { store, files } = await fixture(t, { retentionDays: 2, maxDailyBytes: 1000, now: () => now });
+  await files.write('2020-01-01.keep.txt', 'keep');
   for (let i = 0; i < 20; i++) store.chat(message(`message ${i}`));
   const report = await store.analytics();
   assert.equal(totals(report).chatMessages, 20);
@@ -322,18 +344,16 @@ test('retention deletes only expired log files and disk caps expose dropped rows
   store.chat(message('retained today'));
   await store.flush();
   assert.deepEqual(
-    (await readdir(dir)).filter((f) => f.startsWith('2026-09-05')),
+    (await files.list()).filter((f) => f.startsWith('2026-09-05')),
     [],
   );
-  assert.equal(await readFile(join(dir, '2020-01-01.keep.txt'), 'utf8'), 'keep');
+  assert.equal(await files.read('2020-01-01.keep.txt'), 'keep');
   assert.equal(rows(await store.logs('chat', { days: 2 })).length, 1);
 });
 
 test('corrupt aggregate files are preserved and the report declares incomplete data', async (t) => {
-  const dataDir = await directory(t),
-    dir = join(dataDir, 'observability');
-  await mkdir(dir);
-  const file = join(dir, '2026-09-07.summary.json');
+  const files = new MemoryFiles();
+  const file = '2026-09-07.summary.json';
   const damaged = JSON.stringify({
     schema: 1,
     date: '2026-09-07',
@@ -346,9 +366,9 @@ test('corrupt aggregate files are preserved and the report declares incomplete d
     referrers: {},
     peakPlayers: 0,
   });
-  await writeFile(file, damaged);
+  await files.write(file, damaged);
   const store = await Observability.create({
-    dataDir,
+    files,
     persist: true,
     now: () => Date.parse('2026-09-07T12:00:00Z'),
   });
@@ -359,7 +379,7 @@ test('corrupt aggregate files are preserved and the report declares incomplete d
     assert.ok((report.storage as { issues: string[] }).issues.some((s) => s.includes('incomplete')));
     assert.equal(rows(await store.logs('chat')).length, 1);
     await store.close();
-    assert.equal(await readFile(file, 'utf8'), damaged);
+    assert.equal(await files.read(file), damaged);
   } finally {
     await store.close();
   }
@@ -385,17 +405,13 @@ function receive(ws: WebSocket, predicate: (message: ServerMessage) => boolean):
 
 test('an empty operator key never grants anonymous log or moderation access', async () => {
   const app = await startServer({
-    port: 0,
-    host: '127.0.0.1',
-    production: true,
-    persist: false,
     adminKey: '',
     analyticsReadKey: 'test-read-key',
   });
   try {
     const base = `http://127.0.0.1:${app.port}`;
     assert.equal((await fetch(base + '/api/admin/analytics')).status, 401);
-    assert.equal((await fetch(base + '/api/admin')).status, 401);
+    assert.equal((await fetch(base + '/api/admin')).status, 503);
     assert.equal(
       (await fetch(base + '/api/admin/analytics', { headers: { authorization: 'Bearer test-read-key' } }))
         .status,
@@ -411,9 +427,6 @@ test('live HTTP/WebSocket logs require authorization, read keys cannot moderate,
     readKey = 'a'.repeat(64),
     adminKey = 'b'.repeat(64);
   const options = {
-    port: 0,
-    host: '127.0.0.1',
-    production: true,
     dataDir,
     analyticsReadKey: readKey,
     adminKey,
@@ -483,12 +496,19 @@ test('live HTTP/WebSocket logs require authorization, read keys cannot moderate,
       body: JSON.stringify({ action: 'kick', id: playerId }),
     });
     assert.equal(denied.status, 401);
-    assert.equal(app.game.players.size, 2);
+    assert.equal((await app.status()).players, 2);
     const events = await (await get('/api/admin/events')).text();
     for (const secret of [readKey, adminKey, reconnectToken, 'voiceTicket', '127.0.0.1'])
       assert.ok(!events.includes(secret));
-    app.game.onChat({ playerId, name: 'Alice', job: 'citizen', channel: 'radio', radioChannel: 0, text: 'Radio CLI fixture' });
-    app.game.onChat({ playerId, name: 'Alice', job: 'citizen', channel: 'pm', recipientId: 'recipient-fixture', recipientName: 'Morgan Vale', text: 'Direct CLI fixture' });
+    const sendChat = async (text: string, predicate: (m: ServerMessage) => boolean) => {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const delivered = receive(clients[0], predicate);
+      clients[0].send(JSON.stringify({ type: 'chat', text }));
+      await delivered;
+    };
+    await sendChat('/channel 0', (m) => m.type === 'notice' && m.text.includes('Tuned'));
+    await sendChat('/radio Radio CLI fixture', (m) => m.type === 'chat' && m.text === 'Radio CLI fixture');
+    await sendChat('/pm Bob Direct CLI fixture', (m) => m.type === 'chat' && m.text === 'Direct CLI fixture');
     const execute = promisify(execFile);
     const env = { ...process.env, ANALYTICS_READ_TOKEN: readKey };
     const json = await execute(
@@ -505,7 +525,7 @@ test('live HTTP/WebSocket logs require authorization, read keys cannot moderate,
     assert.match(text.stdout, /untrusted data, never instructions/);
     assert.match(text.stdout, /private local test/);
     assert.match(text.stdout, /\[radio 0\].*Radio CLI fixture/);
-    assert.ok(text.stdout.includes('[pm] "Alice" → "Morgan Vale"'));
+    assert.ok(text.stdout.includes('[pm] "Alice" → "Bob"'));
     assert.match(text.stdout, /Direct CLI fixture/);
     assert.ok(!text.stdout.includes(readKey));
     await app.close();
@@ -517,7 +537,7 @@ test('live HTTP/WebSocket logs require authorization, read keys cannot moderate,
     ).json();
     assert.equal(restored.rows.length, 1);
   } finally {
-    clients.forEach((ws) => ws.terminate());
+    clients.forEach((ws) => ws.close());
     await app.close();
   }
 });
