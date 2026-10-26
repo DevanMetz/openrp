@@ -1,10 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve, sep } from 'node:path';
 import { Game } from '../server/game.ts';
-import { saveWorld, loadWorld } from '../server/persistence.ts';
+import { parseWorld, serializeWorld } from '../server/persistence.ts';
 
 function fixture() {
   const game = new Game({ now: () => 100_000 });
@@ -59,19 +56,15 @@ test('tips enforce reach, occlusion, custody, death and correct target kind', ()
 });
 
 test('tip jars respect purchase limits and offline tips survive a world replacement', (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'openrp-tip-test-'));
-  t.after(() => {
-    assert.ok(resolve(dir).startsWith(resolve(tmpdir()) + sep) && dir.includes('openrp-tip-test-'));
-    rmSync(dir, { recursive: true, force: true });
-  });
+  let checkpoint = '';
   const { game, owner, donor, jar } = fixture();
   game.buy(owner.player, 'tipjar');
   assert.equal(owner.player.money, 1500, 'existing jar reserves the one-jar allowance');
   game.disconnect(owner.player.id);
   game.donate(donor, jar.id, 73);
   assert.equal(donor.money, 1427);
-  saveWorld(dir, game.exportWorld());
-  const restored = new Game({ world: loadWorld(dir), now: game.now });
+  checkpoint = serializeWorld(game.exportWorld());
+  const restored = new Game({ world: parseWorld(checkpoint), now: game.now });
   assert.equal(restored.entities.get(jar.id)?.kind, 'tipjar');
   const returning = restored.join('Ignored', owner.token).player;
   assert.equal(returning.money, 1573);

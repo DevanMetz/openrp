@@ -1,5 +1,6 @@
-import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import { randomToken } from './security.ts';
+import { createHash, scrypt, timingSafeEqual } from 'node:crypto';
+import type { HttpRequest as IncomingMessage, HttpResponse as ServerResponse } from './http.ts';
 import type { Game, Profile } from './game.ts';
 
 export interface Account {
@@ -25,7 +26,7 @@ export function profileForToken(game: Game, token: unknown): Profile | undefined
     : undefined;
 }
 async function derive(password: string, salt: string): Promise<Buffer> {
-  // OWASP's 32 MiB scrypt configuration; async work keeps the simulation thread responsive.
+  // Preserve the existing scrypt parameters and saved hash format under nodejs_compat.
   return new Promise((done, fail) =>
     scrypt(password, salt, 32, { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 }, (error, key) =>
       error ? fail(error) : done(key),
@@ -33,7 +34,7 @@ async function derive(password: string, salt: string): Promise<Buffer> {
   );
 }
 async function encodePassword(password: string): Promise<string> {
-  const salt = randomBytes(16).toString('hex');
+  const salt = randomToken(16);
   return `scrypt$32768$8$3$${salt}$${(await derive(password, salt)).toString('hex')}`;
 }
 class AccountError extends Error {
@@ -146,7 +147,7 @@ export class Accounts {
         if (profile && this.banned(profile.id))
           throw new AccountError(403, 'This identity is banned from the server.');
         profile ??= {
-          id: randomUUID(),
+          id: crypto.randomUUID(),
           name: username,
           money: this.game.options.startingMoney,
           tokenHash: '',
@@ -170,7 +171,7 @@ export class Accounts {
   private issue(profile: Profile, account?: Account): string {
     const previousHash = profile.tokenHash,
       previousAccount = profile.account;
-    const token = randomBytes(32).toString('hex');
+    const token = randomToken(32);
     this.game.profiles.delete(previousHash);
     profile.tokenHash = tokenHash(token);
     if (account) profile.account = account;

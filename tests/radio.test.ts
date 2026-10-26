@@ -20,7 +20,11 @@ test('text radio isolates tuned recipients, rejects invalid tuning and resets af
     events.length = 0;
     game.handle(p.id, { type: 'chat', text });
   };
-  const recipients = () => events.filter(({ e }) => e.type === 'chat').map(({ to }) => to).sort();
+  const recipients = () =>
+    events
+      .filter(({ e }) => e.type === 'chat')
+      .map(({ to }) => to)
+      .sort();
   send(a, '/radio Default channel');
   assert.deepEqual(recipients(), [a.id, b.id, c.id].sort());
   send(a, '/channel 100');

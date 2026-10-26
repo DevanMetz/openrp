@@ -1,0 +1,6 @@
+# Copy to .dev.vars; keep values private. Set production secrets with wrangler secret put.
+ADMIN_TOKEN=
+ANALYTICS_READ_TOKEN=
+SERVER_PASSWORD=
+# Same-host origins work locally without an allowlist.
+ALLOWED_ORIGINS=

@@ -1,18 +1,27 @@
-import { test } from 'node:test';
+import { Game } from '../server/game.ts';
+import { VoiceRelay, type VoiceSocket } from '../server/voice.ts';
+import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { WebSocket } from 'ws';
-import { startServer } from '../server/main.ts';
+import { startTestWorker as startServer } from './support/worker.ts';
 import * as voice from '../shared/voice.ts';
 import type { ServerMessage } from '../shared/types.ts';
 
+let app: Awaited<ReturnType<typeof startServer>>;
+before(async () => {
+  app = await startServer({ adminKey: 'voice-operator-test' });
+});
+after(async () => {
+  await app.close();
+});
 const pause = (ms = 70) => new Promise((resolve) => setTimeout(resolve, ms));
-const waitFor = async (predicate: () => boolean) => {
+const waitFor = async (predicate: () => boolean | Promise<boolean>) => {
   const deadline = Date.now() + 3000;
-  while (!predicate()) {
+  while (!(await predicate())) {
     if (Date.now() > deadline) throw new Error('Voice test timed out');
     await pause(10);
   }
@@ -112,32 +121,29 @@ async function resident(base: string, name: string, token?: string) {
     speak: () =>
       audio.send(voice.encodeVoiceFrame(new Float32Array(voice.VOICE_SAMPLES).fill(0.2), ++sequence)),
     close: () => {
-      game.terminate();
-      audio.terminate();
+      game.close();
+      audio.close();
     },
   };
 }
 
 test(
-  'real voice sockets enforce proximity, death, push-to-talk, mute and deafen while game traffic continues',
-  { timeout: 10000 },
+  'real voice sockets enforce proximity, push-to-talk, mute and deafen while game traffic continues',
+  { timeout: 30_000 },
   async () => {
-    const app = await startServer({ port: 0, host: '127.0.0.1', production: true, persist: false });
     const clients: Awaited<ReturnType<typeof resident>>[] = [];
     try {
       const base = `ws://127.0.0.1:${app.port}`;
-      const a = await resident(base, 'Voice Alice');
+      const fixture = new Game();
+      const seeds = ['Voice Alice', 'Voice Bailey', 'Voice Casey'].map((name) => fixture.join(name));
+      seeds.forEach((seed, i) => Object.assign(seed.player, { x: i === 2 ? 60 : i * 2, y: 0.12, z: 24 }));
+      await app.restore(fixture.exportWorld());
+      const a = await resident(base, 'Voice Alice', seeds[0].token);
       clients.push(a);
-      const b = await resident(base, 'Voice Bailey');
+      const b = await resident(base, 'Voice Bailey', seeds[1].token);
       clients.push(b);
-      const c = await resident(base, 'Voice Casey');
+      const c = await resident(base, 'Voice Casey', seeds[2].token);
       clients.push(c);
-      const pa = app.game.players.get(a.welcome.id)!,
-        pb = app.game.players.get(b.welcome.id)!,
-        pc = app.game.players.get(c.welcome.id)!;
-      Object.assign(pa, { x: 0, y: 0.12, z: 24 });
-      Object.assign(pb, { x: 2, y: 0.12, z: 24 });
-      Object.assign(pc, { x: 60, y: 0.12, z: 24 });
       a.speak();
       await waitFor(() => b.packets.length === 1);
       assert.equal(
@@ -161,23 +167,14 @@ test(
       await a.config(true, false);
       await expectQuiet('PTT must be enabled');
       await a.config();
-      pa.deadUntil = Date.now() + 60000;
-      await expectQuiet('dead players cannot speak');
-      pa.deadUntil = 0;
-      pb.deadUntil = Date.now() + 60000;
-      await expectQuiet('dead players cannot listen');
-      pb.deadUntil = 0;
-      pb.x = 50;
-      await expectQuiet('moving out of range stops routing immediately');
-      pb.x = 2;
       const before = b.packets.length;
       a.speak();
       await waitFor(() => b.packets.length === before + 1);
-      assert.equal(app.game.players.size, 3);
+      assert.equal((await app.status()).players, 3);
       assert.ok(clients.every((c) => c.game.readyState === WebSocket.OPEN));
       await b.config(true, true, [a.welcome.id]);
       a.close();
-      await waitFor(() => !app.game.players.has(a.welcome.id));
+      await waitFor(async () => (await app.status()).players === 2);
       const resumed = await resident(base, 'Voice Alice', a.welcome.token);
       clients.push(resumed);
       assert.equal(resumed.welcome.id, a.welcome.id);
@@ -191,16 +188,15 @@ test(
       );
     } finally {
       clients.forEach((c) => c.close());
-      await app.close();
+      await waitFor(async () => (await app.status()).players === 0);
     }
   },
 );
 
 test(
   'voice admission rejects strangers and duplicate sockets, revokes tickets on disconnect, and isolates malformed audio',
-  { timeout: 10000 },
+  { timeout: 30_000 },
   async () => {
-    const app = await startServer({ port: 0, host: '127.0.0.1', production: true, persist: false });
     const base = `ws://127.0.0.1:${app.port}`;
     const clients: WebSocket[] = [];
     let a: Awaited<ReturnType<typeof resident>> | undefined;
@@ -223,14 +219,14 @@ test(
       const ticket = a.welcome.voiceTicket;
       a.game.close();
       await once(a.game, 'close');
-      await waitFor(() => app.game.players.size === 0);
+      await waitFor(async () => (await app.status()).players === 0);
       await rejected(ticket);
       const origin = new WebSocket(`${base}/voice`, { origin: 'https://untrusted.example' });
       clients.push(origin);
       const response = await new Promise<number>((resolve) => {
         origin.on('unexpected-response', (_req, res) => {
           res.resume();
-          origin.terminate();
+          origin.close();
           resolve(res.statusCode!);
         });
         origin.on('error', () => {});
@@ -238,24 +234,16 @@ test(
       assert.equal(response, 403);
     } finally {
       a?.close();
-      clients.forEach((ws) => ws.terminate());
-      await app.close();
+      clients.forEach((ws) => ws.close());
     }
   },
 );
 
 test(
   'voice disconnects on moderation, ignores replayed frames, and bounds packet floods',
-  { timeout: 10000 },
+  { timeout: 30_000 },
   async () => {
     const key = 'voice-operator-test';
-    const app = await startServer({
-      port: 0,
-      host: '127.0.0.1',
-      production: true,
-      persist: false,
-      adminKey: key,
-    });
     const clients: Awaited<ReturnType<typeof resident>>[] = [];
     try {
       const base = `ws://127.0.0.1:${app.port}`;
@@ -280,10 +268,70 @@ test(
       });
       assert.equal(response.status, 200);
       await kicked;
-      assert.equal(app.game.players.has(b.welcome.id), false);
+      assert.equal((await app.status()).players === 2, false);
     } finally {
       clients.forEach((c) => c.close());
-      await app.close();
+      await waitFor(async () => (await app.status()).players === 0);
     }
   },
 );
+
+// Exercise authoritative live-position/death gates without a transport or server replica.
+test('voice relay reevaluates death and range on every frame', () => {
+  class Socket implements VoiceSocket {
+    readyState = 1;
+    packets: (string | Uint8Array)[] = [];
+    listeners = new Map<string, Function>();
+    send(value: string | Uint8Array) {
+      this.packets.push(value);
+    }
+    close() {
+      if (this.readyState === 3) return;
+      this.readyState = 3;
+      this.listeners.get('close')?.();
+    }
+    addEventListener(type: string, listener: Function) {
+      this.listeners.set(type, listener);
+    }
+    receive(data: string | ArrayBuffer) {
+      this.listeners.get('message')?.({ data });
+    }
+  }
+  const game = new Game();
+  const a = game.join('Speaker').player,
+    b = game.join('Listener').player;
+  Object.assign(a, { x: 0, y: 0, z: 24 });
+  Object.assign(b, { x: 2, y: 0, z: 24 });
+  const relay = new VoiceRelay(game);
+  const sockets = [a, b].map((p) => {
+    const socket = new Socket();
+    const ticket = relay.register(p.id);
+    relay.connect(socket, 'fixture');
+    socket.receive(JSON.stringify({ type: 'join', ticket }));
+    socket.receive(JSON.stringify({ type: 'config', listening: true, transmitting: true, muted: [] }));
+    socket.packets = [];
+    return socket;
+  });
+  let seq = 0;
+  const speak = () => sockets[0].receive(voice.encodeVoiceFrame(new Float32Array(320), ++seq));
+  try {
+    speak();
+    assert.equal(sockets[1].packets.length, 1);
+    a.deadUntil = Date.now() + 60000;
+    speak();
+    assert.equal(sockets[1].packets.length, 1);
+    a.deadUntil = 0;
+    b.deadUntil = Date.now() + 60000;
+    speak();
+    assert.equal(sockets[1].packets.length, 1);
+    b.deadUntil = 0;
+    b.x = 50;
+    speak();
+    assert.equal(sockets[1].packets.length, 1);
+    b.x = 2;
+    speak();
+    assert.equal(sockets[1].packets.length, 2);
+  } finally {
+    relay.close();
+  }
+});

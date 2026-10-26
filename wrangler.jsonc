@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "openrp",
+  "main": "server/worker.ts",
+  "compatibility_date": "2026-10-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/", "/index.html", "/ws", "/voice", "/health", "/api/*"],
+  },
+  "observability": { "enabled": true, "traces": { "enabled": true } },
+  "durable_objects": { "bindings": [{ "name": "WORLD", "class_name": "World" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["World"] }],
+  "routes": [
+    { "pattern": "openrp.dev", "custom_domain": true },
+    { "pattern": "www.openrp.dev", "custom_domain": true },
+  ],
+  "vars": {
+    "SERVER_NAME": "OpenRP | Union District",
+    "STARTING_MONEY": "1500",
+    "SALARY_SECONDS": "60",
+    "JAIL_SECONDS": "60",
+    "LOG_RETENTION_DAYS": "30",
+    "ALLOWED_ORIGINS": "https://openrp.dev,https://www.openrp.dev",
+  },
+}

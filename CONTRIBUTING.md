@@ -4,7 +4,7 @@ OpenRP is a small TypeScript game. Issues, bug fixes, original assets, new props
 
 1. Fork the repository and create a branch for a focused change.
 2. Run `npm ci` and `npm run dev`.
-3. Put authoritative rules in `server/game.ts`; share collision and movement in `shared/`.
+3. Open http://localhost:8787. Put authoritative rules in `server/game.ts`; share collision and movement in `shared/`.
 4. Run `npm run check`. Add regression tests for changes to game rules, permissions, money or networking.
 5. Test graphical or input changes in a desktop browser. Include a screenshot and the steps you tried in the pull request.
 
@@ -12,4 +12,6 @@ Use existing jobs, map and item definitions before introducing a new framework. 
 
 New art must be original or clearly licensed for redistribution. Include attribution and the license for external assets. Do not submit extracted Valve/Garry’s Mod models, sounds, textures or proprietary map files.
 
-Keep `data/`, `.env`, credentials, logs, generated builds and `node_modules/` out of commits. Describe incomplete behavior plainly. By submitting code, you agree to make your contribution available under this repository’s MIT license.
+Keep `data/`, `.env`, `.dev.vars`, `.wrangler/`, credentials, logs, generated builds and `node_modules/` out of commits. Describe incomplete behavior plainly. By submitting code, you agree to make your contribution available under this repository’s MIT license.
+
+Production runs `server/worker.ts`; platform-independent rules remain in Game and shared modules. Regenerate binding declarations with `npm run cf-typegen` after config changes. Tests include the actual Worker via Wrangler with isolated local SQLite persistence; clock-controlled game tests call the shared Game directly. Do not introduce a second server implementation or production test endpoints. See [hosting](docs/HOSTING.md).

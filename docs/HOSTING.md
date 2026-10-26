@@ -1,83 +1,57 @@
-# Hosting OpenRP
+# Cloudflare hosting
 
-Run `npm ci`, `npm run build`, then `npm start`. The Node process serves the client, `/ws` for gameplay and `/voice` for proximity audio on one port. Forward both WebSocket paths through your reverse proxy. `/health` is the deployment health check. `/api/status` reports the live population; `maxPlayers: null` means no slot cap. A static website host cannot run the simulation.
+OpenRP runs as one Worker (`openrp`) with Workers Static Assets and one SQLite-backed `World` Durable Object, selected by `idFromName('official')`. Both custom domains, `openrp.dev` and `www.openrp.dev`, use that same world. The Worker serves the Vite client; the object terminates `/ws` and `/voice`, owns accounts, moderation and analytics, and runs the existing Game simulation. No Node process, container, volume, D1 database or external service is required.
 
-## Railway
+## Local development
 
-Connect the GitHub repository, attach a volume at `/app/data`, keep one replica and serverless sleeping disabled, and set the health-check path to `/health`. Enable **Wait for CI**. Dockerfile detection supplies build/start commands. The entrypoint gives the mounted directory to `node` and drops root privileges before starting the game. New Railway services use dashboard settings because first-time legacy config-as-code adoption closed in August 2026.
+Use Node 22.12 or newer (24 recommended), `npm ci`, and `npm run dev`. Open http://localhost:8787. The command builds the three HTML entry points, watches the client and runs `wrangler dev`. Refresh after a client rebuild. Wrangler stores local state in ignored `.wrangler/`; deleting it resets the local world. Copy `.dev.vars.example` to `.dev.vars` for private local keys. Same-host requests are accepted locally even when the production origin allowlist is configured.
 
-Set **Teardown → Draining** to **30 seconds** and deployment overlap to **0 seconds**. The equivalent service variables are `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=30` and `RAILWAY_DEPLOYMENT_OVERLAP_SECONDS=0`. Railway's default draining window is zero; the explicit window gives the server time to finish its world checkpoint and pending logs after SIGTERM. Keep the existing volume attached during every release. See [Railway deployment teardown](https://docs.railway.com/deployments/deployment-teardown).
+`npm run build` builds the client. `npm run cf-typegen` regenerates binding types from Wrangler configuration; installed Workers types supply platform declarations. `npm run check` typechecks, runs regression and real Worker tests, builds, exercises the built Worker and performs a credential-free dry-run deploy. Tests need permission to bind loopback ports. `node --import tsx scripts/load.ts 100 15` runs an isolated local Worker load scenario; its driver memory/lag are not Worker metrics or a production capacity promise.
 
-| Variable               | Default                 | Purpose                                                             |
-| ---------------------- | ----------------------- | ------------------------------------------------------------------- |
-| `PORT`                 | `3000`                  | HTTP and WebSocket port                                             |
-| `HOST`                 | `0.0.0.0`               | Bind address                                                        |
-| `SERVER_NAME`          | `OpenRP Union District` | In-game name                                                        |
-| `DATA_DIR`             | `./data`                | Persistent directory; `/app/data` on Railway                        |
-| `STARTING_MONEY`       | `1500`                  | New identity wallet                                                 |
-| `SALARY_SECONDS`       | `60`                    | Payday interval                                                     |
-| `JAIL_SECONDS`         | `60`                    | Sentence length                                                     |
-| `ALLOWED_ORIGINS`      | same host               | Exact comma-separated browser origins                               |
-| `TRUST_PROXY`          | `none`                  | Use `railway` only behind Railway ingress to trust its `X-Real-IP`  |
-| `SERVER_PASSWORD`      | empty                   | Optional shared join password                                       |
-| `LOG_RETENTION_DAYS`   | `30`                    | Retained UTC calendar days for analytics and text chat (1–90)       |
-| `ANALYTICS_READ_TOKEN` | empty                   | Optional private read-only bearer token; never expose to the client |
+## Deploy on your Cloudflare account
 
-There is no `MAX_PLAYERS` setting or fixed total admission limit. Job limits, 20 props/player, 240 world entities, and abuse protections still apply. Active residents do not count toward the eight pending, unjoined sockets/IP. Connection churn is limited to 120 attempts/IP/minute for each socket path. Gameplay messages are limited to 8 KiB and 120/second per socket. Heartbeats remove dead sockets; slow consumers cannot accumulate unbounded buffers.
+Authenticate Wrangler, change or remove the two `routes` custom-domain entries in `wrangler.jsonc` for your own zone, and update `ALLOWED_ORIGINS`. Leave the account ID out of the config; select your account through Wrangler or `CLOUDFLARE_ACCOUNT_ID`. Set private keys interactively:
 
-## Voice hosting
+```sh
+npx wrangler secret put ADMIN_TOKEN
+npx wrangler secret put ANALYTICS_READ_TOKEN
+# Only for a password-protected game:
+npx wrangler secret put SERVER_PASSWORD
+npm run check
+npm run deploy
+```
 
-Proximity voice runs on the same host and needs no TURN service, extra ports, API key or subscription. Browsers require HTTPS or localhost for microphone access and AudioWorklet. Railway with the existing Cloudflare HTTPS/WSS proxy supports both paths. Deploy the client and server together: protocol 3 adds a private voice ticket to the welcome message.
+Generate independent high-entropy operator and read tokens privately; never put values in command arguments, config, browser code or Git. Unset operator access returns 503; incorrect credentials return 401. The read token only grants analytics/chat/event reads. Removing SERVER_PASSWORD opens joins. Non-secret settings are `SERVER_NAME`, `STARTING_MONEY`, `SALARY_SECONDS`, `JAIL_SECONDS`, `LOG_RETENTION_DAYS` and comma-separated `ALLOWED_ORIGINS`.
 
-Voice uses mono 16 kHz PCM in 20 ms frames, about **32 KB/s per active talker per nearby listener**, plus framing. It is deliberately independent of game snapshots. Relaying only within 28 metres, per-player mute, no self echo, dead-player suppression and tight audio backpressure reduce traffic, but simultaneous talkers in a crowded square still multiply egress. There is no player slot cap; this does not promise unlimited audio capacity. Monitor bandwidth as well as CPU. Opus/SFU transport is a future scaling option.
+The SQLite migration provisions the `World` class on first deploy. Preserve its class name, migration history, binding and instance name on subsequent releases. `workers_dev: true` also exposes a workers.dev address. The custom domains target the Worker directly. The known apex DNS points to a removed Railway application: remove that obsolete CNAME if it conflicts with adding the Workers Custom Domain. Check the www record for conflicts too. See [Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/). No DNS changes or production deployment have been verified by this migration.
 
-The server checks each audio recipient against current authoritative positions. Session-specific voice tickets are revoked when the game session ends or an operator removes a resident. Malformed audio and voice floods close the voice socket without disrupting that player's game connection. Voice media is not written to disk. Transport encryption terminates at the host/proxy; do not describe this as end-to-end encrypted.
+`.github/workflows/ci.yml` validates Node 22 and 24, including a dry-run deploy. `.github/workflows/deploy.yml` checks and deploys pushes to main only when both `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets exist. Otherwise it succeeds with a skip notice. These secrets have not been configured here. The API token needs appropriate Worker deployment and zone access; configure application secrets separately with Wrangler.
 
-## Domain and TLS
+## World storage and recovery
 
-Add the custom domain with target port 3000 in Railway. Copy both its CNAME target and ownership-verification TXT record into Cloudflare. Cloudflare proxying is supported. In Railway mode the server accepts CF-Connecting-IP only when Railway reports a peer inside Cloudflare's published networks. Direct callers cannot spoof that header. Keep Cloudflare-to-origin TLS enabled; verify the origin certificate and HTTPS before opening play.
+World JSON, bans and bounded daily analytics/chat/event streams are stored in SQLite rows inside the world object. Blob rows are chunked to at most 64 KiB so a large world or summary never depends on a single large storage value. World replacement is transactional. The strict existing save validator runs on load, checkpoint and import. Invalid state fails closed instead of silently starting an empty economy.
 
-Set `ALLOWED_ORIGINS=https://openrp.dev,https://www.openrp.dev` on the official host. Never publish the Vite development server.
+The simulation runs at 30 Hz and sends snapshots at 15 Hz only while residents are joined. The object uses standard WebSocket acceptance, deliberately keeping the instance awake for the simulation. It checkpoints every three seconds and on joins, disconnects and operator/account changes. When the last player leaves it checkpoints, flushes logs and stops its timers. Redeployment disconnects clients; they reconnect using their existing credentials. Abrupt failure can lose the last few seconds and unfinished session-completion accounting. A Durable Object alarm at each UTC day boundary enforces log retention while idle. No process signals or draining settings apply.
 
-## Persistence
+The old Railway volume is unavailable. No world, accounts, bans or historic logs have been migrated. A new object starts with a new world. If you have a private `world.json` backup, an authenticated operator may POST it to `/api/admin/world` when no gameplay sockets are connected. The endpoint streams at most 32 MiB, validates the complete save and constructs a replacement Game before atomically replacing storage. Invalid backups leave current state intact. It restores world profiles and objects, not old ban lists or analytics. GET on the same endpoint exports a current world backup. Use a private client that sends `Authorization: Bearer` from your environment, never a token in a URL. Saved account hashes are compatible with the existing scrypt format; reconnect hashes still require the original browser token. Keep backups private, including hashes, character details and chat in any separately exported logs.
 
-The versioned `world.json` checkpoint stores names, wallets, credential hashes, character inventory and ammunition, vitals, position, job cooldowns, property keys, city laws and world entities together. Props retain IDs, ownership, rotation, paint, frozen/fading state and health; businesses retain prices, stock and cash. Saving them in one atomic file keeps a wallet change and its corresponding item or stock change together. The server saves on joins, disconnects, every 10 seconds and graceful shutdown. A hard kill or power loss can lose up to the last 10 seconds; stop the process gracefully for updates. Corrupt or unsupported saves fail startup instead of silently starting an empty world.
-
-On the first startup without `world.json`, existing `profiles.json` wallets and credentials are imported. The legacy file is left untouched as a migration backup; after migration, `world.json` is authoritative. Back up the entire volume and stop the server before restoring it. Keep `DATA_DIR` on the same persistent volume across deployments. Raw reconnect credentials stay in the player's browser. Accounts additionally save a username and salted password hash in the same checkpoint; signing in recovers the same character after clearing browser storage. Unclaimed guests still require their original browser credential. Keep checkpoints and backups private.
-
-**Initial upgrade from versions before 0.4.0:** those versions never saved inventory, props, businesses or property to disk. Profile migration cannot reconstruct that live state once the old process stops. The official 0.3.0 → 0.4.0 deployment preserved saved wallets, but no pre-upgrade world snapshot was captured, so its unsaved items and builds were not carried over. Full-world recovery applies to checkpoints written by 0.4.0 and later; retaining an old `profiles.json` file alone does not preserve a world.
-
-The volume also stores identity bans and a generated operator key. Keep it private. Run **one game process per world/data directory**. Replicas would create separate worlds. Ordinary disconnects leave props, businesses and property in the world and continue counting toward owner/world limits. Offline shop sales credit the saved owner's wallet. Production runs while the server is running, without catch-up income for server downtime. Held props are released and in-progress reloads/lockpicks are cancelled on reconnect. Custody, wanted and death timers remain enforced. A saved job resumes if an active slot is available, otherwise the resident becomes a Citizen while retaining inventory. Operator kick/ban cleanup and explicit in-game removal still delete objects.
-
-## Username and password accounts
-
-Accounts work out of the box on the same game server, alongside guest play. No email service, separate database or authentication provider is needed. Serve the public game over HTTPS, including the same-origin `POST /api/account` route. The optional `SERVER_PASSWORD` remains a separate admission restriction for private hosts.
-
-Account registration claims the current guest when its reconnect credential is supplied. Registration, password login and logout checkpoint a rotated session credential before reporting success. Successful login closes the previous live session; logout revokes that credential without deleting belongings. A failed checkpoint rolls back the account change. Existing 0.4 worlds gain the new city geometry while retaining existing property IDs, inventories and props. Keep the persistent volume and stop gracefully as with any other update; do not roll back to an older executable after saving in the expanded map without restoring its matching backup.
-
-Usernames are case-insensitive and passwords are stored only as salted scrypt hashes. No email or automated forgotten-password reset is implemented. Passwords and credential hashes are excluded from game snapshots and analytics. A new account initially uses its username as its public roleplay name; the player can change that with `/rpname`. Bans continue to apply to the same character identity after guest conversion or password login.
-
-## Operator commands
-
-Run inside the container using Railway SSH or the dashboard Console:
+Operator commands use `ADMIN_TOKEN` and default to https://openrp.dev:
 
 ```sh
 node --import tsx scripts/admin.ts list
-node --import tsx scripts/admin.ts kick RESIDENT_ID Repeated spawn camping
-node --import tsx scripts/admin.ts ban RESIDENT_ID Prop blocking
+node --import tsx scripts/admin.ts kick RESIDENT_ID reason
+node --import tsx scripts/admin.ts ban RESIDENT_ID reason
 node --import tsx scripts/admin.ts unban RESIDENT_ID
-node --import tsx scripts/admin.ts cleanup RESIDENT_ID Abandoned setup
-node --import tsx scripts/admin.ts announce Update in five minutes. Inventories and the world will be saved.
+node --import tsx scripts/admin.ts cleanup RESIDENT_ID reason
+node --import tsx scripts/admin.ts announce message
 ```
 
-`list` includes owners with placed entities or property, their public IDs, counts, and online/offline status. `cleanup` removes only the selected owner's placed entities, property ownership and shared keys, including while that owner is offline. It preserves wallets and carried inventory, leaves other owners' objects in place, and saves immediately. Use it to clear abandoned setups without resetting the world. Cleanup is an operator command; the analytics read key cannot invoke it.
+Set `OPENRP_ADMIN_URL=http://localhost:8787` for local operations. Remote CLI access requires HTTPS and does not follow redirects. Analytics uses its own environment token; see [OBSERVABILITY.md](OBSERVABILITY.md).
 
-The CLI reads the private mounted key and calls the authenticated endpoint on loopback. The key never enters the browser or repository. Bans persist immediately and apply to character identities, whether guests or accounts; fresh identities can evade them. Starting funds and elections are not Sybil-resistant. Moderate the public alpha and use the optional password if needed.
+## Runtime limits and cost
 
-## Analytics and chat logs
+One world is one authoritative object: CPU, memory, storage and fan-out constrain capacity even without an application player slot cap. Long-lived active WebSockets and simulation timers keep it running and incur usage. Scrypt password work, physics, snapshots and voice share the instance's resources. Measure on your account before making capacity promises. Consult current [Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [Durable Objects limits](https://developers.cloudflare.com/durable-objects/platform/limits/), [pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/) and [Static Assets billing](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/); no fixed price or throughput is promised here.
 
-Daily analytics and text chat persist under `DATA_DIR/observability` on the volume, with 30-day automatic retention. Use `scripts/observe.ts` from the Railway Console, or provision the separate read-only key for private remote reads. The key does not authorize moderation actions. For commands, filtering, metric definitions, storage caps and privacy details, see [OBSERVABILITY.md](OBSERVABILITY.md). No audio is recorded.
+Workers sockets do not expose Node's `bufferedAmount` or server-initiated protocol ping. Gameplay uses existing client input/ping activity: after five seconds without inbound activity, snapshots pause and require a full resync; after thirty seconds the session closes. Server-initiated closes release simulation state immediately, even without a peer close acknowledgement. A per-session byte budget bounds gameplay delivery and forces snapshot resync when exhausted. Cloudflare handles incoming protocol ping automatically. Voice remains tied to the gameplay heartbeat, validates and rate-limits frames, bounds aggregate delivery per listener with a byte budget and drops excess live frames. These bounds cannot measure a socket's actual network backlog. No new wire protocol is introduced; version 0.6.5/protocol 7 remain unchanged.
 
-## Verification and capacity
-
-Run `npm run check`, then test two browsers on the public hostname, job changes, props, chat, reconnects, and wallets across a restart. Run `npx tsx scripts/load.ts 100 15` for an isolated local synthetic movement check. No slot cap is a product behavior, not unlimited hardware or bandwidth. Watch CPU, memory, egress and gameplay latency as population grows. Current local measurements are in `TESTING.md`.
+`/health` checks object initialization and `/api/status` reports population, version, protocol and password/account flags. The root and index routes run Worker-first to record successful home-page/referrer analytics; the other static pages and assets go directly to Static Assets. Worker logs and traces are enabled. Structured errors exclude secrets. Performance logs report observed tick duration and scheduling lag, not Node RSS or perf_hooks percentiles. Worker clock precision and frozen time within synchronous execution can produce zero-duration ticks; these values are not CPU profiling. Browser voice needs HTTPS or localhost. Nothing records audio or transcripts.

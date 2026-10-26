@@ -1,14 +1,14 @@
 import { once } from 'node:events';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { WebSocket } from 'ws';
-import { startServer } from '../server/main.ts';
+import { startLocalWorker } from './worker-local.ts';
 import { idleInput } from '../shared/movement.ts';
 import type { ServerMessage } from '../shared/types.ts';
 
 // Intentionally starts an isolated loopback world; never sends load to a public server.
 const count = Math.max(1, Math.min(110, Number(process.argv[2]) || 100));
 const seconds = Math.max(5, Math.min(60, Number(process.argv[3]) || 15));
-const app = await startServer({ port: 0, host: '127.0.0.1', production: true, persist: false });
+const app = await startLocalWorker();
 const clients: WebSocket[] = [],
   latencies: number[] = [];
 let bytes = 0,
@@ -67,20 +67,23 @@ try {
       {
         scenario:
           'isolated local synthetic movement over real WebSockets; not a production capacity guarantee',
-        residents: app.game.players.size,
+        residents: (await (await fetch(`${app.base}/api/status`)).json()).players,
         connectionsOpen: clients.filter((ws) => ws.readyState === WebSocket.OPEN).length,
         elapsedSeconds: +elapsed.toFixed(2),
         snapshotsPerClientPerSecond: +(frames / count / elapsed).toFixed(2),
         totalOutboundMiBPerSecond: +(bytes / 1048576 / elapsed).toFixed(2),
         meanPingMs: +(latencies.reduce((a, b) => a + b, 0) / Math.max(1, latencies.length)).toFixed(2),
-        eventLoopP99Ms: +(delay.percentile(99) / 1e6).toFixed(2),
-        processMemoryMiB: +(process.memoryUsage().rss / 1048576).toFixed(1),
+        loadDriverEventLoopP99Ms: +(delay.percentile(99) / 1e6).toFixed(2),
+        loadDriverMemoryMiB: +(process.memoryUsage().rss / 1048576).toFixed(1),
       },
       null,
       2,
     ),
   );
-  if (app.game.players.size !== count || clients.some((ws) => ws.readyState !== WebSocket.OPEN))
+  if (
+    (await (await fetch(`${app.base}/api/status`)).json()).players !== count ||
+    clients.some((ws) => ws.readyState !== WebSocket.OPEN)
+  )
     process.exitCode = 1;
 } finally {
   clients.forEach((ws) => ws.terminate());
