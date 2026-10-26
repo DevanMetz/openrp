@@ -1,20 +1,20 @@
+// Regression fixture for synchronous Game mutation tests; production runs server/worker.ts.
 import { createServer, type Server } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { ViteDevServer } from 'vite';
-import { Game, cleanText } from './game.ts';
-import { loadProfiles, loadWorld, saveWorld } from './persistence.ts';
-import { clientIP, JoinRate } from './network.ts';
-import { Moderation } from './moderation.ts';
-import { VoiceRelay } from './voice.ts';
-import { Observability } from './observability.ts';
-import { Accounts, profileForToken } from './accounts.ts';
-import { PROTOCOL, SNAPSHOT_RATE, TICK_RATE, VERSION } from '../shared/catalog.ts';
-import type { ClientMessage, Snapshot } from '../shared/types.ts';
-import { makeDelta } from '../shared/replication.ts';
+import { Game, cleanText } from '../../server/game.ts';
+import { loadProfiles, loadWorld, saveWorld } from './file-persistence.ts';
+import { JoinRate } from '../../server/network.ts';
+import { Moderation } from './node-moderation.ts';
+import { VoiceRelay } from './node-voice.ts';
+import { Observability } from './file-observability.ts';
+import { Accounts, profileForToken } from '../../server/accounts.ts';
+import { PROTOCOL, SNAPSHOT_RATE, TICK_RATE, VERSION } from '../../shared/catalog.ts';
+import type { ClientMessage, Snapshot } from '../../shared/types.ts';
+import { makeDelta } from '../../shared/replication.ts';
 
 try {
   process.loadEnvFile();
@@ -42,7 +42,7 @@ export async function startServer(
   const port = options.port ?? numeric(process.env.PORT, 3000, 1, 65535);
   const host = options.host ?? process.env.HOST ?? '0.0.0.0';
   const production = options.production ?? process.argv.includes('--production');
-  const dataDir = resolve(options.dataDir ?? process.env.DATA_DIR ?? './data');
+  const dataDir = resolve(options.dataDir ?? './data');
   const persist = options.persist !== false;
   const world = persist && !options.game ? loadWorld(dataDir) : undefined;
   const game =
@@ -144,7 +144,7 @@ export async function startServer(
         res.end('{"error":"Account requests must use this server’s page."}');
         return;
       }
-      await accounts.handle(req, res, clientIP(req, proxy), () => !closed && !res.destroyed);
+      await accounts.handle(req, res, req.socket.remoteAddress ?? 'unknown', () => !closed && !res.destroyed);
       return;
     }
     if (req.url?.split('?')[0].startsWith('/api/admin/')) {
@@ -259,7 +259,7 @@ export async function startServer(
     .map((s) => s.trim())
     .filter(Boolean);
   const joinRate = new JoinRate();
-  const proxy = process.env.TRUST_PROXY ?? 'none';
+
   server.on('upgrade', (req, socket, head) => {
     if (closed) {
       socket.destroy();
@@ -283,7 +283,7 @@ export async function startServer(
       socket.destroy();
       return;
     }
-    const ip = clientIP(req, proxy);
+    const ip = req.socket.remoteAddress ?? 'unknown';
     if (path === '/voice') {
       voice.upgrade(req, socket, head, ip);
       return;
@@ -319,7 +319,7 @@ export async function startServer(
       window: Date.now(),
       alive: true,
       needsFull: true,
-      ip: clientIP(req, proxy),
+      ip: req.socket.remoteAddress ?? 'unknown',
     };
     sessions.set(ws, session);
     const joinTimeout = setTimeout(() => {
@@ -486,6 +486,16 @@ export async function startServer(
       server.off('error', fail);
       ok();
     });
+  }).catch(async (error) => {
+    clearInterval(tick);
+    clearInterval(broadcast);
+    clearInterval(heartbeat);
+    clearInterval(saving);
+    clearInterval(sampling);
+    eventLoop.disable();
+    await observations.close();
+    await voice.close();
+    throw error;
   });
   const actualPort = (server.address() as { port: number }).port;
   const close = async () => {
@@ -507,14 +517,4 @@ export async function startServer(
     await new Promise<void>((ok) => server.close(() => ok()));
   };
   return { server, game, port: actualPort, close };
-}
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const app = await startServer();
-  console.log(
-    `\n  OpenRP · Union District\n  http://localhost:${app.port}\n  No player slot cap · ${TICK_RATE} Hz server\n`,
-  );
-  for (const signal of ['SIGINT', 'SIGTERM'] as const)
-    process.once(signal, () => {
-      void app.close().then(() => process.exit(0));
-    });
 }

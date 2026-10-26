@@ -4,6 +4,9 @@ export default defineConfig({
   build: {
     target: 'es2022',
     chunkSizeWarningLimit: 650,
-    rollupOptions: { output: { manualChunks: { three: ['three'] } } },
+    rollupOptions: {
+      input: { main: 'index.html', studio: 'studio.html', voiceLab: 'voice-lab.html' },
+      output: { manualChunks: { three: ['three'] } },
+    },
   },
 });

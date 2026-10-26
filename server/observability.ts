@@ -1,23 +1,24 @@
 import { randomUUID } from 'node:crypto';
-import {
-  appendFile,
-  mkdir,
-  open,
-  readdir,
-  readFile,
-  rename,
-  stat,
-  unlink,
-  writeFile,
-} from 'node:fs/promises';
-import { join } from 'node:path';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { LogFiles } from './storage.ts';
+import type { HttpRequest as IncomingMessage, HttpResponse as ServerResponse } from './http.ts';
 import { cleanText } from './game.ts';
 import type { JobId, Player } from '../shared/types.ts';
 
 const DAY = 86_400_000;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const CHANNELS = ['local', 'whisper', 'yell', 'ooc', 'advert', 'broadcast', 'pm', 'radio', 'me', 'group', 'system'];
+const CHANNELS = [
+  'local',
+  'whisper',
+  'yell',
+  'ooc',
+  'advert',
+  'broadcast',
+  'pm',
+  'radio',
+  'me',
+  'group',
+  'system',
+];
 const dateAt = (time: number) => new Date(time).toISOString().slice(0, 10);
 const safeText = (value: unknown, length: number) =>
   cleanText(value, length)
@@ -97,10 +98,12 @@ interface Session {
 }
 export interface ObservationOptions {
   dataDir: string;
+  files?: LogFiles;
   persist: boolean;
   retentionDays?: number;
   now?: () => number;
   maxDailyBytes?: number;
+  maintenance?: boolean;
 }
 export interface LogQuery {
   days?: number;
@@ -116,6 +119,10 @@ export interface LogQuery {
 export class Observability {
   readonly retentionDays: number;
   private dir: string;
+  private get files(): LogFiles {
+    if (!this.options.files) throw new Error('Persistent log storage is required');
+    return this.options.files;
+  }
   private now: () => number;
   private days = new Map<string, DayStats>();
   private dirty = new Set<string>();
@@ -135,7 +142,7 @@ export class Observability {
   private bootId = randomUUID();
 
   private constructor(private options: ObservationOptions) {
-    this.dir = join(options.dataDir, 'observability');
+    this.dir = options.dataDir;
     this.now = options.now ?? Date.now;
     this.retentionDays = Math.max(1, Math.min(90, options.retentionDays ?? 30));
     this.maxBytes = options.maxDailyBytes ?? 16 * 1024 * 1024;
@@ -144,14 +151,13 @@ export class Observability {
   static async create(options: ObservationOptions): Promise<Observability> {
     const store = new Observability(options);
     if (options.persist) {
-      await mkdir(store.dir, { recursive: true, mode: 0o700 });
       await store.prune();
-      for (const file of await readdir(store.dir)) {
+      for (const file of await store.files.list()) {
         if (!/^\d{4}-\d{2}-\d{2}\.summary\.json$/.test(file)) continue;
         const date = file.slice(0, 10);
         try {
-          if ((await stat(join(store.dir, file))).size > 16 * 1024 * 1024) throw new Error();
-          const day: unknown = JSON.parse(await readFile(join(store.dir, file), 'utf8'));
+          if ((await store.files.size(file)) > 16 * 1024 * 1024) throw new Error();
+          const day: unknown = JSON.parse(await store.files.read(file));
           if (!validSummary(day, date)) throw new Error();
           store.days.set(date, day);
         } catch {
@@ -161,10 +167,11 @@ export class Observability {
       }
     }
     store.event('server_start', { bootId: store.bootId });
-    store.maintenance = setInterval(() => {
-      void store.flush();
-    }, 5000);
-    store.maintenance.unref();
+    if (options.maintenance !== false)
+      store.maintenance = setInterval(() => {
+        void store.flush();
+      }, 5000);
+    store.maintenance?.unref?.();
     return store;
   }
 
@@ -369,11 +376,10 @@ export class Observability {
           let size = this.sizes.get(file);
           if (size === undefined) {
             size = this.options.persist
-              ? await stat(join(this.dir, file))
-                  .then((s) => s.size)
-                  .catch(() => 0)
+              ? await this.files.size(file).catch(() => 0)
               : Buffer.byteLength(this.memory.get(file) ?? '');
           }
+          size ??= 0;
           const accepted: string[] = [];
           let dropped = 0;
           for (const row of rows) {
@@ -391,7 +397,7 @@ export class Observability {
           if (accepted.length) {
             // A leading newline isolates an incomplete tail left by an interrupted write.
             const text = '\n' + accepted.join('');
-            if (this.options.persist) await appendFile(join(this.dir, file), text, { mode: 0o600 });
+            if (this.options.persist) await this.files.append(file, text);
             else this.memory.set(file, (this.memory.get(file) ?? '') + text);
             size++;
           }
@@ -408,9 +414,7 @@ export class Observability {
         this.dirty.delete(date);
         if (this.options.persist) {
           try {
-            const file = join(this.dir, `${date}.summary.json`);
-            await writeFile(file + '.tmp', data, { mode: 0o600 });
-            await rename(file + '.tmp', file);
+            await this.files.write(`${date}.summary.json`, data);
           } catch {
             this.dirty.add(date);
             this.issue(`Writing ${date}.summary.json failed.`);
@@ -428,15 +432,15 @@ export class Observability {
     return dateAt(this.now() - (this.retentionDays - 1) * DAY);
   }
 
-  private async prune(): Promise<void> {
+  async prune(): Promise<void> {
     const cutoff = this.cutoff();
     if (this.options.persist)
-      for (const file of await readdir(this.dir)) {
+      for (const file of await this.files.list()) {
         if (
           /^\d{4}-\d{2}-\d{2}\.(?:chat\.jsonl|events\.jsonl|summary\.json(?:\.tmp)?)$/.test(file) &&
           file.slice(0, 10) < cutoff
         )
-          await unlink(join(this.dir, file));
+          await this.files.remove(file);
       }
     for (const date of this.days.keys())
       if (date < cutoff) {
@@ -613,23 +617,17 @@ export class Observability {
     file: string,
     end?: number,
   ): AsyncGenerator<{ text: string; start: number; bytes: number }> {
-    let handle;
-    if (this.options.persist) {
-      try {
-        handle = await open(join(this.dir, file), 'r');
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
-        throw error;
-      }
-    }
     const memory = this.options.persist ? undefined : Buffer.from(this.memory.get(file) ?? '');
-    let position = Math.min(end ?? Infinity, handle ? (await handle.stat()).size : memory!.length);
+    let position = Math.min(
+      end ?? Infinity,
+      this.options.persist ? await this.files.size(file).catch(() => 0) : memory!.length,
+    );
     let remainder: Buffer = Buffer.alloc(0);
     try {
       while (position > 0) {
         const start = Math.max(0, position - 65536),
           chunk = Buffer.alloc(position - start);
-        if (handle) await handle.read(chunk, 0, chunk.length, start);
+        if (this.options.persist) chunk.set(await this.files.range(file, start, chunk.length));
         else memory!.copy(chunk, 0, start, position);
         const buffer = Buffer.concat([chunk, remainder]);
         let last = buffer.length;
@@ -649,7 +647,7 @@ export class Observability {
       }
       if (remainder.length) yield { text: remainder.toString('utf8'), start: 0, bytes: remainder.length };
     } finally {
-      await handle?.close();
+      // Storage readers hold no open handles.
     }
   }
 

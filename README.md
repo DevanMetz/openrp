@@ -4,13 +4,15 @@
 
 Choose a job, buy a storefront, sell weapons or meals, hide money printers, build with physics props, become mayor, or patrol the city as Civil Protection. Everyone plays in the same server-owned world.
 
-OpenRP is a playable **0.6 alpha**, not a complete Source engine port. All map geometry, characters, equipment, textures, and game sound effects are original and generated locally. No Garry’s Mod installation, extracted Valve assets, external asset CDN, API keys, or paid services are required to run your own server.
+OpenRP is a playable **0.6 alpha**, not a complete Source engine port. All map geometry, characters, equipment, textures, and game sound effects are original and generated locally. No Garry’s Mod installation, extracted Valve assets, external asset CDN, external art APIs are required. Hosting on Cloudflare requires an account and is subject to its usage limits and billing.
 
 ![OpenRP's multiplayer city, with buildings, streets, and a public square](public/social-card.png)
 
 ## Run it
 
-Install **Node.js 22.12 or newer** (Node 24 recommended), then:
+Play at **https://openrp.dev**. Choose an account or Guest, then return to the streets.
+
+For local development, install **Node.js 22.12 or newer** (24 recommended):
 
 ```sh
 git clone https://github.com/DevanMetz/openrp.git
@@ -19,26 +21,9 @@ npm ci
 npm run dev
 ```
 
-Open **http://localhost:3000**. Create an account with a username and password, or choose **Guest** and enter a roleplay name. Then select **Return to the streets**. The server and Vite run together on one port.
+Open **http://localhost:8787**. Vite builds the client and Wrangler runs the Worker and local Durable Object. Refresh after client rebuilds. Local state lives in ignored `.wrangler/`; optional private local keys belong in `.dev.vars`.
 
-For a production build:
-
-```sh
-npm run build
-npm start
-```
-
-For Docker:
-
-```sh
-docker compose up --build
-```
-
-### Play with friends
-
-On your LAN, friends open `http://YOUR-COMPUTER-LAN-IP:3000`. The server binds to `0.0.0.0` by default. Allow the chosen TCP port through your firewall if needed. `localhost` always points to the viewer’s own computer, so send your actual LAN IP to friends.
-
-For internet play, run the Node server on a host that supports long-lived WebSockets and put HTTPS in front of it. Forward `/ws` and `/voice` upgrades to the same server as the page. Voice needs HTTPS or localhost; a plain HTTP LAN address can play the game but cannot access the microphone. Static hosts such as GitHub Pages alone cannot run the multiplayer server. See [hosting and configuration](docs/HOSTING.md).
+To self-host on your own Cloudflare account, configure your domains and origins in `wrangler.jsonc`, authenticate Wrangler, set the private secrets, and run `npm run deploy`. See [hosting and configuration](docs/HOSTING.md) for deployment, backups and runtime limits. The Worker serves the client and both WebSocket paths; the Durable Object owns the shared world.
 
 To test two identities yourself, use two different browsers or a private window. Guest and account sessions keep separate browser credentials. Signing into an account on another browser moves that character to the new session.
 
@@ -72,13 +57,13 @@ Find **Alder Court** and **Mercer Court** in West Alder, and **Linden House** an
 
 ### Private analytics and chat logs
 
-Operators can read live population, daily joins and returning identities, connected playtime, peak population, popular jobs, purchases and server performance. All accepted text-chat channels are searchable by player, date, channel or message. Logs stay on the private server volume for 30 days; voice audio is never recorded.
+Operators can read live population, daily joins and returning identities, connected playtime, peak population, popular jobs, purchases and server performance. All accepted text-chat channels are searchable by player, date, channel or message. Logs stay in the private Durable Object for 30 days by default; voice audio is never recorded.
 
 On the configured owner's workstation, run `npm run analytics -- --days 7` or `npm run chatlogs -- --limit 100`. A separate read-only key cannot moderate players. See [analytics access, definitions and retention](docs/OBSERVABILITY.md) to configure your own host or read structured JSON.
 
 ### Default economy
 
-New players start with $1,500 to make the initial sandbox easy to explore. Salaries pay every 60 seconds. A $1,000 printer produces $100 per 30 seconds, with a $5,000 collection cap. Door prices range from $100 to $350; resale returns 65%. Jail lasts 60 seconds. Edit `.env` and [the catalog](shared/catalog.ts) to rebalance your server.
+New players start with $1,500 to make the initial sandbox easy to explore. Salaries pay every 60 seconds. A $1,000 printer produces $100 per 30 seconds, with a $5,000 collection cap. Door prices range from $100 to $350; resale returns 65%. Jail lasts 60 seconds. Edit non-secret Wrangler variables and [the catalog](shared/catalog.ts) to rebalance your server.
 
 ## Controls
 
@@ -153,9 +138,9 @@ Aim at your own unfrozen building prop or a loose firearm, cash bundle or food i
 
 The mechanics aim to capture the recognizable DarkRP loop, but this is an independent implementation. Union District is an original map, not `rp_downtown` or `rp_evocity`. Character rigs and collisions are simplified. All three floors of the four new apartment buildings are playable; upper stories of the original buildings and businesses remain scenery. The alpha does not include Source/BSP/Lua compatibility, Workshop addons, vehicles, ragdolls, welded constraints or wire systems. Operators have authenticated kick/ban commands; a full admin UI and forgotten-password recovery remain future work. Physics Gun manipulation is owner-only. Police need a wanted flag before using the arrest baton. Gun licenses and most written laws are social roleplay rules rather than a complete legal simulation.
 
-Names, wallets, inventory, ammunition, armor, position, props, shop stock, printer cash and property ownership persist together in `data/world.json`. Refreshing or restarting the server keeps your belongings; sign into your account or use the same guest browser identity, and keep the server's data directory on persistent storage. Props retain their placement, rotation, paint and frozen state. Shops stay open while their owner is offline and sales credit the saved wallet. Jobs resume when a slot is available; a full job returns you as a Citizen with your inventory. Normal gameplay can still consume, destroy or remove items, and operator removals still clean up owned objects. Accounts save a salted password hash and can recover their character across browsers. Guest access depends on its browser bearer credential. The server enforces bounds, prices, ownership, role restrictions and request limits, but this alpha has not been audited or load-tested for a large hostile public server.
+Names, wallets, inventory, ammunition, armor, position, props, shop stock, printer cash and property ownership persist together in the World Durable Object’s SQLite checkpoint. Refreshing or restarting the server keeps your belongings; sign into your account or use the same guest browser identity, and preserve the Durable Object migration history and instance identity. Props retain their placement, rotation, paint and frozen state. Shops stay open while their owner is offline and sales credit the saved wallet. Jobs resume when a slot is available; a full job returns you as a Citizen with your inventory. Normal gameplay can still consume, destroy or remove items, and operator removals still clean up owned objects. Accounts save a salted password hash and can recover their character across browsers. Guest access depends on its browser bearer credential. The server enforces bounds, prices, ownership, role restrictions and request limits, but this alpha has not been audited or load-tested for a large hostile public server.
 
-Full-world persistence starts with **0.4.0**. Earlier versions saved names, wallets and credentials only. Upgrading imports those saved profiles, but cannot recover inventory, props or property held only in an old server process after it stops. The official first 0.4.0 upgrade preserved saved wallets; no pre-upgrade world snapshot was available. Subsequent updates restore the full `world.json` checkpoint. See [persistence and upgrades](docs/HOSTING.md#persistence).
+Full-world persistence starts with **0.4.0**. Earlier versions saved names, wallets and credentials only. Upgrading imports those saved profiles, but cannot recover inventory, props or property held only in an old server process after it stops. The official first 0.4.0 upgrade preserved saved wallets; no pre-upgrade world snapshot was available. The Cloudflare move has no access to that historical volume and migrates none of its contents; a private world.json backup can be restored through the operator API. Subsequent updates restore the object’s checkpoint. See [persistence and upgrades](docs/HOSTING.md#world-storage-and-recovery).
 
 ## Development
 
@@ -171,7 +156,7 @@ The test suite exercises the game rules and real multi-client WebSocket connecti
 
 ```text
 client/    Three.js rendering, procedural assets, input, audio and DOM interface
-server/    HTTP/WebSocket host, authoritative game rules, Cannon physics, wallet storage
+server/    Cloudflare Worker, world Durable Object, shared game rules and SQLite adapters
 shared/    Map collision, movement, jobs, items and network types
 tests/     Node test runner: rules, persistence, and real WebSocket integration
 docs/      Architecture, deployment, testing and fidelity notes

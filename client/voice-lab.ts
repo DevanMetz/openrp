@@ -2,7 +2,6 @@ import { ProximityVoice } from './voice.ts';
 import { applyDelta } from '../shared/replication.ts';
 import type { ServerMessage, Snapshot } from '../shared/types.ts';
 
-if (!import.meta.env.DEV) throw new Error('Voice lab is development-only');
 const output = document.getElementById('results')!;
 const button = document.getElementById('run') as HTMLButtonElement;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -24,7 +23,7 @@ const waitFor = async (condition: () => boolean, description: string) => {
 async function join(voice: ProximityVoice, name: string): Promise<string> {
   let id = '';
   let state: Snapshot | undefined;
-  const ws = new WebSocket(`ws://${location.host}/ws`);
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`);
   sockets.push(ws);
   ws.onopen = () => ws.send(JSON.stringify({ type: 'join', name }));
   ws.onmessage = ({ data }) => {

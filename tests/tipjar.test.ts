@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { Game } from '../server/game.ts';
-import { saveWorld, loadWorld } from '../server/persistence.ts';
+import { saveWorld, loadWorld } from './support/file-persistence.ts';
 
 function fixture() {
   const game = new Game({ now: () => 100_000 });

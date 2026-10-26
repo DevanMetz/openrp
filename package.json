@@ -9,16 +9,18 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "tsx watch server/main.ts",
-    "build": "tsc --noEmit && vite build",
-    "start": "tsx server/main.ts --production",
-    "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts",
-    "check": "npm run typecheck && npm test && npm run build && npm run test:production",
+    "dev": "node --import tsx scripts/dev.ts",
+    "build": "vite build",
+    "start": "wrangler dev",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.worker.json",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "check": "npm run typecheck && npm test && npm run build && npm run test:production && wrangler deploy --dry-run --outdir /tmp/openrp-dryrun",
     "format": "prettier --write .",
-    "test:production": "tsx scripts/smoke-production.ts",
+    "test:production": "npm run build && node --import tsx scripts/smoke-production.ts",
     "analytics": "node --import tsx scripts/observe.ts analytics --url https://openrp.dev",
-    "chatlogs": "node --import tsx scripts/observe.ts chat --url https://openrp.dev"
+    "chatlogs": "node --import tsx scripts/observe.ts chat --url https://openrp.dev",
+    "deploy": "npm run build && wrangler deploy",
+    "cf-typegen": "wrangler types --include-runtime false"
   },
   "dependencies": {
     "@fontsource/barlow": "^5.3.0",
@@ -29,11 +31,13 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261026.1",
     "@types/node": "^24.0.0",
     "@types/three": "^0.180.0",
     "@types/ws": "^8.18.0",
     "prettier": "^3.9.6",
     "typescript": "^5.9.0",
-    "vite": "^7.1.0"
+    "vite": "^7.1.0",
+    "wrangler": "^4.152.0"
   }
 }

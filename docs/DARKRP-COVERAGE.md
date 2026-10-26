@@ -6,7 +6,7 @@ Reviewed September 7, 2026 against OpenRP `1e1a400` and upstream DarkRP `5abcf7a
 
 The upstream [module tree](https://github.com/FPtje/DarkRP/tree/5abcf7abab9e489b2d882a55d95f84c206d9d05c/gamemode/modules) and [entity/weapon tree](https://github.com/FPtje/DarkRP/tree/5abcf7abab9e489b2d882a55d95f84c206d9d05c/entities) identify base systems to investigate. A directory's existence establishes a subsystem, not its complete behavioral specification. Detailed implementation work must read that subsystem's rules before claiming coverage.
 
-OpenRP evidence comes from `shared/types.ts` and `shared/catalog.ts` (supported jobs, objects and messages), `server/game.ts` (authoritative rules and commands), `server/persistence.ts`, `server/main.ts`, the client UI/renderers, and the tests. An implemented label means a working OpenRP counterpart exists, not that every upstream option, hook or edge case is reproduced.
+OpenRP evidence comes from `shared/types.ts` and `shared/catalog.ts` (supported jobs, objects and messages), `server/game.ts` (authoritative rules and commands), `server/persistence.ts`, `server/worker.ts`, the client UI/renderers, and the tests. An implemented label means a working OpenRP counterpart exists, not that every upstream option, hook or edge case is reproduced.
 
 Common server addons and Source/Sandbox functionality remain part of the broader investigation. They must be tracked separately so implementing a base module is not mistaken for implementing every server's addons. No percentage-complete estimate is justified yet.
 

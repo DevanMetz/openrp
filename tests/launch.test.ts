@@ -3,10 +3,9 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { WebSocket } from 'ws';
 import { Game } from '../server/game.ts';
-import { startServer } from '../server/main.ts';
+import { startServer } from './support/node-server.ts';
 import { makeDelta, applyDelta } from '../shared/replication.ts';
 import { clientIP, JoinRate } from '../server/network.ts';
-import type { IncomingMessage } from 'node:http';
 import type { ServerMessage } from '../shared/types.ts';
 
 test('delta replication reconstructs motion, inventory, laws, new residents and removed entities', () => {
@@ -27,21 +26,16 @@ test('delta replication reconstructs motion, inventory, laws, new residents and 
   assert.equal(before.players[0].money, 1500);
 });
 
-test('forwarded IPs are only used for an explicit trusted Railway deployment', () => {
-  const req = {
-    headers: { 'x-real-ip': '203.0.113.24' },
-    socket: { remoteAddress: '127.0.0.1' },
-  } as unknown as IncomingMessage;
-  assert.equal(clientIP(req, 'none'), '127.0.0.1');
-  assert.equal(clientIP(req, 'railway'), '203.0.113.24');
-  req.headers['cf-connecting-ip'] = '198.51.100.9';
-  assert.equal(clientIP(req, 'railway'), '203.0.113.24', 'Direct callers cannot spoof Cloudflare visitors');
-  req.headers['x-real-ip'] = '172.64.1.1';
-  assert.equal(clientIP(req, 'railway'), '198.51.100.9');
-  req.headers['x-real-ip'] = '2606:4700::1';
-  assert.equal(clientIP(req, 'railway'), '198.51.100.9');
-  req.headers['x-real-ip'] = 'spoofed, 127.0.0.1';
-  assert.equal(clientIP(req, 'railway'), '127.0.0.1');
+test('Workers ingress address and connection churn limits', () => {
+  assert.equal(
+    clientIP(
+      new Request('https://openrp.dev', {
+        headers: { 'CF-Connecting-IP': '198.51.100.9', 'X-Real-IP': '203.0.113.24' },
+      }),
+    ),
+    '198.51.100.9',
+  );
+  assert.equal(clientIP(new Request('https://openrp.dev')), 'unknown');
   const rate = new JoinRate();
   for (let i = 0; i < 120; i++) assert.equal(rate.allow('one', 1), true);
   assert.equal(rate.allow('one', 2), false);

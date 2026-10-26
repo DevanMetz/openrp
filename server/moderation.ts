@@ -1,56 +1,26 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
-import { join } from 'node:path';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import { secretMatches } from './security.ts';
+import type { HttpRequest as IncomingMessage, HttpResponse as ServerResponse } from './http.ts';
 import { cleanText, type Game } from './game.ts';
 
 export class Moderation {
-  private key: string;
-  private bans = new Map<string, string>();
-  private readKey?: string;
+  private bans: Map<string, string>;
   constructor(
-    private dir: string,
-    private persist: boolean,
-    key?: string,
-    readKey?: string,
+    private key: string | undefined,
+    private readKey: string | undefined,
+    saved: [string, string][],
+    private persist: (bans: [string, string][]) => void,
   ) {
-    this.readKey = readKey ?? process.env.ANALYTICS_READ_TOKEN;
-    if (persist) mkdirSync(dir, { recursive: true });
-    const keyPath = join(dir, '.admin-token');
-    this.key =
-      key ??
-      (persist && existsSync(keyPath)
-        ? readFileSync(keyPath, 'utf8').trim()
-        : randomBytes(32).toString('hex'));
-    if (persist && !existsSync(keyPath)) writeFileSync(keyPath, this.key, { mode: 0o600, flag: 'wx' });
-    if (persist && existsSync(join(dir, 'bans.json'))) {
-      const saved: unknown = JSON.parse(readFileSync(join(dir, 'bans.json'), 'utf8'));
-      if (
-        !Array.isArray(saved) ||
-        saved.some((b) => !Array.isArray(b) || b.length !== 2 || b.some((v) => typeof v !== 'string'))
-      )
-        throw new Error('Invalid bans.json; restore a valid backup.');
-      this.bans = new Map(saved);
-    }
+    this.bans = new Map(saved);
   }
   banned(id: string): boolean {
     return this.bans.has(id);
   }
   authorized(req: IncomingMessage, readOnly = false): boolean {
-    const candidate = Buffer.from(req.headers.authorization?.replace(/^Bearer /, '') ?? '');
-    const matches = (value: string) => {
-      const expected = Buffer.from(value);
-      return (
-        expected.length > 0 && candidate.length === expected.length && timingSafeEqual(candidate, expected)
-      );
-    };
-    return matches(this.key) || (readOnly && !!this.readKey && matches(this.readKey));
+    const candidate = req.headers.authorization?.replace(/^Bearer /, '') ?? '';
+    return secretMatches(candidate, this.key) || (readOnly && secretMatches(candidate, this.readKey));
   }
   private save(): void {
-    if (!this.persist) return;
-    const path = join(this.dir, 'bans.json');
-    writeFileSync(path + '.tmp', JSON.stringify([...this.bans]), { mode: 0o600 });
-    renameSync(path + '.tmp', path);
+    this.persist([...this.bans]);
   }
   async handle(
     req: IncomingMessage,
@@ -90,16 +60,18 @@ export class Moderation {
       return;
     }
     try {
-      let body = '';
+      const chunks: Buffer[] = [];
+      let length = 0;
       for await (const chunk of req) {
-        body += chunk;
-        if (Buffer.byteLength(body) > 2048) {
+        length += chunk.byteLength;
+        if (length > 2048) {
           res.writeHead(413);
           res.end('{}');
           return;
         }
+        chunks.push(Buffer.from(chunk));
       }
-      const data: unknown = JSON.parse(body);
+      const data: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
       if (!data || typeof data !== 'object') throw new Error('Invalid command');
       const command = data as Record<string, unknown>;
       const id = cleanText(command.id, 80),
@@ -122,7 +94,7 @@ export class Moderation {
       } else throw new Error('Unknown command or resident');
       game.onActivity({ kind: 'moderation', action: String(command.action), playerId: id, reason });
       checkpoint();
-      console.log(`Operator ${String(command.action)}: ${id || 'announcement'}`);
+      console.log(JSON.stringify({ event: 'moderation', action: command.action, id }));
       res.end(JSON.stringify({ ok: true, ...(removed && { removed }) }));
     } catch (error) {
       res.writeHead(400);

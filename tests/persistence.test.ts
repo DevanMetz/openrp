@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { loadProfiles, saveProfiles } from '../server/persistence.ts';
+import { loadProfiles, saveProfiles } from './support/file-persistence.ts';
 
 test('atomic profile store round-trips and refuses to overwrite corrupt data', () => {
   const dir = mkdtempSync(join(tmpdir(), 'openrp-store-test-'));

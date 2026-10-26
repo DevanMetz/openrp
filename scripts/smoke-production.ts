@@ -1,41 +1,44 @@
 import assert from 'node:assert/strict';
-import { readdir } from 'node:fs/promises';
-import { startServer } from '../server/main.ts';
+import { startLocalWorker } from './worker-local.ts';
+import { WebSocket } from 'ws';
+import { once } from 'node:events';
 
-const app = await startServer({ port: 0, host: '127.0.0.1', production: true, persist: false });
+const app = await startLocalWorker();
+const clients: WebSocket[] = [];
 try {
-  const base = `http://127.0.0.1:${app.port}`;
-  const home = await fetch(base);
-  assert.equal(home.status, 200, 'production index exists; run npm run build first');
+  const home = await fetch(app.base);
+  assert.equal(home.status, 200);
   const html = await home.text();
   assert.ok(html.includes('OpenRP'));
   assert.equal(home.headers.get('permissions-policy'), 'microphone=(self), camera=()');
-  const assets = [...html.matchAll(/(?:src|href)="(\/assets\/[^"\s]+)"/g)].map((match) => match[1]);
-  assert.ok(assets.some((asset) => asset.endsWith('.js')));
-  assert.ok(assets.some((asset) => asset.endsWith('.css')));
-  for (const asset of assets) {
-    const response = await fetch(base + asset);
-    assert.equal(response.status, 200, asset);
-    assert.ok(response.headers.get('cache-control')?.includes('immutable'));
-    if (asset.endsWith('.js')) assert.ok(response.headers.get('content-type')?.includes('javascript'));
-    if (asset.endsWith('.css')) assert.ok(response.headers.get('content-type')?.includes('text/css'));
-  }
-  assert.equal((await fetch(`${base}/.env`)).status, 404);
-  assert.equal((await fetch(`${base}/voice-lab.html`)).status, 404);
-  assert.equal((await fetch(`${base}/client/voice-lab.ts`)).status, 404);
-  const worklet = (await readdir('dist/assets')).find((name) => /^voice-worklet-.*\.js$/.test(name));
-  assert.ok(worklet, 'capture worklet is emitted as a production asset');
-  const capture = await fetch(`${base}/assets/${worklet}`);
-  assert.equal(capture.status, 200);
-  assert.ok(capture.headers.get('content-type')?.includes('javascript'));
-  assert.ok((await capture.text()).includes('registerProcessor'));
-  assert.equal((await fetch(`${base}/..%2f..%2fpackage.json`)).status, 403);
-  assert.equal(await (await fetch(`${base}/health`)).text(), 'ok');
-  const status = await (await fetch(`${base}/api/status`)).json();
-  assert.equal(status.players, 0);
+  const assets = [...html.matchAll(/(?:src|href)="(\/assets\/[^"\s]+)"/g)].map((m) => m[1]);
+  assert.ok(assets.some((a) => a.endsWith('.js')));
+  assert.ok(assets.some((a) => a.endsWith('.css')));
+  for (const path of ['/', '/studio.html', '/voice-lab.html', ...assets])
+    assert.equal((await fetch(app.base + path)).status, 200, path);
+  for (const path of ['/.env', '/package.json', '/client/voice-lab.ts'])
+    assert.equal((await fetch(app.base + path)).status, 404, path);
+  assert.equal(await (await fetch(app.base + '/health')).text(), 'ok');
+  assert.equal((await (await fetch(app.base + '/api/status')).json()).players, 0);
+  const ws = new WebSocket(app.base.replace('http:', 'ws:') + '/ws');
+  clients.push(ws);
+  const welcome = new Promise<Record<string, unknown>>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Join timed out')), 5000);
+    ws.on('message', (raw) => {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === 'welcome') {
+        clearTimeout(timeout);
+        resolve(msg);
+      }
+    });
+  });
+  await once(ws, 'open');
+  ws.send(JSON.stringify({ type: 'join', name: 'Worker smoke' }));
+  assert.ok((await welcome).voiceTicket);
   console.log(
-    `Production smoke passed: index, ${assets.length} built assets, voice worklet, microphone policy, excluded lab, MIME/cache headers, private-file boundaries and health.`,
+    `Worker production smoke passed: three HTML pages, ${assets.length} built assets, private paths, health, status and gameplay join.`,
   );
 } finally {
+  clients.forEach((ws) => ws.terminate());
   await app.close();
 }

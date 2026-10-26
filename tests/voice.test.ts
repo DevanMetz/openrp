@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { WebSocket } from 'ws';
-import { startServer } from '../server/main.ts';
+import { startServer } from './support/node-server.ts';
 import * as voice from '../shared/voice.ts';
 import type { ServerMessage } from '../shared/types.ts';
 

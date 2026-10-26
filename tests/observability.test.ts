@@ -7,9 +7,9 @@ import { once } from 'node:events';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { WebSocket } from 'ws';
-import { Observability, type ObservationOptions, type LogQuery } from '../server/observability.ts';
+import { Observability, type ObservationOptions, type LogQuery } from './support/file-observability.ts';
 import { Game } from '../server/game.ts';
-import { startServer } from '../server/main.ts';
+import { startServer } from './support/node-server.ts';
 import type { Player, ServerMessage } from '../shared/types.ts';
 
 interface Row {

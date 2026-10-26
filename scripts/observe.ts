@@ -1,11 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
-try {
-  process.loadEnvFile();
-} catch (error) {
-  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-}
+export {};
 const [action = 'analytics', ...args] = process.argv.slice(2);
 const help =
   'Usage: observe.ts analytics|chat|events [--url https://openrp.dev] [--days 1|7|30] [--date YYYY-MM-DD] [--limit 50] [--player name-or-id] [--channel local|whisper|yell|ooc|advert|broadcast|radio|pm|me|group|system] [--search text] [--kind event] [--cursor value] [--json]';
@@ -40,15 +33,9 @@ for (let i = 0; i < args.length; i++) {
   }
   options.set(flag.slice(2), args[++i]);
 }
-const dataDir = process.env.DATA_DIR ?? './data';
-const readKeyFile = resolve(dataDir, '.analytics-read-token');
-// The private read key is sufficient remotely; operators inside the container may use their existing key.
-const key =
-  process.env.ANALYTICS_READ_TOKEN ??
-  readFileSync(existsSync(readKeyFile) ? readKeyFile : resolve(dataDir, '.admin-token'), 'utf8').trim();
-const base = new URL(
-  options.get('url') ?? process.env.OPENRP_OBSERVE_URL ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`,
-);
+const key = process.env.ANALYTICS_READ_TOKEN;
+if (!key) throw new Error('Set ANALYTICS_READ_TOKEN in your environment.');
+const base = new URL(options.get('url') ?? process.env.OPENRP_OBSERVE_URL ?? 'https://openrp.dev');
 if (
   base.protocol !== 'https:' &&
   !(base.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(base.hostname))
@@ -103,9 +90,9 @@ else if (action === 'analytics') {
     console.log(`${JSON.stringify(source.name)}: ${source.requests}`);
   if (report.current.at)
     console.log(
-      `\nLAST PERFORMANCE SAMPLE ${report.current.at}\nTick mean/max: ${report.current.tickMeanMs.toFixed(2)}/${report.current.tickMaxMs.toFixed(2)} ms | Tick rate: ${report.current.ticksPerSecond.toFixed(1)}/s | Event-loop p99: ${report.current.eventLoopP99Ms.toFixed(1)} ms | Memory: ${report.current.rssMiB.toFixed(1)} MiB\nVoice connections: ${report.current.voiceConnections} | Relayed voice frames in sample: ${report.current.voiceFramesOut}`,
+      `\nLAST PERFORMANCE SAMPLE ${report.current.at}\nTick mean/max: ${report.current.tickMeanMs.toFixed(2)}/${report.current.tickMaxMs.toFixed(2)} ms | Tick rate: ${report.current.ticksPerSecond.toFixed(1)}/s | Tick scheduling lag max: ${(report.current.tickLagMaxMs ?? 0).toFixed(2)} ms\nVoice connections: ${report.current.voiceConnections} | Relayed voice frames in sample: ${report.current.voiceFramesOut}`,
     );
-  else console.log('\nPerformance: waiting for first 60-second sample.');
+  else console.log('\nPerformance: waiting for first active-world sample.');
   console.log(
     `\nRetention: ${report.storage.retentionDays} UTC calendar days | Dropped log rows: ${number(totals.droppedLogRecords)}`,
   );

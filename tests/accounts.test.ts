@@ -5,10 +5,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createServer } from 'node:http';
 import { WebSocket } from 'ws';
-import { startServer } from '../server/main.ts';
+import { startServer } from './support/node-server.ts';
 import { Game } from '../server/game.ts';
 import { Accounts, profileForToken } from '../server/accounts.ts';
-import { loadWorld } from '../server/persistence.ts';
+import { loadWorld } from './support/file-persistence.ts';
 import { BUILDINGS, toWorld } from '../shared/map.ts';
 import type { ServerMessage } from '../shared/types.ts';
 
@@ -230,7 +230,10 @@ test('a ban or shutdown during password work cannot claim a guest or rotate its 
     () => true,
   );
   const server = createServer((req, res) => void accounts.handle(req, res, 'test', () => running));
-  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+  await new Promise<void>((done, fail) => {
+    server.once('error', fail);
+    server.listen(0, '127.0.0.1', done);
+  });
   try {
     const port = (server.address() as { port: number }).port;
     const body = { action: 'register', username: 'unchanged_guest', password, token: guest.token };
@@ -288,7 +291,10 @@ test('failed account checkpoints roll back the claim and keep the original guest
     () => false,
   );
   const server = createServer((req, res) => void accounts.handle(req, res, 'test', () => true));
-  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+  await new Promise<void>((done, fail) => {
+    server.once('error', fail);
+    server.listen(0, '127.0.0.1', done);
+  });
   try {
     const port = (server.address() as { port: number }).port;
     const result = await account(port, {

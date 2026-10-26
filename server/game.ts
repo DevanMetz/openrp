@@ -1,5 +1,6 @@
+import { randomToken } from './security.ts';
 import * as CANNON from 'cannon-es';
-import { randomBytes, randomUUID, createHash } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import {
   CHAT_RANGES,
   GOVERNMENT,
@@ -236,9 +237,9 @@ export class Game {
     const saved = validToken ? this.profiles.get(hash(validToken)) : undefined;
     if (saved && this.players.has(saved.id))
       throw new Error('This identity is already connected. Use a private window for a second player.');
-    const issued = saved ? validToken : randomBytes(32).toString('hex');
+    const issued = saved ? validToken : randomToken(32);
     const profile = saved ?? {
-      id: randomUUID(),
+      id: crypto.randomUUID(),
       name: '',
       money: this.options.startingMoney,
       tokenHash: hash(issued),
@@ -913,7 +914,7 @@ export class Game {
       }
       r.votesAt = this.now();
       this.vote = {
-        id: randomUUID(),
+        id: crypto.randomUUID(),
         kind: 'job',
         candidate: p.id,
         candidateName: p.name,
@@ -950,7 +951,7 @@ export class Game {
     }
     r.votesAt = this.now();
     this.vote = {
-      id: randomUUID(),
+      id: crypto.randomUUID(),
       kind: 'demote',
       candidate: target.id,
       candidateName: target.name,
@@ -1146,7 +1147,7 @@ export class Game {
     const def = PROPS.find((v) => v.id === kind);
     const e: Entity = {
       ...pos,
-      id: randomUUID(),
+      id: crypto.randomUUID(),
       kind,
       owner,
       q: { x: 0, y: 0, z: 0, w: 1 },
@@ -1894,7 +1895,7 @@ export class Game {
       return;
     }
     const items = carried.map((item) => ({
-      id: randomUUID(),
+      id: crypto.randomUUID(),
       kind: 'weapon' as const,
       health: 100,
       cash: 0,

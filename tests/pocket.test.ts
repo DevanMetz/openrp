@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { Game } from '../server/game.ts';
-import { loadWorld, saveWorld } from '../server/persistence.ts';
+import { loadWorld, saveWorld } from './support/file-persistence.ts';
 import { MAX_ENTITIES, MAX_PROPS, POCKET_CAPACITY } from '../shared/catalog.ts';
 import { BLOCKS } from '../shared/map.ts';
 import type { EntityKind, Player } from '../shared/types.ts';

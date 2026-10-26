@@ -6,6 +6,8 @@ permissions:
   contents: read
 jobs:
   check:
+    env:
+      WRANGLER_SEND_METRICS: 'false'
     runs-on: ubuntu-latest
     strategy:
       matrix:

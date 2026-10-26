@@ -12,5 +12,6 @@
     "allowImportingTsExtensions": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["client", "server", "shared", "tests", "scripts", "vite.config.ts"]
+  "include": ["client", "server", "shared", "tests", "scripts", "vite.config.ts"],
+  "exclude": ["server/worker.ts", "server/sql-files.ts", "server/voice.ts"]
 }

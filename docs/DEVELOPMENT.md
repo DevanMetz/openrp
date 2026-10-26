@@ -1,5 +1,7 @@
 # Ongoing DarkRP development
 
+Current hosting targets Cloudflare Workers Static Assets and one SQLite-backed World Durable Object. Use `npm run dev` at http://localhost:8787 and `npm run check` before release. See [HOSTING.md](HOSTING.md). The Railway release records below are historical; no old volume data was migrated and a Cloudflare production deployment has not been verified here. Real Worker tests require loopback socket access; typechecking and bundling alone do not verify runtime behavior.
+
 The active objective is comprehensive DarkRP feature coverage and the best practical visuals. This is an ongoing worklist, not a claim of feature parity or visual completion.
 
 ## Verified increments

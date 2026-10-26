@@ -4,11 +4,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { WebSocket } from 'ws';
-import { startServer } from '../server/main.ts';
+import { startServer } from './support/node-server.ts';
 import { Game } from '../server/game.ts';
 import type { ClientMessage, ServerMessage, Snapshot } from '../shared/types.ts';
 import { applyDelta } from '../shared/replication.ts';
-import { loadWorld } from '../server/persistence.ts';
+import { loadWorld } from './support/file-persistence.ts';
 import { idleInput } from '../shared/movement.ts';
 
 class Client {

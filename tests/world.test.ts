@@ -6,8 +6,8 @@ import { join, resolve, sep } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Game, type SavedWorld } from '../server/game.ts';
-import { loadWorld, saveProfiles, saveWorld } from '../server/persistence.ts';
-import { startServer } from '../server/main.ts';
+import { loadWorld, saveProfiles, saveWorld } from './support/file-persistence.ts';
+import { startServer } from './support/node-server.ts';
 import { JAIL, SPAWNS } from '../shared/map.ts';
 import { MAX_PROPS } from '../shared/catalog.ts';
 import { idleInput } from '../shared/movement.ts';
@@ -440,7 +440,13 @@ test('authenticated operators can clear an offline owner without wiping inventor
     const cleaned = await promisify(execFile)(
       process.execPath,
       ['--import', 'tsx', 'scripts/admin.ts', 'cleanup', owner.player.id, 'Abandoned setup'],
-      { env: { ...process.env, DATA_DIR: dir, PORT: String(app.port) } },
+      {
+        env: {
+          ...process.env,
+          ADMIN_TOKEN: key,
+          OPENRP_ADMIN_URL: `http://127.0.0.1:${app.port}`,
+        },
+      },
     );
     assert.deepEqual(JSON.parse(cleaned.stdout), { ok: true, removed: { entities: 2, properties: 1 } });
     assert.equal(app.game.entities.size, 1);

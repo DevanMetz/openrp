@@ -1,32 +1,32 @@
-import { randomBytes } from 'node:crypto';
-import type { IncomingMessage } from 'node:http';
-import type { Duplex } from 'node:stream';
-import { WebSocket, WebSocketServer } from 'ws';
 import type { Game } from './game.ts';
-import { JoinRate } from './network.ts';
-import { identifyVoiceFrame, inVoiceRange, validVoiceFrame, VOICE_BACKLOG_BYTES } from '../shared/voice.ts';
-
+import { randomToken } from './security.ts';
+import { validVoiceFrame, identifyVoiceFrame, inVoiceRange } from '../shared/voice.ts';
+export interface VoiceSocket {
+  readyState: number;
+  send(data: string | Uint8Array): void;
+  close(code?: number, reason?: string): void;
+  addEventListener(type: 'message', listener: (event: { data: string | ArrayBuffer }) => void): void;
+  addEventListener(type: 'close' | 'error', listener: () => void): void;
+}
 interface VoiceSession {
   id?: string;
   ip: string;
   listening: boolean;
   transmitting: boolean;
   muted: Set<string>;
-  alive: boolean;
   window: number;
   frames: number;
   controls: number;
   allowance: number;
   lastFrame: number;
   sequence?: number;
+  outbound: number;
+  outboundAt: number;
 }
 
 export class VoiceRelay {
-  private wss = new WebSocketServer({ noServer: true, maxPayload: 48_000, perMessageDeflate: false });
   private tickets = new Map<string, string>();
-  private sessions = new Map<WebSocket, VoiceSession>();
-  private joinRate = new JoinRate();
-  private heartbeat: ReturnType<typeof setInterval>;
+  private sessions = new Map<VoiceSocket, VoiceSession>();
   private framesIn = 0;
   private framesOut = 0;
   private bytesOut = 0;
@@ -42,22 +42,13 @@ export class VoiceRelay {
     return value;
   }
 
-  constructor(private game: Game) {
-    this.heartbeat = setInterval(() => {
-      this.joinRate.prune();
-      for (const [ws, session] of this.sessions) {
-        if (!session.alive || ws.bufferedAmount > VOICE_BACKLOG_BYTES * 4) ws.terminate();
-        else {
-          session.alive = false;
-          ws.ping();
-        }
-      }
-    }, 15_000);
+  constructor(private game: Game) {}
+  pending(ip: string): number {
+    return [...this.sessions.values()].filter((s) => !s.id && s.ip === ip).length;
   }
-
   register(id: string): string {
     this.remove(id);
-    const ticket = randomBytes(32).toString('hex');
+    const ticket = randomToken();
     this.tickets.set(ticket, id);
     return ticket;
   }
@@ -73,51 +64,43 @@ export class VoiceRelay {
     }
   }
 
-  upgrade(req: IncomingMessage, socket: Duplex, head: Buffer, ip: string): void {
-    if (
-      [...this.sessions.values()].filter((s) => !s.id && s.ip === ip).length >= 8 ||
-      !this.joinRate.allow(ip)
-    ) {
-      socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-    this.wss.handleUpgrade(req, socket, head, (ws) => this.connect(ws, ip));
-  }
-
-  private connect(ws: WebSocket, ip: string): void {
+  connect(ws: VoiceSocket, ip: string): void {
     const session: VoiceSession = {
       ip,
       listening: false,
       transmitting: false,
       muted: new Set(),
-      alive: true,
       window: Date.now(),
       frames: 0,
       controls: 0,
       allowance: 12,
+      outbound: 512_000,
+      outboundAt: Date.now(),
       lastFrame: Date.now(),
     };
     this.sessions.set(ws, session);
     const timeout = setTimeout(() => {
       if (!session.id) ws.close(1008, 'Voice join timed out');
     }, 5000);
-    ws.on('error', () => ws.terminate());
-    ws.on('pong', () => {
-      session.alive = true;
-    });
-    ws.on('close', () => {
+    ws.addEventListener('error', () => ws.close(1011, 'Voice connection failed'));
+    ws.addEventListener('close', () => {
       clearTimeout(timeout);
       this.sessions.delete(ws);
     });
-    ws.on('message', (raw, binary) => {
-      if (ws.readyState !== WebSocket.OPEN) return;
+    ws.addEventListener('message', (event) => {
+      const raw = event.data,
+        binary = typeof raw !== 'string';
+      if (ws.readyState !== 1) return;
       const now = Date.now();
       if (now - session.window >= 1000) {
         session.window = now;
         session.frames = session.controls = 0;
       }
-      const bytes = Buffer.isBuffer(raw) ? raw : Buffer.concat(Array.isArray(raw) ? raw : [Buffer.from(raw)]);
+      const bytes = typeof raw === 'string' ? Buffer.from(raw) : Buffer.from(raw);
+      if (bytes.byteLength > 48_000) {
+        ws.close(1009, 'Voice message too large');
+        return;
+      }
       if (binary) {
         if (!session.id || !validVoiceFrame(bytes)) {
           ws.close(1008, 'Invalid voice frame');
@@ -149,13 +132,23 @@ export class VoiceRelay {
             !listener.id ||
             !listener.listening ||
             listener.muted.has(session.id) ||
-            peer.readyState !== WebSocket.OPEN ||
-            peer.bufferedAmount > VOICE_BACKLOG_BYTES
+            peer.readyState !== 1
           )
             continue;
           const player = this.game.players.get(listener.id);
           if (player && !player.deadUntil && inVoiceRange(speaker, player)) {
-            peer.send(packet, { binary: true });
+            // No bufferedAmount on Workers. Bound aggregate delivery per listener and
+            // drop live audio rather than enqueue an unbounded fan-in from speakers.
+            listener.outbound = Math.min(512_000, listener.outbound + (now - listener.outboundAt) * 256);
+            listener.outboundAt = now;
+            if (listener.outbound < packet.byteLength) continue;
+            listener.outbound -= packet.byteLength;
+            try {
+              peer.send(packet);
+            } catch {
+              peer.close(1011, 'Voice send failed');
+              continue;
+            }
             this.framesOut++;
             this.bytesOut += packet.byteLength;
           }
@@ -206,10 +199,8 @@ export class VoiceRelay {
     });
   }
 
-  async close(): Promise<void> {
-    clearInterval(this.heartbeat);
+  close(): void {
     this.tickets.clear();
-    for (const ws of this.sessions.keys()) ws.terminate();
-    await new Promise<void>((resolve) => this.wss.close(() => resolve()));
+    for (const ws of this.sessions.keys()) ws.close(1000, 'World stopped');
   }
 }

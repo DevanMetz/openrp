@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../server/game.ts';
 import { EVIDENCE_CAPACITY } from '../shared/catalog.ts';
-import { saveWorld, loadWorld } from '../server/persistence.ts';
+import { saveWorld, loadWorld } from './support/file-persistence.ts';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
