@@ -1,3 +1,4 @@
+import { maybeMarkdown } from './markdown-negotiation.ts';
 import { DurableObject } from 'cloudflare:workers';
 import { Game, cleanText } from './game.ts';
 import { parseWorld, serializeWorld } from './persistence.ts';
@@ -571,7 +572,7 @@ export class World extends DurableObject<WorldEnv> {
         this.observations.page(request.headers.get('Referer') ?? undefined);
         this.ctx.waitUntil(this.observations.flush());
       }
-      return response;
+      return maybeMarkdown(request, response);
     }
     return json({ error: 'Not found' }, 404);
   }
@@ -591,7 +592,7 @@ export default {
       const response =
         ['/', '/index.html', '/ws', '/voice', '/health'].includes(path) || path.startsWith('/api/')
           ? await env.WORLD.get(env.WORLD.idFromName('official')).fetch(request)
-          : await env.ASSETS.fetch(request);
+          : await maybeMarkdown(request, await env.ASSETS.fetch(request));
       if (response.status === 101) return response;
       const secured = new Response(response.body, response);
       secured.headers.set('X-Content-Type-Options', 'nosniff');
